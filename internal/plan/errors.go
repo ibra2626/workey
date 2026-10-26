@@ -52,7 +52,14 @@ const (
 	CodeNotFound     = "not_found"     // a referenced entity does not exist
 	CodeMakeupTarget = "makeup_target" // makeup_of does not point at a missed session
 	CodeReferenced   = "referenced"    // deleting an entity still referenced by sessions
+	CodeFuture       = "future"        // completing or undoing a session dated after today
 )
+
+// fieldError builds a *ValidationError carrying a single field error, for the
+// store-dependent checks that fail on one target (completion, undo).
+func fieldError(path, code, message string) *ValidationError {
+	return &ValidationError{Errors: []FieldError{{Path: path, Code: code, Message: message}}}
+}
 
 // errBuilder accumulates FieldErrors during validation.
 type errBuilder struct {

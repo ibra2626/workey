@@ -260,6 +260,175 @@ func (s *Store) SessionsByDateRange(ctx context.Context, q dbtx, from, to string
 	return sessions, nil
 }
 
+// SessionByID returns the session with the given id and its ordered items, or
+// (nil, nil) if there is none.
+func (s *Store) SessionByID(ctx context.Context, q dbtx, id int64) (*Session, error) {
+	var ss Session
+	err := q.QueryRowContext(ctx, `
+		SELECT id, date, start_time, duration_min, kind, topic_group_id, makeup_of,
+		       completed_at, completed_source, created_at, updated_at
+		FROM sessions WHERE id = ?`, id,
+	).Scan(
+		&ss.ID, &ss.Date, &ss.StartTime, &ss.DurationMin, &ss.Kind,
+		&ss.TopicGroupID, &ss.MakeupOf, &ss.CompletedAt, &ss.CompletedSource,
+		&ss.CreatedAt, &ss.UpdatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("store: get session %d: %w", id, err)
+	}
+	items, err := s.sessionItems(ctx, q, ss.ID)
+	if err != nil {
+		return nil, err
+	}
+	ss.Items = items
+	return &ss, nil
+}
+
+// sessionItems returns the items of one session ordered by ordinal.
+func (s *Store) sessionItems(ctx context.Context, q dbtx, sessionID int64) ([]SessionItem, error) {
+	rows, err := q.QueryContext(ctx, `
+		SELECT id, session_id, ordinal, book, chapter_no, chapter_title,
+		       page_from, page_to, konu_from, konu_to, soru_from, soru_to,
+		       antrenman_from, antrenman_to
+		FROM session_items WHERE session_id = ? ORDER BY ordinal`, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("store: query items of %d: %w", sessionID, err)
+	}
+	defer rows.Close()
+	var items []SessionItem
+	for rows.Next() {
+		var it SessionItem
+		if err := rows.Scan(
+			&it.ID, &it.SessionID, &it.Ordinal, &it.Book, &it.ChapterNo, &it.ChapterTitle,
+			&it.PageFrom, &it.PageTo, &it.KonuFrom, &it.KonuTo, &it.SoruFrom, &it.SoruTo,
+			&it.AntrenmanFrom, &it.AntrenmanTo,
+		); err != nil {
+			return nil, fmt.Errorf("store: scan item of %d: %w", sessionID, err)
+		}
+		items = append(items, it)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: iterate items of %d: %w", sessionID, err)
+	}
+	return items, nil
+}
+
+// AllSessions returns every session ordered by date then start time, each with
+// its items ordered by ordinal. It powers the plan-wide read models (progress,
+// the 38-week strip) for this single-user app.
+func (s *Store) AllSessions(ctx context.Context, q dbtx) ([]Session, error) {
+	rows, err := q.QueryContext(ctx, `
+		SELECT id, date, start_time, duration_min, kind, topic_group_id, makeup_of,
+		       completed_at, completed_source, created_at, updated_at
+		FROM sessions
+		ORDER BY date, start_time`)
+	if err != nil {
+		return nil, fmt.Errorf("store: query all sessions: %w", err)
+	}
+	defer rows.Close()
+
+	var sessions []Session
+	index := map[int64]int{}
+	for rows.Next() {
+		var ss Session
+		if err := rows.Scan(
+			&ss.ID, &ss.Date, &ss.StartTime, &ss.DurationMin, &ss.Kind,
+			&ss.TopicGroupID, &ss.MakeupOf, &ss.CompletedAt, &ss.CompletedSource,
+			&ss.CreatedAt, &ss.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("store: scan session: %w", err)
+		}
+		index[ss.ID] = len(sessions)
+		sessions = append(sessions, ss)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: iterate sessions: %w", err)
+	}
+	if len(sessions) == 0 {
+		return nil, nil
+	}
+
+	itemRows, err := q.QueryContext(ctx, `
+		SELECT id, session_id, ordinal, book, chapter_no, chapter_title,
+		       page_from, page_to, konu_from, konu_to, soru_from, soru_to,
+		       antrenman_from, antrenman_to
+		FROM session_items
+		ORDER BY session_id, ordinal`)
+	if err != nil {
+		return nil, fmt.Errorf("store: query all session items: %w", err)
+	}
+	defer itemRows.Close()
+	for itemRows.Next() {
+		var it SessionItem
+		if err := itemRows.Scan(
+			&it.ID, &it.SessionID, &it.Ordinal, &it.Book, &it.ChapterNo, &it.ChapterTitle,
+			&it.PageFrom, &it.PageTo, &it.KonuFrom, &it.KonuTo, &it.SoruFrom, &it.SoruTo,
+			&it.AntrenmanFrom, &it.AntrenmanTo,
+		); err != nil {
+			return nil, fmt.Errorf("store: scan session item: %w", err)
+		}
+		if i, ok := index[it.SessionID]; ok {
+			sessions[i].Items = append(sessions[i].Items, it)
+		}
+	}
+	if err := itemRows.Err(); err != nil {
+		return nil, fmt.Errorf("store: iterate session items: %w", err)
+	}
+	return sessions, nil
+}
+
+// SetSessionCompletion updates a session's completion fields and updated_at.
+// Pass non-nil completedAt and completedSource to mark it done, or nil/nil to
+// clear completion (undo).
+func (s *Store) SetSessionCompletion(ctx context.Context, q dbtx, id int64, completedAt, completedSource *string, updatedAt string) error {
+	if _, err := q.ExecContext(ctx, `
+		UPDATE sessions SET completed_at = ?, completed_source = ?, updated_at = ?
+		WHERE id = ?`,
+		completedAt, completedSource, updatedAt, id,
+	); err != nil {
+		return fmt.Errorf("store: set completion %d: %w", id, err)
+	}
+	return nil
+}
+
+// MakeupLink records that a session (SessionID at Date/StartTime) makes up the
+// missed session MakeupOf.
+type MakeupLink struct {
+	SessionID int64
+	Date      string
+	StartTime string
+	MakeupOf  int64
+}
+
+// ListMakeupLinks returns every makeup link (sessions whose makeup_of is set),
+// ordered by date then start time. The plan layer uses these to mark a missed
+// session as "moved" and to name the day it was moved to.
+func (s *Store) ListMakeupLinks(ctx context.Context, q dbtx) ([]MakeupLink, error) {
+	rows, err := q.QueryContext(ctx, `
+		SELECT id, date, start_time, makeup_of
+		FROM sessions WHERE makeup_of IS NOT NULL
+		ORDER BY date, start_time`)
+	if err != nil {
+		return nil, fmt.Errorf("store: query makeup links: %w", err)
+	}
+	defer rows.Close()
+	var links []MakeupLink
+	for rows.Next() {
+		var l MakeupLink
+		if err := rows.Scan(&l.SessionID, &l.Date, &l.StartTime, &l.MakeupOf); err != nil {
+			return nil, fmt.Errorf("store: scan makeup link: %w", err)
+		}
+		links = append(links, l)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: iterate makeup links: %w", err)
+	}
+	return links, nil
+}
+
 // InsertAudit appends an audit row and sets a.ID.
 func (s *Store) InsertAudit(ctx context.Context, q dbtx, a *AuditEntry) error {
 	res, err := q.ExecContext(ctx, `
