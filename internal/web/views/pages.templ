@@ -4,7 +4,7 @@ package views
 // It renders a single flat panel with a heading and a sample-data note; the
 // Turkish glyphs here exercise both font subsets at render time.
 templ Placeholder(active string, title string, heading string, csrf string) {
-	@Layout(title, active, csrf) {
+	@Layout(LayoutProps{Title: title, Active: active, CSRF: csrf}) {
 		<div class="mx-auto max-w-[760px]">
 			<section class="rounded-panel bg-card p-5 md:p-7">
 				<p class="text-label text-ink-3">Taslak düzen · WKY-02</p>

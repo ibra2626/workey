@@ -1,28 +1,41 @@
 package views
 
+import "strconv"
+
+// LayoutProps carries the shell's per-page inputs: the document title, the
+// active nav key ("bugun" | "hafta" | "ilerleme"), the per-session CSRF token,
+// and the exam countdown shown in the desktop rail's foot.
+type LayoutProps struct {
+	Title      string
+	Active     string
+	CSRF       string
+	DaysToExam int
+	HasExam    bool
+}
+
 // Layout is the base HTML shell: Turkish document, embedded CSS and htmx, the
-// desktop rail and the mobile bottom tab bar, and a slot for page content.
-// active is one of "bugun", "hafta", "ilerleme". csrf is the per-session CSRF
-// token, attached to <body> via hx-headers so every htmx request carries it.
-templ Layout(title string, active string, csrf string) {
+// desktop rail and the mobile bottom tab bar, and a slot for page content. The
+// CSRF token is attached to <body> via hx-headers so every htmx request carries
+// it.
+templ Layout(p LayoutProps) {
 	<!DOCTYPE html>
 	<html lang="tr">
 		<head>
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
-			<title>{ title }</title>
+			<title>{ p.Title }</title>
 			<link rel="stylesheet" href={ asset("/static/app.css") }/>
 			<script defer src={ asset("/static/htmx.min.js") }></script>
 		</head>
-		<body class="min-h-screen" { hxHeaders(csrf)... }>
+		<body class="min-h-screen" { hxHeaders(p.CSRF)... }>
 			@iconSprite()
 			<div class="md:flex md:min-h-screen">
-				@rail(active)
+				@rail(p)
 				<main class="min-w-0 flex-1 px-5 pt-6 pb-[88px] md:px-8 md:py-8">
 					{ children... }
 				</main>
 			</div>
-			@tabBar(active)
+			@tabBar(p.Active)
 		</body>
 	</html>
 }
@@ -49,18 +62,27 @@ templ icon(id string, sizeClass string) {
 }
 
 // rail is the desktop-only left navigation (232px, Card White, right hairline).
-templ rail(active string) {
+// Its foot carries the days-to-exam figure (DESIGN.md desktop rail).
+templ rail(p LayoutProps) {
 	<nav class="hidden md:flex md:w-[232px] md:shrink-0 md:flex-col gap-1 bg-card border-r border-line px-5 pt-7 pb-7">
 		<p class="cn mb-7 px-3 text-wordmark font-semibold text-ink">Workey</p>
 		for _, it := range navItems {
 			<a
 				href={ templ.SafeURL(it.Href) }
 				class="flex items-center gap-3 rounded-nav px-3 py-[10px] text-body text-ink-3 no-underline transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:2px] aria-[current=page]:bg-ground aria-[current=page]:font-semibold aria-[current=page]:text-ink"
-				{ ariaCurrent(active == it.Key)... }
+				{ ariaCurrent(p.Active == it.Key)... }
 			>
 				@icon(it.Icon, "w-5 h-5")
 				{ it.Label }
 			</a>
+		}
+		if p.HasExam && p.DaysToExam > 0 {
+			<div class="mt-auto px-3">
+				<p class="text-label font-semibold text-ink-3">Sınava</p>
+				<p class="cn leading-none text-numeral-rail font-semibold text-ink">
+					{ strconv.Itoa(p.DaysToExam) } <span class="text-numeral-unit text-ink-3">gün</span>
+				</p>
+			</div>
 		}
 	</nav>
 }

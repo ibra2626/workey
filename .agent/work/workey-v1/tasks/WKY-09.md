@@ -23,4 +23,12 @@ The 20:30 screen: tonight's assignment and one-tap "Tamamlandı", matching the B
 - Preview: 390×844 and 1280 screenshots, console free of errors.
 
 ## Progress
-Not started.
+Done (2026-10-26, not committed separately yet — committed with this task).
+
+- `internal/web/views/today.templ`: `Today(TodayPage)` + the swappable `TodayPanel` (id `bugun-panel`). Mobile-first first panel (book ref, chapter, book line + pages, interval profile with mobile legend / desktop in-block labels + 3-col detail, "Tamamlandı" pill); mobile stat tiles **Sınava / Bu hafta / Seans** (no Seri) and the generated note; desktop two-column grid with Bu hafta mini chart, Yarın, Not side panels and the full-width current-phase week blocks. Empty ("Plan henüz yazılmadı."), rest ("Bugün dinlenme.") and after-exam states.
+- `internal/web/views/present.go`: presentation helpers only (profile blocks, volume bars, 38-week strip cells, status words, Turkish dative weekday, book names, axis ticks). No business rule — the service already derived state/notation.
+- `internal/web/views/layout.templ`: `Layout` now takes `LayoutProps` and the rail foot shows "Sınava N gün". `views.go` gained `styleAttr` for the dynamic chart geometry (token colours via CSS vars, never hex). `input.css` gained the `hatch` utility and a `prefers-reduced-motion` guard.
+- Handlers in `internal/web/web.go`: `screenToday`, `completeSession`/`undoSession` at `POST /oturum/{id}/{tamamla|geri-al}` (source `web`, behind requireAuth+requireCSRF). htmx (HX-Request) swaps `#bugun-panel`; a plain form POST (hidden `_csrf` field, now accepted by `requireCSRF`) redirects to `/`. `Auth` carries the `*plan.Service` + exam date (`NewAuth` signature changed; `cmd/workey` and the web tests updated).
+- Tests (`today_test.go`): notation (`M1·3`, `s. 41–58`, `Antr. 1–3`), Turkish date, Seans tile present, no "Seri", `aria-current`, empty state, htmx complete returns the panel fragment with "Geri al", complete without CSRF → 403.
+- Checks green (Go 1.27.3): `go tool templ generate`, Tailwind rebuild, `go build ./...`, `go vet ./...`, `gofmt -l .` empty, `go test ./internal/web/...` pass. Verified live (dev-open, seeded via `PUT /api/v1/{outline,plan}`) at 390 and 1280: on-brand, Turkish glyphs correct, first panel fits 390×844, htmx completion swaps to the done state with "Geri al". Console clean.
+- Note: completing on Bugün swaps only the first panel (per scope); the Bu hafta figures refresh on the next full load, not via OOB swap.

@@ -1,17 +1,43 @@
 package web
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/ibra2626/workey/internal/clock"
+	"github.com/ibra2626/workey/internal/plan"
+	"github.com/ibra2626/workey/internal/store"
 )
 
 // testPassword and its hash are used across the auth tests. The hash is
 // recomputed at test time so the test never hard-codes a stored value.
 const testPassword = "doğru-parola-42"
+
+// testExamDate anchors the screens' exam countdown in the web tests.
+var testExamDate = clock.Date{Year: 2027, Month: 7, Day: 18}
+
+// newService opens a migrated store on a temp database and wraps it in a plan
+// service whose clock is fixed, so the protected screens have real read models
+// to render.
+func newService(t *testing.T, now time.Time) *plan.Service {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "workey.db")
+	st, err := store.Open(path)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	if err := st.Migrate(context.Background()); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+	return plan.New(st, clock.Fake{Current: now})
+}
 
 func newTestAuth(t *testing.T) *Auth {
 	t.Helper()
@@ -19,7 +45,8 @@ func newTestAuth(t *testing.T) *Auth {
 	if err != nil {
 		t.Fatalf("HashPassword: %v", err)
 	}
-	a, err := NewAuth(hash, "test-session-key-0123456789abcdef", true, false)
+	svc := newService(t, time.Date(2026, 10, 28, 9, 0, 0, 0, clock.Location))
+	a, err := NewAuth(svc, testExamDate, hash, "test-session-key-0123456789abcdef", true, false)
 	if err != nil {
 		t.Fatalf("NewAuth: %v", err)
 	}
@@ -222,7 +249,8 @@ func TestStaticAssetIsPublicWithCache(t *testing.T) {
 }
 
 func TestDevOpenBypassesLogin(t *testing.T) {
-	a, err := NewAuth("", "", false, true) // dev, no password hash
+	svc := newService(t, time.Date(2026, 10, 28, 9, 0, 0, 0, clock.Location))
+	a, err := NewAuth(svc, testExamDate, "", "", false, true) // dev, no password hash
 	if err != nil {
 		t.Fatalf("NewAuth dev: %v", err)
 	}

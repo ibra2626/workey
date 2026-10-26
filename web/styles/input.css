@@ -233,3 +233,25 @@
 @utility tnum {
   font-variant-numeric: tabular-nums;
 }
+
+/* The "moved" bar fill (Volume bars): a 135° hairline hatch with a 1px Strong
+   Hairline inset ring. A stripe pattern, never a gradient fill. */
+@utility hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--color-line) 0 3px,
+    transparent 3px 6px
+  );
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+}
+
+/* Honour a reduced-motion preference: drop the colour/background transitions on
+   nav items and the primary button (DESIGN.md accessibility). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

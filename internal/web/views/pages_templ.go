@@ -60,7 +60,7 @@ func Placeholder(active string, title string, heading string, csrf string) templ
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = Layout(title, active, csrf).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Layout(LayoutProps{Title: title, Active: active, CSRF: csrf}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

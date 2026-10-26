@@ -11,6 +11,9 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/ibra2626/workey/internal/clock"
+	"github.com/ibra2626/workey/internal/plan"
 )
 
 // Cookie and header names, and the session lifetime.
@@ -32,6 +35,8 @@ type csrfCtxKey struct{}
 // key for signing session cookies and deriving CSRF tokens, and cookie flags.
 // devOpen bypasses login for local development (no password configured).
 type Auth struct {
+	svc          *plan.Service
+	examDate     clock.Date
 	passwordHash string
 	key          []byte
 	cookieSecure bool
@@ -39,11 +44,14 @@ type Auth struct {
 	throttle     *throttle
 }
 
-// NewAuth builds an Auth from configuration. In dev mode with no password hash
-// (devOpen), login is bypassed and an ephemeral key is generated when none is
-// set, so the server still starts for UI work without secrets configured.
-func NewAuth(passwordHash, sessionKey string, cookieSecure, dev bool) (*Auth, error) {
+// NewAuth builds an Auth from configuration and the plan service the screens
+// render. In dev mode with no password hash (devOpen), login is bypassed and an
+// ephemeral key is generated when none is set, so the server still starts for
+// UI work without secrets configured.
+func NewAuth(svc *plan.Service, examDate clock.Date, passwordHash, sessionKey string, cookieSecure, dev bool) (*Auth, error) {
 	a := &Auth{
+		svc:          svc,
+		examDate:     examDate,
 		passwordHash: passwordHash,
 		cookieSecure: cookieSecure,
 		devOpen:      dev && passwordHash == "",
@@ -198,6 +206,11 @@ func (a *Auth) requireCSRF(next http.Handler) http.Handler {
 		}
 		want := csrfTokenFromRequest(r)
 		got := r.Header.Get(csrfHeader)
+		if got == "" {
+			// No-JS fallback: a plain form POST carries the token in a hidden
+			// field instead of the htmx header.
+			got = r.PostFormValue("_csrf")
+		}
 		if want == "" || subtle.ConstantTimeCompare([]byte(got), []byte(want)) != 1 {
 			http.Error(w, "csrf doğrulaması başarısız", http.StatusForbidden)
 			return

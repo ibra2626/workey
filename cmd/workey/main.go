@@ -80,7 +80,7 @@ func runServe() error {
 	if err != nil {
 		return err
 	}
-	auth, err := web.NewAuth(cfg.PasswordHash, cfg.SessionKey, cfg.CookieSecure, cfg.Dev)
+	auth, err := web.NewAuth(svc, examDate, cfg.PasswordHash, cfg.SessionKey, cfg.CookieSecure, cfg.Dev)
 	if err != nil {
 		return err
 	}

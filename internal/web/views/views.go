@@ -46,3 +46,11 @@ func ariaCurrent(active bool) templ.Attributes {
 	}
 	return nil
 }
+
+// styleAttr renders a raw inline style attribute. It is used for the dynamic
+// chart geometry (bar heights, block flex weights, the ochre today ring and the
+// hatch inset), values the service computes and the design system defines; the
+// token colours come from CSS variables, never hard-coded hex.
+func styleAttr(css string) templ.Attributes {
+	return templ.Attributes{"style": css}
+}

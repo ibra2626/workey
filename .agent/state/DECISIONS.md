@@ -2,6 +2,17 @@
 
 Record accepted decisions with date, context, decision, alternatives, and consequences. Do not record proposals as accepted decisions.
 
+## 2026-10-26 — WKY-09: Bugün screen and web screen wiring (`internal/web`)
+- Context: the first real screen. Web handlers needed the plan service; the session profile needed a shape for `uzun_blok`/`deneme`; completion needed an htmx path with a no-JS fallback.
+- Decisions:
+  - **`Auth` carries the `*plan.Service` and exam date; `NewAuth` signature changed** to `NewAuth(svc, examDate, passwordHash, sessionKey, cookieSecure, dev)`. The screen handlers (`screenToday`, completion) are methods on `Auth`, reusing its session/CSRF context. `cmd/workey` and the web tests pass a real service (the tests open an in-memory store and seed the sample week).
+  - **Presentation helpers live in `internal/web/views/present.go`** (profile blocks, volume bars, 38-week strip cells, status words, book names, axis ticks, Turkish dative weekdays). They format only; every state, fraction and notation string comes pre-computed from the service. Dynamic chart geometry (bar heights, flex weights, the ochre today ring, the hatch inset) is set with an inline `style` via a `styleAttr` helper, and all colours are CSS-variable tokens, never hex.
+  - **Single-block profile for `uzun_blok` and `deneme`:** akşam sessions split 20/50/20 into konu (Teal, 43% height) / soru (Ochre, 92%) / yanlış defteri (Blue-Grey, 64%); `uzun_blok`/`deneme` have no konu/soru breakdown, so they draw one calm full-width block in Phase Mist (z1-soft) at 80% height labelled "Uzun blok" / "Deneme". The soft tint reads as an undifferentiated block of time, not a zone part; this is the single-block profile the task asked to define (DESIGN.md to be aligned in WKY-14).
+  - **Completion is htmx-first with a no-JS fallback.** `POST /oturum/{id}/{tamamla|geri-al}` (source `web`, behind requireAuth+requireCSRF). An `HX-Request` swaps the first panel (`#bugun-panel`, outerHTML); a plain form POST redirects to `/`. The form carries a hidden `_csrf` field and `requireCSRF` now accepts the token from the header **or** that field, so the no-JS path still passes CSRF. Completing swaps only the first panel; the weekly figures refresh on the next full load (no OOB swap in v1).
+  - **`Layout` takes `LayoutProps`** and renders the days-to-exam figure in the desktop rail foot (shown on every screen). A `hatch` Tailwind utility and a `prefers-reduced-motion` guard were added to `input.css`.
+- Alternatives: a separate screens struct instead of extending `Auth` (rejected — the handlers need the session/CSRF already on `Auth`); drawing the profile as SVG with computed coordinates (rejected — flex blocks are simpler, responsive and token-driven); OOB-swapping the weekly figures on completion (deferred — not needed for the one-tap flow); white/zone fill for the single block (rejected — white-on-zone fails contrast and zone tokens mean specific parts; a soft neutral tint is honest).
+- Consequences: WKY-10/11 render behind the same wiring and reuse `present.go` helpers (volume bars, strip, status words are already written). The Bugün completion is the only state-changing web path so far.
+
 ## 2026-10-26 — WKY-08: Web auth (session cookie, CSRF, Giriş) in `internal/web`
 - Context: single-user login protecting all web pages, secure cookies and CSRF on every state-changing htmx request, with no new heavy dependency. Local Windows over plain http on 127.0.0.1 (WKY-12 deploy blocked).
 - Decisions:

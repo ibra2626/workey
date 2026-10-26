@@ -1,0 +1,261 @@
+package views
+
+import (
+	"strconv"
+
+	"github.com/ibra2626/workey/internal/plan"
+)
+
+// Today is the Bugün screen: tonight's assignment in the first panel with a
+// one-tap "Tamamlandı", the week/exam stat tiles and the generated note on
+// mobile, and a two-column grid with the phase panel on desktop. It matches the
+// Bugün artboards of design/directions/04-antrenman-gunlugu.html.
+templ Today(p TodayPage) {
+	@Layout(LayoutProps{Title: "Workey · Bugün", Active: "bugun", CSRF: p.CSRF, DaysToExam: p.DaysToExam, HasExam: p.HasExam}) {
+		<div class="flex items-baseline justify-between px-1">
+			<p class="text-title font-semibold text-ink">{ p.Day.Heading }</p>
+			<p class="text-meta text-ink-3 tnum md:text-body-small">
+				<span class="md:hidden">
+					if p.WeekNumber > 0 {
+						Hafta { strconv.Itoa(p.WeekNumber) } · { phaseShort(p.PhaseName) }
+					}
+				</span>
+				<span class="hidden md:inline">
+					if p.WeekNumber > 0 {
+						Hafta { strconv.Itoa(p.WeekNumber) } / 38 · { p.PhaseName }
+					}
+				</span>
+			</p>
+		</div>
+		<div class="mt-5 grid gap-3 md:grid-cols-[1fr_340px] md:gap-5">
+			@TodayPanel(p)
+			<!-- Mobile: stat tiles and the generated note. -->
+			<div class="md:hidden">
+				<div class="grid grid-cols-3 gap-3">
+					@statTile("Sınava", examFigure(p), "gün")
+					@statTileFrac("Bu hafta", p.WeekDoneMin, p.WeekPlannedMin, "dakika")
+					@statTileFrac("Seans", p.SessionsDone, p.SessionsPlan, "seans")
+				</div>
+				if len(p.Day.Notes) > 0 {
+					<p class="mt-4 text-meta text-ink-3">{ p.Day.Notes[0] }</p>
+				}
+			</div>
+			<!-- Desktop: side column of small panels. -->
+			<div class="hidden md:flex md:flex-col md:gap-5">
+				@todayWeekMini(p)
+				@todayTomorrow(p.Day.Tomorrow)
+				@todayNote(p.Day.Notes)
+			</div>
+			<!-- Desktop: full-width current-phase panel. -->
+			if len(p.PhaseBlocks) > 0 {
+				<section class="hidden rounded-panel bg-card p-6 md:col-span-2 md:block">
+					<div class="flex items-baseline justify-between">
+						<p class="text-label font-semibold text-ink-3">{ p.PhaseLabel }</p>
+					</div>
+					<div class="mt-4 grid grid-cols-7 gap-3">
+						for _, b := range p.PhaseBlocks {
+							<div>
+								<div class="relative h-[44px] overflow-hidden rounded-block bg-z1-soft">
+									if b.FillPct > 0 {
+										<span class="absolute inset-y-0 left-0 bg-ink" { styleAttr("width:" + pct(b.FillPct))... }></span>
+									}
+								</div>
+								<p class={ "mt-1.5 text-meta tnum", templ.KV("font-semibold text-ink", b.IsCurrent), templ.KV("text-ink-2", !b.IsCurrent) }>{ b.Label }</p>
+								if b.Sub != "" {
+									<p class="text-label tnum text-ink-3">{ b.Sub }</p>
+								}
+							</div>
+						}
+					</div>
+				</section>
+			}
+		</div>
+	}
+}
+
+// TodayPanel is the swappable first panel (the htmx target, re-rendered by the
+// complete/undo handlers). It holds tonight's session and its "Tamamlandı"
+// action, or an empty / rest / after-exam state. The First Panel Rule: at
+// 390×844 everything fits without scrolling.
+templ TodayPanel(p TodayPage) {
+	<section id="bugun-panel" class="rounded-panel bg-card p-5 md:p-8">
+		switch {
+			case !p.HasPlan:
+				<p class="text-title-lg font-semibold text-ink">Plan henüz yazılmadı.</p>
+				<p class="mt-2 text-body text-ink-2">Asistan <span class="tnum font-semibold text-ink">save_outline</span> ve <span class="tnum font-semibold text-ink">save_plan</span> ile planı yazınca bu ekranda bu akşamki seans görünecek.</p>
+			case p.AfterExam:
+				<p class="text-title-lg font-semibold text-ink">Sınav tamamlandı.</p>
+				<p class="mt-2 text-body text-ink-2">Plan dönemi bitti. Yeni bir dönem için asistan yeni bir plan yazabilir.</p>
+			case p.Day.IsRest:
+				<p class="text-title-lg font-semibold text-ink">Bugün dinlenme.</p>
+				<p class="mt-2 text-body text-ink-2">Bu akşam planlı seans yok. Yarın { tomorrowHint(p.Day.Tomorrow) }</p>
+			default:
+				@todaySession(firstSession(p.Day), p.CSRF)
+		}
+	</section>
+}
+
+// todaySession renders tonight's assignment: book reference, chapter title, page
+// range, the interval profile with its legend/detail, and the pill (or the done
+// state with a quiet "Geri al" link).
+templ todaySession(sv plan.SessionView, csrf string) {
+	<p class="cn text-numeral-inline font-semibold text-ink-2 md:text-numeral-inline-lg">
+		{ chapterRef(sv) }<span class="hidden md:inline"> · { chapterBook(sv) }</span>
+	</p>
+	<div class="flex items-baseline justify-between gap-4">
+		<h1 class="text-headline font-bold leading-tight md:text-headline-display">{ chapterTitle(sv) }</h1>
+		<p class="hidden shrink-0 cn text-numeral-page font-semibold text-ink md:block">{ headPages(sv) }</p>
+	</div>
+	<p class="mt-1 text-body text-ink-2 md:hidden">
+		{ chapterBook(sv) } · <span class="tnum font-semibold text-ink">{ headPages(sv) }</span>
+	</p>
+	<!-- Session interval profile. -->
+	<div class="mt-6">
+		<div class="flex h-[92px] items-end gap-1 md:h-[150px]">
+			for _, b := range sessionProfile(sv) {
+				<div
+					class="flex items-start overflow-hidden rounded-bar md:rounded-block"
+					{ styleAttr("flex:" + strconv.Itoa(b.Flex) + ";height:" + pct(b.HeightPct) + ";background:" + b.Fill)... }
+				>
+					<div class="hidden p-2.5 md:block">
+						<p class="text-title font-semibold leading-none text-ink">{ b.Label }</p>
+						<p class="mt-1 cn text-numeral-profile font-semibold text-ink">{ b.Duration }</p>
+					</div>
+				</div>
+			}
+		</div>
+		<div class="mt-1.5 flex justify-between text-label tnum text-ink-3">
+			for _, t := range axisTicks(sv.StartTime, sv.DurationMin, sv.Kind != plan.KindAksam) {
+				<span>{ t }</span>
+			}
+		</div>
+	</div>
+	<!-- Mobile: three-row legend. -->
+	<dl class="mt-5 grid grid-cols-[auto_1fr_auto] items-baseline gap-x-3 gap-y-2.5 md:hidden">
+		for _, b := range sessionProfile(sv) {
+			<span class="h-2.5 w-2.5 rounded-xs" { styleAttr("background:" + b.Fill)... }></span>
+			<dt class="text-body font-semibold text-ink">
+				{ b.Label }
+				if b.Pages != "" {
+					<span class="font-normal text-ink-2">· { b.Pages }</span>
+				}
+			</dt>
+			<dd class="cn text-numeral-inline font-semibold text-ink">{ b.Duration }</dd>
+		}
+	</dl>
+	<!-- Desktop: parts detail. -->
+	<div class="mt-6 hidden grid-cols-3 gap-6 text-body md:grid">
+		for _, b := range sessionProfile(sv) {
+			<p>
+				<span class="font-semibold">{ b.Label }</span>
+				if b.Pages != "" {
+					<span>: { b.Pages }</span>
+				}
+			</p>
+		}
+	</div>
+	@completeControl(sv, csrf)
+}
+
+// completeControl is the single primary action. When the session is done it
+// becomes the done state with a quiet "Geri al" link; both post through htmx
+// (swapping the panel) and fall back to a normal form POST + redirect with a
+// hidden CSRF field for the no-JS path.
+templ completeControl(sv plan.SessionView, csrf string) {
+	if sv.State == plan.StateDone {
+		<div class="mt-6 flex items-center justify-between md:mt-8">
+			<p class="flex items-center gap-2 text-title-lg font-semibold text-ink">
+				@icon("i-check", "w-5 h-5")
+				Tamamlandı
+			</p>
+			<form method="post" { completeForm(sv.ID, "geri-al")... }>
+				<input type="hidden" name="_csrf" value={ csrf }/>
+				<button type="submit" class="rounded-nav text-body-small text-ink-3 underline-offset-2 transition-colors hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:2px]">Geri al</button>
+			</form>
+		</div>
+	} else {
+		<form method="post" class="mt-6 md:mt-8" { completeForm(sv.ID, "tamamla")... }>
+			<input type="hidden" name="_csrf" value={ csrf }/>
+			<button
+				type="submit"
+				class="flex h-[54px] w-full items-center justify-center gap-2 rounded-pill bg-ink text-title-lg font-semibold text-card transition-colors duration-200 hover:bg-ink-hover focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:3px] md:h-[56px] md:w-auto md:px-10"
+			>
+				@icon("i-check", "w-5 h-5")
+				Tamamlandı
+			</button>
+		</form>
+	}
+}
+
+// --- desktop side-column panels -----------------------------------------
+
+templ todayWeekMini(p TodayPage) {
+	<section class="rounded-panel bg-card p-6">
+		<p class="text-label font-semibold text-ink-3">Bu hafta</p>
+		<p class="mt-1 cn leading-none">
+			<span class="text-numeral-display font-semibold text-ink">{ strconv.Itoa(p.WeekDoneMin) }</span>
+			<span class="text-numeral-unit text-ink-3">/ { strconv.Itoa(p.WeekPlannedMin) } dk</span>
+		</p>
+		if p.Week != nil {
+			<div class="mt-4 grid grid-cols-7 items-end gap-1.5" style="height:64px">
+				for _, b := range weekBars(p.Week) {
+					if b.Rest {
+						<span class="w-full rounded-pill bg-line" style="height:3px"></span>
+					} else if b.IsToday {
+						<span class="w-full rounded-xs bg-z3-soft" { styleAttr("height:" + pct(b.HeightPct) + ";box-shadow:inset 0 0 0 2px var(--color-z3)")... }></span>
+					} else {
+						<span class={ "w-full rounded-xs", barClass(b) } { styleAttr("height:" + pct(b.HeightPct))... }></span>
+					}
+				}
+			</div>
+			<div class="mt-1 grid grid-cols-7 gap-1.5 text-center text-label text-ink-3">
+				for _, b := range weekBars(p.Week) {
+					<span class={ templ.KV("font-semibold text-ink", b.IsToday) }>{ b.WeekdayShort }</span>
+				}
+			</div>
+		}
+	</section>
+}
+
+templ todayTomorrow(sv *plan.SessionView) {
+	<section class="rounded-panel bg-card p-6">
+		<p class="text-label font-semibold text-ink-3">Yarın</p>
+		if sv != nil {
+			<p class="mt-1 text-title-lg font-semibold text-ink">{ chapterRef(*sv) } { chapterTitle(*sv) }</p>
+			<p class="text-body-small tnum text-ink-3">{ tomorrowLine(*sv) }</p>
+		} else {
+			<p class="mt-1 text-body-small text-ink-3">Dinlenme</p>
+		}
+	</section>
+}
+
+templ todayNote(notes []string) {
+	<section class="rounded-panel bg-card p-6">
+		<p class="text-label font-semibold text-ink-3">Not</p>
+		if len(notes) > 0 {
+			<p class="mt-1 text-body-small text-ink">{ notes[0] }</p>
+		} else {
+			<p class="mt-1 text-body-small text-ink-3">Bu hafta taşınan seans yok.</p>
+		}
+	</section>
+}
+
+// --- stat tiles (mobile) -------------------------------------------------
+
+templ statTile(label string, value string, unit string) {
+	<div class="rounded-panel bg-card p-3.5">
+		<p class="text-label font-semibold text-ink-3">{ label }</p>
+		<p class="mt-1 cn text-numeral-stat font-semibold leading-none text-ink">{ value }</p>
+		<p class="text-label text-ink-3">{ unit }</p>
+	</div>
+}
+
+templ statTileFrac(label string, done int, total int, unit string) {
+	<div class="rounded-panel bg-card p-3.5">
+		<p class="text-label font-semibold text-ink-3">{ label }</p>
+		<p class="mt-1 cn text-numeral-stat font-semibold leading-none text-ink">
+			{ strconv.Itoa(done) }<span class="text-numeral-unit text-ink-3"> / { strconv.Itoa(total) }</span>
+		</p>
+		<p class="text-label text-ink-3">{ unit }</p>
+	</div>
+}
