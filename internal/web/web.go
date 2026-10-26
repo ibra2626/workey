@@ -36,10 +36,12 @@ func (a *Auth) Handler() http.Handler {
 
 	// Protected pages.
 	mux.Handle("GET /{$}", a.requireAuth(http.HandlerFunc(a.screenToday)))
-	mux.Handle("GET /hafta", a.requireAuth(page("hafta", "Workey · Hafta", "Hafta")))
+	mux.Handle("GET /hafta", a.requireAuth(http.HandlerFunc(a.screenWeek)))
 	mux.Handle("GET /ilerleme", a.requireAuth(page("ilerleme", "Workey · İlerleme", "İlerleme")))
 	mux.Handle("POST /oturum/{id}/tamamla", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.completeSession))))
 	mux.Handle("POST /oturum/{id}/geri-al", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.undoSession))))
+	mux.Handle("POST /hafta/oturum/{id}/tamamla", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.weekComplete))))
+	mux.Handle("POST /hafta/oturum/{id}/geri-al", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.weekUndo))))
 	mux.Handle("POST /cikis", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.logout))))
 
 	cop := http.NewCrossOriginProtection()
@@ -206,6 +208,103 @@ func (a *Auth) buildTodayPage(ctx context.Context, csrf string) (views.TodayPage
 	}
 	p.PhaseLabel, p.PhaseBlocks = phaseBlocks(prog)
 	return p, nil
+}
+
+// screenWeek renders the Hafta screen for the week containing ?tarih= (default
+// today).
+func (a *Auth) screenWeek(w http.ResponseWriter, r *http.Request) {
+	date := a.weekDateParam(r)
+	p, err := a.buildWeekPage(r.Context(), date, csrfTokenFromRequest(r))
+	if err != nil {
+		http.Error(w, "sunucu hatası", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = views.Week(p).Render(r.Context(), w)
+}
+
+// weekComplete / weekUndo mark a session from the Hafta screen (source web). An
+// htmx request gets the swapped main content (figures + row); a plain form POST
+// redirects back to that week.
+func (a *Auth) weekComplete(w http.ResponseWriter, r *http.Request) { a.weekSetDone(w, r, true) }
+func (a *Auth) weekUndo(w http.ResponseWriter, r *http.Request)     { a.weekSetDone(w, r, false) }
+
+func (a *Auth) weekSetDone(w http.ResponseWriter, r *http.Request, done bool) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "geçersiz oturum", http.StatusBadRequest)
+		return
+	}
+	var sv *plan.SessionView
+	if done {
+		sv, err = a.svc.Complete(r.Context(), plan.SourceWeb, id)
+	} else {
+		sv, err = a.svc.Undo(r.Context(), plan.SourceWeb, id)
+	}
+	if err != nil {
+		// A future-session or not-found completion is a client error.
+		http.Error(w, "işlem tamamlanamadı", http.StatusUnprocessableEntity)
+		return
+	}
+	date, ok := plan.ParseDate(sv.Date)
+	if !ok {
+		http.Error(w, "sunucu hatası", http.StatusInternalServerError)
+		return
+	}
+	p, err := a.buildWeekPage(r.Context(), date, csrfTokenFromRequest(r))
+	if err != nil {
+		http.Error(w, "sunucu hatası", http.StatusInternalServerError)
+		return
+	}
+	if r.Header.Get("HX-Request") == "" {
+		http.Redirect(w, r, "/hafta?tarih="+p.Week.Start, http.StatusSeeOther)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = views.WeekMain(p).Render(r.Context(), w)
+}
+
+// weekDateParam reads ?tarih=YYYY-MM-DD, falling back to today when it is absent
+// or unparseable.
+func (a *Auth) weekDateParam(r *http.Request) clock.Date {
+	if v := r.URL.Query().Get("tarih"); v != "" {
+		if d, ok := plan.ParseDate(v); ok {
+			return d
+		}
+	}
+	return a.svc.TodayDate()
+}
+
+// buildWeekPage assembles the Hafta view model for the week containing date: the
+// week read model, the exam countdown for the rail, and the previous/next week
+// ?tarih= links.
+func (a *Auth) buildWeekPage(ctx context.Context, date clock.Date, csrf string) (views.WeekPage, error) {
+	wk, err := a.svc.Week(ctx, date)
+	if err != nil {
+		return views.WeekPage{}, err
+	}
+	prog, err := a.svc.Progress(ctx, a.examDate)
+	if err != nil {
+		return views.WeekPage{}, err
+	}
+	p := views.WeekPage{
+		Week:       wk,
+		DaysToExam: prog.DaysToExam,
+		HasExam:    a.examDate != (clock.Date{}),
+		CSRF:       csrf,
+	}
+	if start, ok := plan.ParseDate(wk.Start); ok {
+		p.PrevDate = shiftDays(start, -7).String()
+		p.NextDate = shiftDays(start, 7).String()
+	}
+	return p, nil
+}
+
+// shiftDays returns date moved by n days (zone-free civil arithmetic; Turkey has
+// no DST since 2016).
+func shiftDays(date clock.Date, n int) clock.Date {
+	t := time.Date(date.Year, date.Month, date.Day, 0, 0, 0, 0, time.UTC).AddDate(0, 0, n)
+	return clock.Date{Year: t.Year(), Month: t.Month(), Day: t.Day()}
 }
 
 // phaseBlocks builds the desktop current-phase week blocks from the progress

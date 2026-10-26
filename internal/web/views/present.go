@@ -410,6 +410,122 @@ func statusWord(sv plan.SessionView) string {
 	}
 }
 
+// rowName renders a week-row session name: "M1·3 Üslü ifadeler" for a chapter
+// session, or "Uzun blok" / "Deneme" for the block kinds.
+func rowName(sv plan.SessionView) string {
+	switch sv.Kind {
+	case plan.KindUzunBlok:
+		return "Uzun blok"
+	case plan.KindDeneme:
+		return "Deneme"
+	default:
+		return chapterRef(sv) + " " + chapterTitle(sv)
+	}
+}
+
+// rowMeta renders the mobile week-row meta line: the page span and a status
+// detail, e.g. "s. 41–58 · bugün 20:30", "s. 23–40 · cumartesiye taşındı".
+func rowMeta(sv plan.SessionView) string {
+	pages := headPages(sv)
+	detail := ""
+	switch sv.State {
+	case plan.StateToday:
+		detail = "bugün " + sv.StartTime
+	case plan.StateMoved:
+		if sv.MovedTo != nil {
+			detail = weekdayDative(sv.MovedTo.Weekday) + " taşındı"
+		} else {
+			detail = "taşındı"
+		}
+	case plan.StateMissed:
+		detail = "yapılamadı"
+	default:
+		if sv.Kind == plan.KindUzunBlok || sv.Kind == plan.KindDeneme {
+			detail = sv.StartTime + " · " + dk(sv.DurationMin)
+		} else {
+			detail = dk(sv.DurationMin)
+		}
+	}
+	if pages == "" {
+		return detail
+	}
+	return pages + " " + middleDot + " " + detail
+}
+
+// pagesPlain renders a session's page span without the "s." prefix, for the
+// Hafta table "Sayfa" column, e.g. "41–58".
+func pagesPlain(sv plan.SessionView) string {
+	if from, to, ok := spanOf(sv.Items, func(it plan.Item) (*int, *int) { return &it.PageFrom, &it.PageTo }); ok {
+		return numSpan(from, to)
+	}
+	return ""
+}
+
+// sureCell renders the Hafta table "Süre" column: the duration, or an em dash
+// for a moved session (its minutes moved with it).
+func sureCell(sv plan.SessionView) string {
+	if sv.State == plan.StateMoved {
+		return "—"
+	}
+	return dk(sv.DurationMin)
+}
+
+// rowActionable reports whether a row offers a mark-done / undo control: today,
+// past-done and past-missed rows do; future, planned-future, moved and rest
+// rows do not (DECISIONS: only today and past can be marked).
+func rowActionable(sv plan.SessionView) bool {
+	switch sv.State {
+	case plan.StateDone, plan.StateToday, plan.StateMissed:
+		return true
+	default:
+		return false
+	}
+}
+
+// rowActive reports whether a row's name reads as active (bold): done and today
+// rows, matching the mockup's week list and table.
+func rowActive(sv plan.SessionView) bool {
+	return sv.State == plan.StateDone || sv.State == plan.StateToday
+}
+
+// rowActionSlug returns the completion route slug for an actionable row.
+func rowActionSlug(sv plan.SessionView) string {
+	if sv.State == plan.StateDone {
+		return "geri-al"
+	}
+	return "tamamla"
+}
+
+// rowActionLabel returns the button label for an actionable row.
+func rowActionLabel(sv plan.SessionView) string {
+	if sv.State == plan.StateDone {
+		return "Geri al"
+	}
+	return "Bitir"
+}
+
+// weekForm returns the form attributes for a Hafta row's completion control.
+// The whole main content (#hafta-main) is swapped so the summary figures and
+// the row update together.
+func weekForm(id int64, action string) templ.Attributes {
+	url := "/hafta/oturum/" + strconv.FormatInt(id, 10) + "/" + action
+	return templ.Attributes{
+		"action":    url,
+		"hx-post":   url,
+		"hx-target": "#hafta-main",
+		"hx-swap":   "outerHTML",
+	}
+}
+
+// phaseTail returns the descriptive part of a phase name after "Faz N · ", e.g.
+// "Faz 1 · İşlem temeli" → "İşlem temeli"; the whole string when it has no "·".
+func phaseTail(name string) string {
+	if i := strings.Index(name, " · "); i >= 0 {
+		return name[i+len(" · "):]
+	}
+	return name
+}
+
 // weekdayDative returns the Turkish dative ("-e/-a") form of a capitalised
 // weekday, e.g. "Cumartesi" → "cumartesiye". The tables use it as "… taşındı".
 func weekdayDative(weekday string) string {

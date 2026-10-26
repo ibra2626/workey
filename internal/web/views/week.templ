@@ -1,0 +1,217 @@
+package views
+
+import (
+	"strconv"
+
+	"github.com/ibra2626/workey/internal/plan"
+)
+
+// Week is the Hafta screen: the weekly volume figure and bars with the week
+// list (mobile) / table (desktop), matching the Hafta artboards. ?tarih= loads
+// another week; a row's mark-done / undo control swaps the whole main content so
+// the figures and the row update together.
+templ Week(p WeekPage) {
+	@Layout(LayoutProps{Title: "Workey · Hafta", Active: "hafta", CSRF: p.CSRF, DaysToExam: p.DaysToExam, HasExam: p.HasExam}) {
+		@WeekMain(p)
+	}
+}
+
+templ WeekMain(p WeekPage) {
+	<div id="hafta-main">
+		<!-- Header. -->
+		<div class="flex items-baseline justify-between px-1 md:hidden">
+			<p class="text-title-lg font-semibold text-ink">
+				if p.Week.WeekNumber > 0 {
+					Hafta { strconv.Itoa(p.Week.WeekNumber) } · { p.Week.RangeLabel }
+				} else {
+					{ p.Week.RangeLabel }
+				}
+			</p>
+			if p.Week.PhaseName != "" {
+				<p class="text-meta text-ink-3">{ phaseTail(p.Week.PhaseName) }</p>
+			}
+		</div>
+		<div class="hidden items-baseline justify-between px-1 md:flex">
+			<h1 class="text-headline font-bold text-ink">
+				if p.Week.WeekNumber > 0 {
+					Hafta { strconv.Itoa(p.Week.WeekNumber) }
+				} else {
+					Hafta
+				}
+				<span class="text-numeral-unit font-normal text-ink-3">· { p.Week.RangeLabel }</span>
+			</h1>
+			if p.Week.PhaseName != "" {
+				<p class="text-body-small text-ink-3">{ p.Week.PhaseName }</p>
+			}
+		</div>
+		<div class="mt-2 flex gap-4 px-1 text-body-small text-ink-3">
+			<a href={ templ.SafeURL("/hafta?tarih=" + p.PrevDate) } class="rounded-nav no-underline transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:2px]">‹ Önceki hafta</a>
+			<a href={ templ.SafeURL("/hafta?tarih=" + p.NextDate) } class="rounded-nav no-underline transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:2px]">Sonraki hafta ›</a>
+		</div>
+
+		<!-- Volume panel. -->
+		<section class="mt-3 rounded-panel bg-card p-5 md:mt-5 md:grid md:grid-cols-[260px_1fr] md:gap-10 md:p-7">
+			<div>
+				<div class="flex items-end justify-between md:block">
+					<div>
+						<p class="text-label font-semibold text-ink-3">Haftalık hacim</p>
+						<p class="mt-1 cn leading-none">
+							<span class="text-numeral-display font-semibold text-ink md:text-numeral-hero">{ strconv.Itoa(p.Week.DoneMin) }</span>
+							<span class="text-numeral-unit text-ink-3 md:text-numeral-profile">/ { strconv.Itoa(p.Week.PlannedMin) } dk</span>
+						</p>
+					</div>
+					<p class="text-right text-meta tnum text-ink-3 md:hidden">
+						{ strconv.Itoa(p.Week.SessionsDone) } / { strconv.Itoa(p.Week.SessionsPlanned) } seans<br/>
+						{ strconv.Itoa(p.Week.MovedCount) } taşındı
+					</p>
+				</div>
+				<!-- Desktop figures: volume, sessions, moved — no streak figure. -->
+				<dl class="mt-6 hidden grid-cols-2 gap-y-2 text-body tnum md:grid">
+					<dt class="text-ink-3">Seans</dt>
+					<dd class="font-semibold text-ink">{ strconv.Itoa(p.Week.SessionsDone) } / { strconv.Itoa(p.Week.SessionsPlanned) }</dd>
+					<dt class="text-ink-3">Taşınan</dt>
+					<dd class="font-semibold text-ink">{ strconv.Itoa(p.Week.MovedCount) }</dd>
+				</dl>
+			</div>
+			<div>
+				@weekBarsChart(p.Week, "mobile")
+				@weekBarsChart(p.Week, "desktop")
+			</div>
+		</section>
+
+		<!-- Mobile: week list. -->
+		<ul class="mt-3 divide-y divide-line rounded-panel bg-card md:hidden">
+			for _, d := range p.Week.Days {
+				@weekListRow(d, p.CSRF)
+			}
+		</ul>
+
+		<!-- Desktop: week table. -->
+		<section class="mt-5 hidden rounded-panel bg-card md:block">
+			<table class="w-full text-left text-body">
+				<thead>
+					<tr class="border-b border-line text-label font-semibold text-ink-3">
+						<th class="w-[120px] px-7 py-3">Gün</th>
+						<th class="py-3">Seans</th>
+						<th class="w-[120px] py-3">Sayfa</th>
+						<th class="w-[100px] py-3">Süre</th>
+						<th class="w-[200px] py-3 pr-7">Durum</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-line tnum">
+					for _, d := range p.Week.Days {
+						@weekTableRows(d, p.CSRF)
+					}
+				</tbody>
+			</table>
+		</section>
+	</div>
+}
+
+// weekBarsChart renders the seven daily volume bars. variant is "mobile"
+// (h-120, shown below md) or "desktop" (h-200, shown at md+).
+templ weekBarsChart(wk *plan.WeekView, variant string) {
+	if variant == "mobile" {
+		<div class="grid grid-cols-7 items-end gap-2 md:hidden" style="height:120px" aria-label="Günlük dakika">
+			for _, b := range weekBars(wk) {
+				@volumeBarEl(b)
+			}
+		</div>
+		<div class="mt-1.5 grid grid-cols-7 gap-2 text-center text-label text-ink-3 md:hidden">
+			for _, b := range weekBars(wk) {
+				<span class={ templ.KV("font-semibold text-ink", b.IsToday) }>{ b.WeekdayShort }</span>
+			}
+		</div>
+	} else {
+		<div class="hidden grid-cols-7 items-end gap-3 md:grid" style="height:200px" aria-label="Günlük dakika">
+			for _, b := range weekBars(wk) {
+				@volumeBarEl(b)
+			}
+		</div>
+		<div class="mt-2 hidden grid-cols-7 gap-3 text-center text-meta tnum text-ink-3 md:grid">
+			for _, b := range weekBars(wk) {
+				<span class={ templ.KV("font-semibold text-ink", b.IsToday) }>
+					{ b.WeekdayShort } { strconv.Itoa(b.DayNum) }
+					if !b.Rest {
+						· { strconv.Itoa(b.Minutes) }
+					}
+				</span>
+			}
+		</div>
+	}
+}
+
+// volumeBarEl renders one bar with the state vocabulary: done (ink), moved
+// (hatch + strong-hairline ring), today (sand + ochre ring), planned (line),
+// rest (3px stub).
+templ volumeBarEl(b volumeBar) {
+	<div class="flex h-full flex-col justify-end">
+		if b.Rest {
+			<span class="w-full rounded-pill bg-line" style="height:3px"></span>
+		} else if b.IsToday {
+			<span class="w-full rounded-bar bg-z3-soft" { styleAttr("height:" + pct(b.HeightPct) + ";box-shadow:inset 0 0 0 2px var(--color-z3)")... }></span>
+		} else {
+			<span class={ "w-full rounded-bar", barClass(b) } { styleAttr("height:" + pct(b.HeightPct))... }></span>
+		}
+	</div>
+}
+
+// weekListRow renders one mobile list row (rest day, or one line per session).
+templ weekListRow(d plan.DayRow, csrf string) {
+	if d.IsRest {
+		<li class="flex items-center gap-3 px-4 py-2.5 text-ink-3">
+			<span class="w-9 cn text-center text-numeral-inline-lg font-semibold leading-none">{ strconv.Itoa(d.DayNum) }</span>
+			<p class="text-body-small">Dinlenme</p>
+		</li>
+	} else {
+		for _, sv := range d.Sessions {
+			<li class={ "flex items-center gap-3 px-4 py-3", templ.KV("bg-z3-soft", sv.State == plan.StateToday) }>
+				<span class={ "w-9 cn text-center text-numeral-inline-lg font-semibold leading-none", templ.KV("text-ink-3", !rowActive(sv)) }>{ strconv.Itoa(d.DayNum) }</span>
+				<div class="min-w-0 flex-1">
+					<p class={ "text-body", templ.KV("font-semibold", rowActive(sv)) }>{ rowName(sv) }</p>
+					<p class={ "text-meta tnum", templ.KV("text-ink-2", sv.State == plan.StateToday), templ.KV("text-ink-3", sv.State != plan.StateToday) }>{ rowMeta(sv) }</p>
+				</div>
+				@rowControl(sv, csrf)
+			</li>
+		}
+	}
+}
+
+// weekTableRows renders one desktop table row (rest day, or one per session).
+templ weekTableRows(d plan.DayRow, csrf string) {
+	if d.IsRest {
+		<tr class="text-ink-3">
+			<td class="px-7 py-3">{ d.WeekdayShort } { strconv.Itoa(d.DayNum) }</td>
+			<td colspan="4">Dinlenme</td>
+		</tr>
+	} else {
+		for _, sv := range d.Sessions {
+			<tr class={ templ.KV("bg-z3-soft", sv.State == plan.StateToday) }>
+				<td class={ "px-7 py-3", templ.KV("font-semibold", sv.State == plan.StateToday) }>{ d.WeekdayShort } { strconv.Itoa(d.DayNum) }</td>
+				<td class={ templ.KV("font-semibold", rowActive(sv)) }>{ rowName(sv) }</td>
+				<td>{ pagesPlain(sv) }</td>
+				<td class={ templ.KV("text-ink-3", sv.State == plan.StateMoved) }>{ sureCell(sv) }</td>
+				<td class="py-3 pr-7">
+					<div class="flex items-center gap-2">
+						if sv.State == plan.StateDone {
+							@icon("i-check", "w-4 h-4")
+						}
+						<span class={ templ.KV("font-semibold", sv.State == plan.StateToday), templ.KV("text-ink-3", sv.State == plan.StatePlanned || sv.State == plan.StateMoved) }>{ statusWord(sv) }</span>
+						@rowControl(sv, csrf)
+					</div>
+				</td>
+			</tr>
+		}
+	}
+}
+
+// rowControl is the per-row mark-done / undo control (today and past rows only).
+// It posts to the Hafta completion route and swaps the whole main content.
+templ rowControl(sv plan.SessionView, csrf string) {
+	if rowActionable(sv) {
+		<form method="post" { weekForm(sv.ID, rowActionSlug(sv))... }>
+			<input type="hidden" name="_csrf" value={ csrf }/>
+			<button type="submit" class="shrink-0 rounded-nav px-2 py-1 text-label font-semibold text-ink-3 transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:2px]">{ rowActionLabel(sv) }</button>
+		</form>
+	}
+}

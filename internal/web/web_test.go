@@ -22,10 +22,12 @@ const testPassword = "doğru-parola-42"
 // testExamDate anchors the screens' exam countdown in the web tests.
 var testExamDate = clock.Date{Year: 2027, Month: 7, Day: 18}
 
-// newService opens a migrated store on a temp database and wraps it in a plan
-// service whose clock is fixed, so the protected screens have real read models
-// to render.
-func newService(t *testing.T, now time.Time) *plan.Service {
+// testNow is the web tests' fixed "today": Wednesday 28 Ekim 2026, so the sample
+// week reads as 1 past-done, some past-missed, today and future.
+var testNow = time.Date(2026, 10, 28, 9, 0, 0, 0, clock.Location)
+
+// newStore opens a migrated store on a temp database.
+func newStore(t *testing.T) *store.Store {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "workey.db")
 	st, err := store.Open(path)
@@ -36,21 +38,27 @@ func newService(t *testing.T, now time.Time) *plan.Service {
 	if err := st.Migrate(context.Background()); err != nil {
 		t.Fatalf("Migrate: %v", err)
 	}
-	return plan.New(st, clock.Fake{Current: now})
+	return st
 }
 
-func newTestAuth(t *testing.T) *Auth {
+// newAuthOn builds an Auth whose screens read from st at testNow.
+func newAuthOn(t *testing.T, st *store.Store) *Auth {
 	t.Helper()
 	hash, err := HashPassword(testPassword)
 	if err != nil {
 		t.Fatalf("HashPassword: %v", err)
 	}
-	svc := newService(t, time.Date(2026, 10, 28, 9, 0, 0, 0, clock.Location))
+	svc := plan.New(st, clock.Fake{Current: testNow})
 	a, err := NewAuth(svc, testExamDate, hash, "test-session-key-0123456789abcdef", true, false)
 	if err != nil {
 		t.Fatalf("NewAuth: %v", err)
 	}
 	return a
+}
+
+func newTestAuth(t *testing.T) *Auth {
+	t.Helper()
+	return newAuthOn(t, newStore(t))
 }
 
 // do runs one request against the auth handler and returns the response.
@@ -183,13 +191,14 @@ func TestExpiredCookieRejected(t *testing.T) {
 func TestTamperedCookieRejected(t *testing.T) {
 	a := newTestAuth(t)
 	c := login(t, a)
-	// Flip the last character of the signed value.
-	tampered := c.Value[:len(c.Value)-1]
-	if strings.HasSuffix(c.Value, "A") {
-		tampered += "B"
-	} else {
-		tampered += "A"
+	// Flip the first character of the signed value. The first base64 char
+	// carries high payload bits, so the change always alters the decoded bytes
+	// (unlike the last char, whose low bits are padding and can decode the same).
+	first := "A"
+	if c.Value[0] == 'A' {
+		first = "B"
 	}
+	tampered := first + c.Value[1:]
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: tampered})
 	res := do(t, a, req)
@@ -249,7 +258,7 @@ func TestStaticAssetIsPublicWithCache(t *testing.T) {
 }
 
 func TestDevOpenBypassesLogin(t *testing.T) {
-	svc := newService(t, time.Date(2026, 10, 28, 9, 0, 0, 0, clock.Location))
+	svc := plan.New(newStore(t), clock.Fake{Current: testNow})
 	a, err := NewAuth(svc, testExamDate, "", "", false, true) // dev, no password hash
 	if err != nil {
 		t.Fatalf("NewAuth dev: %v", err)

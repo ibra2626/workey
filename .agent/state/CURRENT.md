@@ -1,8 +1,8 @@
-# CURRENT — WKY-09 done, Bugün screen live
+# CURRENT — WKY-10 done, Hafta screen live
 
 Updated 2026-10-26.
 
-Active task: .agent/work/workey-v1/tasks/WKY-09.md (done, committed)
+Active task: .agent/work/workey-v1/tasks/WKY-11.md (WKY-09, WKY-10 done, committed)
 
 - Feature: `workey-v1` — Go + templ + htmx + Tailwind single binary; REST `/api/v1`, MCP `/mcp` and web share the one business-logic layer `internal/plan`; SQLite (modernc). Local Windows only; WKY-12 deploy remains **blocked** by the user (do not start until lifted).
 - Plan: `.agent/work/workey-v1/TASKS.md`; shared rules: `.agent/work/workey-v1/README.md`. Product: `PRODUCT.md`; visuals: `DESIGN.md`; decisions: `.agent/state/DECISIONS.md`.
@@ -25,6 +25,6 @@ Running all remaining tasks in order (user: "kalan taskları sırası ile bana s
 
 ## Next step
 
-WKY-10: Hafta screen (`internal/web/views/week.templ` + handler on `Week()`; route `/hafta` with `?tarih=`). Reuse `present.go` `weekBars`, `statusWord`, `dayState`. Row action (mark done/undo) via htmx on today/past rows, future rows no action; swap row + summary. Replace the Placeholder for `/hafta` in `web.go`. Remove Seri from the desktop header.
+WKY-11: İlerleme screen (progress.templ + handler on Progress()); route /ilerleme. Reuse present.go progressStrip, percentClass. Remove deneme/seviye panels; rebalance columns.
 
 Dev preview: `tmp-dev.db` seeded on 127.0.0.1:8099 (WORKEY_DEV=1, token `devtoken`); real system "today" is 2026-10-26 (Monday).

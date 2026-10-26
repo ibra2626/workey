@@ -11,16 +11,24 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ibra2626/workey/internal/clock"
 	"github.com/ibra2626/workey/internal/plan"
+	"github.com/ibra2626/workey/internal/store"
 )
 
-// seedWeek loads the sample outline and week fixtures into the service, so the
-// protected screens render the mockup state (today = Wednesday 28 Ekim 2026).
-func seedWeek(t *testing.T, svc *plan.Service) {
+// seedClock is a Monday (26 Ekim) clock used only for seeding: at the start of
+// the week every sample session is today-or-future, so SavePlan creates them all
+// (a later Wednesday read then derives past/today/future states).
+var seedClock = clock.Date{Year: 2026, Month: 10, Day: 26}
+
+// seedWeek loads the sample outline and week fixtures into the store through a
+// Monday-clock service, so all seven days exist before the Wednesday read.
+func seedWeek(t *testing.T, st *store.Store) {
 	t.Helper()
 	ctx := context.Background()
+	svc := plan.New(st, clock.Fake{Current: timeAt(seedClock)})
 	var outline plan.SaveOutlineRequest
 	loadFixture(t, "sample-outline.json", &outline)
 	if _, err := svc.SaveOutline(ctx, plan.SourceAPI, outline); err != nil {
@@ -33,6 +41,11 @@ func seedWeek(t *testing.T, svc *plan.Service) {
 	}
 }
 
+// timeAt returns 09:00 Istanbul on the given civil date.
+func timeAt(d clock.Date) time.Time {
+	return time.Date(d.Year, d.Month, d.Day, 9, 0, 0, 0, clock.Location)
+}
+
 func loadFixture(t *testing.T, name string, v any) {
 	t.Helper()
 	buf, err := os.ReadFile(filepath.Join("..", "..", "testdata", name))
@@ -42,6 +55,12 @@ func loadFixture(t *testing.T, name string, v any) {
 	if err := json.Unmarshal(buf, v); err != nil {
 		t.Fatalf("decode fixture %s: %v", name, err)
 	}
+}
+
+// readBody reads a response body into a string.
+func readBody(res *http.Response) string {
+	b, _ := io.ReadAll(res.Body)
+	return string(b)
 }
 
 // getAuthed performs an authenticated GET and returns the response body.
@@ -60,8 +79,9 @@ func getAuthed(t *testing.T, a *Auth, path string) string {
 }
 
 func TestBugunRendersTonightsSession(t *testing.T) {
-	a := newTestAuth(t)
-	seedWeek(t, a.svc)
+	st := newStore(t)
+	a := newAuthOn(t, st)
+	seedWeek(t, st)
 	body := getAuthed(t, a, "/")
 
 	// Turkish date heading and the exact book notation and page range.
@@ -81,8 +101,9 @@ func TestBugunRendersTonightsSession(t *testing.T) {
 }
 
 func TestBugunHasSeansTileAndNoSeri(t *testing.T) {
-	a := newTestAuth(t)
-	seedWeek(t, a.svc)
+	st := newStore(t)
+	a := newAuthOn(t, st)
+	seedWeek(t, st)
 	body := getAuthed(t, a, "/")
 
 	if !strings.Contains(body, "Seans") {
@@ -94,8 +115,9 @@ func TestBugunHasSeansTileAndNoSeri(t *testing.T) {
 }
 
 func TestBugunMarksActiveNav(t *testing.T) {
-	a := newTestAuth(t)
-	seedWeek(t, a.svc)
+	st := newStore(t)
+	a := newAuthOn(t, st)
+	seedWeek(t, st)
 	body := getAuthed(t, a, "/")
 	if !strings.Contains(body, `aria-current="page"`) {
 		t.Error("Bugün does not mark the active nav item with aria-current")
@@ -124,8 +146,9 @@ func todaySessionID(t *testing.T, a *Auth) int64 {
 }
 
 func TestCompleteViaHTMXSwapsPanel(t *testing.T) {
-	a := newTestAuth(t)
-	seedWeek(t, a.svc)
+	st := newStore(t)
+	a := newAuthOn(t, st)
+	seedWeek(t, st)
 	cookie := login(t, a)
 	sid, _ := a.decodeSession(cookie.Value)
 	id := todaySessionID(t, a)
@@ -155,8 +178,9 @@ func TestCompleteViaHTMXSwapsPanel(t *testing.T) {
 }
 
 func TestCompleteWithoutCSRFIsForbidden(t *testing.T) {
-	a := newTestAuth(t)
-	seedWeek(t, a.svc)
+	st := newStore(t)
+	a := newAuthOn(t, st)
+	seedWeek(t, st)
 	cookie := login(t, a)
 	id := todaySessionID(t, a)
 
