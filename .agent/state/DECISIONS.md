@@ -47,6 +47,21 @@ Record accepted decisions with date, context, decision, alternatives, and conseq
 - Decision (user): after "Tamamlandı" the panel shows a quiet "Geri al" text link. Hafta rows for today and past days can be marked done or undone. Future days cannot be marked. Every change is audited with its source (web/api/mcp).
 - Alternatives: today only with undo; no undo.
 
+## 2026-10-26 — WKY-02: frontend toolchain and base layout
+
+- Context: WKY-02 set up the server-rendered UI toolchain (templ, Tailwind, self-hosted fonts, htmx) and the base layout, with everything embedded so the app is a single binary and no request leaves localhost. User approved the three downloads in-session (source + size).
+- Decisions:
+  - **templ `v0.3.1100`**, added as a Go tool (`tool github.com/a-h/templ/cmd/templ` in `go.mod`); run with `go tool templ generate`. Generated `*_templ.go` **are committed** (so `go build ./...` and a fresh clone build without first running templ; `scripts/build.sh` still regenerates them). Runtime lib `github.com/a-h/templ` is a direct dependency.
+  - **Tailwind CSS standalone CLI `v4.3.3`**, binary at `./bin/tailwindcss.exe` (`/bin/` is gitignored — the binary is a ~110 MB dev tool, re-downloadable from `tailwindlabs/tailwindcss` releases). v4 CSS-first config: tokens live in `web/styles/input.css` `@theme`, sources via `@source "../../internal/web/views"`; output minified to `web/static/app.css`. Soft tints are explicit tokens (`--color-z1-soft`, `--color-z3-soft`), never opacity modifiers (Soft Token Rule).
+  - **htmx `2.0.11`** (npm stable `latest`; GitHub's "latest" release is a v4.0.0 pre-release — not used), saved to `web/static/htmx.min.js`, loaded with `defer`. Only client-side JS; served locally.
+  - **Fonts self-hosted** via Fontsource (jsDelivr): Barlow 400/500/600/700 and Barlow Condensed 500/600/700, each in `latin` + `latin-ext` woff2 (14 files) under `web/static/fonts/` with per-subset `unicode-range` (latin-ext carries ş ğ İ; latin carries ı ç ö ü) and `font-display: swap`. `OFL.txt` sits alongside. No Google Fonts / CDN link anywhere.
+  - **Assets embedded** with `embed.FS` in the top-level `web` package (`web/assets.go`); served under `GET /static/` with `Cache-Control: public, max-age=31536000, immutable` and a `?v=<sha256-12>` cache-busting query derived from `app.css`.
+  - **Responsive breakpoint = Tailwind `md` (768px)**: mobile bottom tab bar below `md`, desktop 232px rail at `md`+. DESIGN.md left this switch-over "not yet decided"; this is the v1 choice.
+  - **Packages:** top-level `web` (embedded assets) and `internal/web` (handlers) are both `package web`; importers alias the former as `assets`. templ components live in `internal/web/views` (`package views`).
+  - **Dev launch:** `.claude/launch.json` `workey-dev` runs `go run ./cmd/workey serve` with `env WORKEY_DEV=1` on port 8080 (a `bash -lc` launcher resolved to WSL bash and failed on this machine).
+- Alternatives: gitignore generated templ files and generate in CI (rejected — breaks `go build` from a clean checkout for a local-first app); Tailwind via npm/PostCSS (rejected — the stack decision is the standalone CLI, no Node); Google Fonts CDN (rejected — must work offline, no external request); htmx 4.0.0 pre-release (rejected — task wants 2.x and npm stable is 2.0.11).
+- Consequences: editing a `.templ` requires `go tool templ generate`; changing classes/tokens requires a Tailwind rebuild before `go build` (app.css is embedded). The Tailwind binary must be re-downloaded on a fresh machine (not in git). CLAUDE.md "Checks" updated accordingly.
+
 ## 2026-10-26 — Session data model: 1..n items, no free-text note
 - Decision (user): a session has date, start time, duration (minutes), kind (`aksam`, `uzun_blok`, `deneme`), optional topic group, optional `makeup_of`, and 1..n items. An item has book (M1, M2, M3, G1, G2), chapter number, chapter title, page range, and optional splits: konu pages, soru pages, antrenman range. No free-text note field; the desktop "Not" panel is generated from state (missed/moved sessions).
 - Alternatives: same plus a 140-character AI note; one item per session.

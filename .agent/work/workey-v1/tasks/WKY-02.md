@@ -27,4 +27,9 @@ templ components render through the server with the DESIGN.md token set, self-ho
 - Preview screenshots at 390 and 1280.
 
 ## Progress
-Not started.
+Done (2026-10-26).
+- templ `v0.3.1100` added as a Go tool; generated `*_templ.go` committed (DECISIONS). Tailwind standalone CLI `v4.3.3` at `./bin/tailwindcss.exe` (gitignored). htmx `2.0.11` → `web/static/htmx.min.js`. Barlow 400/500/600/700 + Barlow Condensed 500/600/700, latin + latin-ext woff2 (14 files) + `OFL.txt` → `web/static/fonts/`. All user-approved in-session.
+- `web/styles/input.css`: `@theme` tokens (13 colours incl. z1-soft/z3-soft, two font families, radii, spacing, type scale), `@font-face` per subset with `unicode-range` + `font-display: swap`, `@source` → views, `.cn`/`.tnum` utilities. Compiled minified to `web/static/app.css`.
+- `web/assets.go`: `embed.FS` for `web/static`, `GET /static/` handler with immutable cache + `?v=` hash. `internal/web/views/` templ: `Layout` (`<html lang="tr">`, viewport, CSS/htmx, desktop 232px rail + mobile 68px tab bar with stroked SVG icons, `aria-current="page"`, focus rings), `Placeholder` page. `internal/web/web.go` serves `/`, `/hafta`, `/ilerleme`. Wired into `cmd/workey` mux. `scripts/build.sh` + `.claude/launch.json` `workey-dev`.
+- Checks all clean: `go tool templ generate` (idempotent), `go build ./...`, `go vet ./...`, `gofmt -l .` (empty), `go test ./internal/config/... ./internal/clock/... ./internal/web/... ./cmd/...` (all ok). Browser (built-in): placeholder renders at 375 and 1280; rail/tab-bar switch at `md`; ş ğ ı İ ç ö ü covered by all loaded Barlow + Barlow Condensed faces (`document.fonts.check` true, computed font Barlow, not fallback); no console errors; htmx loaded; no CDN/network reference in source.
+- Not committed (awaiting explicit request).

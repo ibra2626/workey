@@ -1,21 +1,20 @@
-# CURRENT — WKY-01 done, skeleton builds
+# CURRENT — WKY-02 done, frontend toolchain + base layout live
 
 Updated 2026-10-26.
 
-Active task: .agent/work/workey-v1/tasks/WKY-02.md (next; not started)
+Active task: .agent/work/workey-v1/tasks/WKY-03.md (next; not started)
 
 - Feature: `workey-v1` — Go + templ + htmx + Tailwind single binary; Giriş / Bugün / Hafta / İlerleme; REST `/api/v1` and MCP `/mcp` over one `internal/plan` service; SQLite (modernc). Local Windows only; WKY-12 (deploy) blocked by the user.
-- Plan: `.agent/work/workey-v1/TASKS.md`; shared invariants + layout in `.agent/work/workey-v1/README.md` (read with each task).
+- Plan: `.agent/work/workey-v1/TASKS.md`; shared invariants + layout in `.agent/work/workey-v1/README.md` (read with each task). Module path `github.com/ibra2626/workey`, go1.27.3.
 
-## WKY-01 result (done)
-- System Go upgraded to go1.27.3 (user). Module path `github.com/ibra2626/workey` (user-confirmed).
-- Created: `go.mod` (`go 1.27.0` + `toolchain go1.27.3`), `.gitignore` (+ `.env`, `/bin/`, `*.db`, `*.db-*`), `.env.example` (placeholders).
-  - `internal/config` — env parse/validate; errors name the variable, never the value; token/hash/key required unless `WORKEY_DEV=1`.
-  - `internal/clock` — `Clock`/`System`/`Fake`, civil `Date`, `Today`, `WeekStart` (Monday); Europe/Istanbul via embedded `time/tzdata`.
-  - `cmd/workey/main.go` — `serve` default (ReadHeaderTimeout, signal.NotifyContext graceful shutdown, `GET /healthz`); `hash-password` stub for WKY-08.
-  - `CLAUDE.md` Checks section filled; DECISIONS entry added (module path, tzdata, Go upgrade).
-- Checks all clean: `go build ./...`, `go vet ./...`, `go test ./internal/config/... ./internal/clock/... ./cmd/...` (3 pkg ok), `gofmt -l .` empty, `go version` → go1.27.3.
-- Nothing committed (commit only on explicit request). Tools still not installed: templ, Tailwind standalone CLI, govulncheck.
+## WKY-02 result (done)
+- **Toolchain (user-approved downloads):** templ `v0.3.1100` as a Go tool (`go tool templ generate`); generated `*_templ.go` are committed (DECISIONS). Tailwind standalone CLI `v4.3.3` at `./bin/tailwindcss.exe` (`/bin/` gitignored, re-downloadable). htmx `2.0.11` at `web/static/htmx.min.js` (npm stable; GitHub "latest" v4.0.0 is a pre-release, not used). Barlow 400/500/600/700 + Barlow Condensed 500/600/700, latin + latin-ext woff2 (14 files) + `OFL.txt` in `web/static/fonts/`.
+- **CSS:** `web/styles/input.css` — Tailwind v4 CSS-first: `@theme` with 13 colour tokens (incl. `z1-soft`/`z3-soft`), `--font-sans`/`--font-condensed`, radii, spacing, full type scale; `@font-face` per weight×subset with `unicode-range` (latin-ext → ş ğ İ; latin → ı ç ö ü) + `font-display: swap`; `@source "../../internal/web/views"`; `.cn` (condensed, weight 500, tnum) and `.tnum` utilities; base layer sets Barlow on ground/ink + z1-soft `::selection`. Built minified to `web/static/app.css` (~25 KB). Soft Token Rule respected (no `/opacity` on var colours).
+- **Serving/layout:** top-level `package web` (`web/assets.go`) embeds `web/static` via `embed.FS`; `GET /static/` with `Cache-Control: ...immutable` + `?v=<sha256[:12] of app.css>`. `internal/web/views/` (`package views`): `Layout(title, active)` → `<html lang="tr">`, viewport, CSS + deferred htmx, desktop 232px rail (`md`+) and mobile 68px fixed bottom tab bar (`<md`), both with the three sections, stroked SVG sprite icons (1.8 stroke), `aria-current="page"` on the active link, focus-visible ink rings; `Placeholder(active,title,heading)` page. `internal/web/web.go` (`package web`, aliases top-level as `assets`) registers `/`, `/hafta`, `/ilerleme`. Wired via `web.AddRoutes(mux)` in `cmd/workey/main.go`. Breakpoint = Tailwind `md` (768px), v1 choice (DESIGN left it open).
+- **Tooling files:** `scripts/build.sh` (templ → tailwind → go build); `.claude/launch.json` `workey-dev` = `go run ./cmd/workey serve` with `env WORKEY_DEV=1`, port 8080 (bash launcher hit WSL bash, replaced with `go` + env).
+- **Checks all clean:** `go tool templ generate` (idempotent), `go build ./...`, `go vet ./...`, `gofmt -l .` (empty), `go test ./internal/config/... ./internal/clock/... ./internal/web/... ./cmd/...` (all ok). `internal/web/web_test.go` asserts `lang="tr"`, `aria-current="page"` count = 2 (rail + tab bar) on the correct section, and immutable Cache-Control on `/static/app.css`.
+- **Browser-verified** (built-in pane, workey-dev): placeholder renders at 375 and 1280; rail/tab-bar switch at `md`; active rail item takes Trail Ground fill + semibold; `document.fonts.check` true for ş ğ ı İ ç ö ü across all Barlow + Barlow Condensed weights (computed font Barlow, not fallback); no console errors; `window.htmx` present; no CDN/network reference in source (`web internal cmd` grep clean).
+- Nothing committed (commit only on explicit request). New untracked: `web/`, `internal/web/`, `scripts/`, `go.sum`; modified: `cmd/workey/main.go`, `go.mod`, `.claude/launch.json`, `CLAUDE.md`, `.agent/...`. `./bin/tailwindcss.exe` stays out of git.
 
 ## Next step
-New session → `WKY-02 görevine başla` (frontend toolchain: templ, Tailwind, fonts, htmx, base layout). WKY-02 will need the user's OK to download Tailwind CLI, htmx and fonts (source, size).
+New session → `WKY-03 görevine başla`. Build on the base layout: real screens use `internal/web/views` components and the token set in `web/styles/input.css`; rebuild CSS (`./bin/tailwindcss.exe -i web/styles/input.css -o web/static/app.css --minify`) and `go tool templ generate` after edits before `go build`.

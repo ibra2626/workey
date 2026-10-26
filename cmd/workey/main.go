@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ibra2626/workey/internal/config"
+	web "github.com/ibra2626/workey/internal/web"
 )
 
 func main() {
@@ -81,6 +82,7 @@ func runServe() error {
 func newMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthz)
+	web.AddRoutes(mux)
 	return mux
 }
 

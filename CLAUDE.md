@@ -7,11 +7,14 @@
 - **UI language Turkish:** ş ğ ı İ ç ö ü must render; never rely on CSS uppercase for Turkish; notation `M2·17, s. 210–225`, decimal comma.
 - **Design:** follow `DESIGN.md`; tints are explicit soft tokens (no `/35` opacity on CSS-variable colors).
 - **Checks (run only what the change touches):**
+  - `go tool templ generate` (regenerate `*_templ.go` after editing any `.templ`; the generated files are committed)
+  - `./bin/tailwindcss.exe -i web/styles/input.css -o web/static/app.css --minify` (rebuild CSS after a class or token change; `web/static/app.css` is embedded so it must exist before `go build`)
   - `go build ./...`
   - `go vet ./...`
-  - `go test ./internal/config/... ./internal/clock/... ./cmd/...` (or the focused package)
-  - `gofmt -l .` (must print nothing)
-  - Toolchain: `go.mod` pins `toolchain go1.27.3`; build/test with 1.27.3. `templ generate`, Tailwind build and `govulncheck` land in later tasks.
+  - `go test ./internal/config/... ./internal/clock/... ./internal/web/... ./cmd/...` (or the focused package)
+  - `gofmt -l .` (must print nothing; generated `*_templ.go` are already gofmt-clean)
+  - `scripts/build.sh` runs templ generate → Tailwind → `go build` in order.
+  - Toolchain: `go.mod` pins `toolchain go1.27.3`; build/test with 1.27.3. templ (`go tool templ`) and the Tailwind standalone CLI (`./bin/tailwindcss.exe`, gitignored) are installed; `govulncheck` lands in a later task.
 - **Commits:** no convention established yet; commit/push/PR only on explicit request.
 
 ## Agent state

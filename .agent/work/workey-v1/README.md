@@ -30,5 +30,5 @@ Read once per session together with your task file. Product truth: `PRODUCT.md`;
 - Go: latest stable is go1.27.3 (go.dev, released 2026-10-19); installed is go1.27.0. `go.mod` uses `go 1.27.0` + `toolchain go1.27.3`; build and govulncheck with 1.27.3. Stdlib `net/http` with method+pattern routing; no web framework.
 - Runtime target for v1: local Windows only (WKY-12 deploy is blocked). Keep code OS-neutral (paths via `filepath`, no Unix-only syscalls) so a Linux server stays possible.
 - Each new module gets a DECISIONS.md entry (why, alternatives) in the task that adds it.
-- Tools not installed yet: templ (add via `go get -tool`), Tailwind standalone CLI, govulncheck (`go run golang.org/x/vuln/cmd/govulncheck@latest` or tool directive). Downloading binaries, fonts or htmx needs the user's explicit OK in that session (state file, source, size).
+- templ (`go tool templ`, generated `*_templ.go` committed) and the Tailwind standalone CLI (`./bin/tailwindcss.exe`, gitignored) are installed since WKY-02; govulncheck is still to add (`go run golang.org/x/vuln/cmd/govulncheck@latest` or a tool directive). Downloading any further binaries, fonts or JS needs the user's explicit OK in that session (source, size).
 - Keep `CLAUDE.md` "Checks" current when a check is added.
