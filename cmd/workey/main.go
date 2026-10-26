@@ -18,6 +18,7 @@ import (
 	"github.com/ibra2626/workey/internal/api"
 	"github.com/ibra2626/workey/internal/clock"
 	"github.com/ibra2626/workey/internal/config"
+	"github.com/ibra2626/workey/internal/mcpserver"
 	"github.com/ibra2626/workey/internal/plan"
 	"github.com/ibra2626/workey/internal/store"
 	web "github.com/ibra2626/workey/internal/web"
@@ -72,10 +73,14 @@ func runServe() error {
 	svc := plan.New(st, clock.System{})
 	examDate := clock.Date{Year: cfg.ExamDate.Year(), Month: cfg.ExamDate.Month(), Day: cfg.ExamDate.Day()}
 	apiHandler := api.New(svc, examDate, cfg.APIToken)
+	mcpHandler, err := mcpserver.New(svc, examDate, cfg.APIToken)
+	if err != nil {
+		return err
+	}
 
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           newMux(apiHandler),
+		Handler:           newMux(apiHandler, mcpHandler),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -103,13 +108,16 @@ func runServe() error {
 }
 
 // newMux builds the HTTP router. Kept separate from runServe so handlers are
-// testable with httptest. apiHandler may be nil (e.g. in tests that exercise
-// only the always-on routes).
-func newMux(apiHandler http.Handler) *http.ServeMux {
+// testable with httptest. apiHandler and mcpHandler may be nil (e.g. in tests
+// that exercise only the always-on routes).
+func newMux(apiHandler, mcpHandler http.Handler) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthz)
 	if apiHandler != nil {
 		mux.Handle("/api/v1/", apiHandler)
+	}
+	if mcpHandler != nil {
+		mux.Handle("/mcp", mcpHandler)
 	}
 	web.AddRoutes(mux)
 	return mux
