@@ -1,0 +1,130 @@
+package views
+
+import (
+	"strconv"
+
+	"github.com/ibra2626/workey/internal/plan"
+)
+
+// Progress is the İlerleme screen: honest progress against the exam date — plan
+// position, totals, the 38-week strip and the topic-group tracks. It matches the
+// İlerleme artboards minus the removed seviye-testi and deneme panels
+// (DECISIONS); the layout rebalances to a single column so no hole is left.
+templ Progress(p ProgressPage) {
+	@Layout(LayoutProps{Title: "Workey · İlerleme", Active: "ilerleme", CSRF: p.CSRF, DaysToExam: p.DaysToExam, HasExam: p.HasExam}) {
+		<div class="flex items-baseline justify-between px-1">
+			<p class="text-title-lg font-semibold text-ink md:hidden">İlerleme</p>
+			<h1 class="hidden text-headline font-bold text-ink md:block">İlerleme</h1>
+			if p.HasExam || p.Progress.PlannedMin > 0 {
+				<p class="text-meta tnum text-ink-3 md:text-body-small">
+					<span class="md:hidden">
+						if p.HasExam && p.DaysToExam > 0 {
+							{ strconv.Itoa(p.DaysToExam) } gün · { p.Progress.ExamDate }
+						} else {
+							{ strconv.Itoa(p.Progress.SessionsDone) } / { strconv.Itoa(p.Progress.SessionsPlanned) } seans
+						}
+					</span>
+					<span class="hidden md:inline">
+						{ strconv.Itoa(p.Progress.SessionsDone) } / { strconv.Itoa(p.Progress.SessionsPlanned) } seans · { p.Progress.DoneHours } / { p.Progress.PlannedHours } saat
+					</span>
+				</p>
+			}
+		</div>
+		if !p.Progress.HasPlan {
+			<section class="mt-5 rounded-panel bg-card p-5 md:p-7">
+				<p class="text-title-lg font-semibold text-ink">Plan henüz yazılmadı.</p>
+				<p class="mt-2 text-body text-ink-2">Asistan planı yazınca ilerleme burada 38 hafta üzerinden gösterilecek.</p>
+			</section>
+		} else {
+			<!-- Plan position and the 38-week strip. -->
+			<section class="mt-5 rounded-panel bg-card p-5 md:p-7">
+				<div class="flex items-end justify-between">
+					<div>
+						<p class="text-label font-semibold text-ink-3">38 haftalık plan</p>
+						<p class="mt-1 cn leading-none">
+							<span class="text-numeral-rail font-semibold text-ink md:text-numeral-display">{ strconv.Itoa(p.Progress.WeekNumber) }</span>
+							<span class="text-numeral-unit text-ink-3">/ { strconv.Itoa(p.Progress.WeeksTotal) } hafta</span>
+						</p>
+					</div>
+					<!-- Mobile totals / desktop legend. -->
+					<p class="text-right text-meta tnum text-ink-3 md:hidden">
+						{ p.Progress.DoneHours } / { p.Progress.PlannedHours } sa<br/>
+						{ strconv.Itoa(p.Progress.SessionsDone) } / { strconv.Itoa(p.Progress.SessionsPlanned) } seans
+					</p>
+					<div class="hidden gap-5 text-meta text-ink-3 md:flex">
+						@legendSwatch("var(--color-ink)", "Yapılan")
+						@legendSwatch("var(--color-z1-soft)", phaseShort(p.Progress.CurrentPhase)+" planı")
+						@legendSwatch("var(--color-line)", "Sonraki fazlar")
+					</div>
+				</div>
+				<!-- 38-week strip. -->
+				<div class="mt-4 flex items-stretch gap-[2px] md:mt-5 md:gap-[4px]" style="height:44px" aria-label="38 haftalık plan">
+					for _, c := range progressStrip(p.Progress) {
+						<div class="relative h-full flex-1 overflow-hidden rounded-xs" { styleAttr("background:" + c.BaseFill)... }>
+							if c.InkPct > 0 {
+								<span class="absolute inset-x-0 bottom-0 bg-ink" { styleAttr("height:" + pct(c.InkPct))... }></span>
+							}
+						</div>
+					}
+				</div>
+				<div class="mt-1.5 flex justify-between text-label tnum text-ink-3">
+					<span>{ phaseRangeLabel(p.Progress) }</span>
+					<span>H{ strconv.Itoa(p.Progress.WeeksTotal) }
+						if p.Progress.ExamDate != "" {
+							· { p.Progress.ExamDate }
+						}
+					</span>
+				</div>
+			</section>
+			<!-- Topic groups. -->
+			<section class="mt-3 rounded-panel bg-card p-5 md:mt-5 md:p-7">
+				<p class="text-label font-semibold text-ink-3">Konu grupları · soru ağırlığı ve tamamlanan</p>
+				<ul class="mt-4 space-y-3 md:space-y-4">
+					for _, gp := range p.Progress.Groups {
+						@groupRow(gp)
+					}
+				</ul>
+			</section>
+		}
+	}
+}
+
+// groupRow renders one topic group's completion: a progress track with the done
+// share in ink, the DGS question weight, and the condensed percentage (Lichen
+// Ink at zero).
+templ groupRow(gp plan.GroupProgress) {
+	<!-- Mobile. -->
+	<li class="md:hidden">
+		<div class="flex items-baseline justify-between gap-3">
+			<span class="text-body font-semibold text-ink">{ gp.Name }</span>
+			<span class={ "cn text-numeral-inline font-semibold", percentClass(gp.Percent) }>%{ strconv.Itoa(gp.Percent) }</span>
+		</div>
+		<div class="mt-1 flex items-center gap-2">
+			<div class="h-[6px] flex-1 overflow-hidden rounded-bar bg-line">
+				if gp.Percent > 0 {
+					<span class="block h-full rounded-bar bg-ink" { styleAttr("width:" + pct(gp.Percent))... }></span>
+				}
+			</div>
+			<span class="w-[64px] text-right text-label tnum text-ink-3">{ dgsLabel(gp) }</span>
+		</div>
+	</li>
+	<!-- Desktop. -->
+	<li class="hidden grid-cols-[200px_1fr_70px_48px] items-center gap-4 md:grid">
+		<span class="text-body font-semibold text-ink">{ gp.Name }</span>
+		<div class="h-[8px] overflow-hidden rounded-bar bg-line">
+			if gp.Percent > 0 {
+				<span class="block h-full rounded-bar bg-ink" { styleAttr("width:" + pct(gp.Percent))... }></span>
+			}
+		</div>
+		<span class="text-right text-meta tnum text-ink-3">{ dgsLabel(gp) }</span>
+		<span class={ "text-right cn text-numeral-unit font-semibold", percentClass(gp.Percent) }>%{ strconv.Itoa(gp.Percent) }</span>
+	</li>
+}
+
+// legendSwatch is one coloured square with its label, for the strip legend.
+templ legendSwatch(fill string, label string) {
+	<span class="flex items-center gap-1.5">
+		<span class="h-3 w-3 rounded-xs" { styleAttr("background:" + fill)... }></span>
+		{ label }
+	</span>
+}

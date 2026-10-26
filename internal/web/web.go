@@ -37,7 +37,7 @@ func (a *Auth) Handler() http.Handler {
 	// Protected pages.
 	mux.Handle("GET /{$}", a.requireAuth(http.HandlerFunc(a.screenToday)))
 	mux.Handle("GET /hafta", a.requireAuth(http.HandlerFunc(a.screenWeek)))
-	mux.Handle("GET /ilerleme", a.requireAuth(page("ilerleme", "Workey · İlerleme", "İlerleme")))
+	mux.Handle("GET /ilerleme", a.requireAuth(http.HandlerFunc(a.screenProgress)))
 	mux.Handle("POST /oturum/{id}/tamamla", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.completeSession))))
 	mux.Handle("POST /oturum/{id}/geri-al", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.undoSession))))
 	mux.Handle("POST /hafta/oturum/{id}/tamamla", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.weekComplete))))
@@ -111,15 +111,21 @@ func renderLogin(w http.ResponseWriter, r *http.Request, errMsg string) {
 	_ = views.Login(errMsg).Render(r.Context(), w)
 }
 
-// page renders a placeholder view for one section. The CSRF token is read from
-// the request's session and passed to the layout. Replaced by real screens in
-// WKY-10 (Hafta) and WKY-11 (İlerleme).
-func page(active, title, heading string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		csrf := csrfTokenFromRequest(r)
-		_ = views.Placeholder(active, title, heading, csrf).Render(r.Context(), w)
+// screenProgress renders the İlerleme screen.
+func (a *Auth) screenProgress(w http.ResponseWriter, r *http.Request) {
+	prog, err := a.svc.Progress(r.Context(), a.examDate)
+	if err != nil {
+		http.Error(w, "sunucu hatası", http.StatusInternalServerError)
+		return
 	}
+	p := views.ProgressPage{
+		Progress:   prog,
+		DaysToExam: prog.DaysToExam,
+		HasExam:    a.examDate != (clock.Date{}),
+		CSRF:       csrfTokenFromRequest(r),
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = views.Progress(p).Render(r.Context(), w)
 }
 
 // screenToday renders the Bugün screen for the clock's current date.

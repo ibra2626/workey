@@ -1,8 +1,8 @@
-# CURRENT — WKY-10 done, Hafta screen live
+# CURRENT — WKY-11 done, İlerleme screen live
 
 Updated 2026-10-26.
 
-Active task: .agent/work/workey-v1/tasks/WKY-11.md (WKY-09, WKY-10 done, committed)
+Active task: .agent/work/workey-v1/tasks/WKY-13.md (WKY-09/10/11 done, committed)
 
 - Feature: `workey-v1` — Go + templ + htmx + Tailwind single binary; REST `/api/v1`, MCP `/mcp` and web share the one business-logic layer `internal/plan`; SQLite (modernc). Local Windows only; WKY-12 deploy remains **blocked** by the user (do not start until lifted).
 - Plan: `.agent/work/workey-v1/TASKS.md`; shared rules: `.agent/work/workey-v1/README.md`. Product: `PRODUCT.md`; visuals: `DESIGN.md`; decisions: `.agent/state/DECISIONS.md`.
@@ -25,6 +25,6 @@ Running all remaining tasks in order (user: "kalan taskları sırası ile bana s
 
 ## Next step
 
-WKY-11: İlerleme screen (progress.templ + handler on Progress()); route /ilerleme. Reuse present.go progressStrip, percentClass. Remove deneme/seviye panels; rebalance columns.
+WKY-13: End-to-end MCP writes a week (docs/mcp.md), then WKY-14 visual review + v1 gate. WKY-12 deploy stays blocked (skip). All three web screens live behind requireAuth; routes /, /hafta, /ilerleme + completion POSTs.
 
 Dev preview: `tmp-dev.db` seeded on 127.0.0.1:8099 (WORKEY_DEV=1, token `devtoken`); real system "today" is 2026-10-26 (Monday).

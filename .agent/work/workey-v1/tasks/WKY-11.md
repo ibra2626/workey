@@ -21,4 +21,11 @@ Honest progress against the exam date, matching the İlerleme artboards minus th
 - Preview screenshots at 390 and 1280.
 
 ## Progress
-Not started.
+Done (2026-10-26).
+
+- `internal/web/views/progress.templ`: `Progress(ProgressPage)`. Header "İlerleme" + "N gün · 18 Tem" (mobile) / "X / Y seans · X / Y saat" (desktop). Plan panel: "N / 38 hafta", mobile totals (sa, seans), desktop legend (Yapılan / "Faz N planı" / Sonraki fazlar). 38-week strip: each column is its phase tint (current phase Phase Mist, later Hairline) with a Forest-Ink overlay for the done fraction; labels "Faz 1 · H1–7" and "H38 · 18 Tem". Topic-group rows: name, Hairline track with the ink done share, DGS weight "8–10 soru" (never "s."), condensed % (Lichen Ink at zero). Empty state.
+- Removed per DECISIONS: the "İlk ölçüm · seviye testi" panel and the "Denemeler · net" chart. **Rebalance:** İlerleme is a single column — the strip panel and the topic-group panel each span the full width (no empty 380px side column, no hole). Noted in DECISIONS.
+- Denominators come from the saved plan (`PlannedHours`, `SessionsPlanned`, `WeeksTotal`), never the mockup's 342/190. Weeks beyond the saved plan are unplanned (Hairline, zero done).
+- `present.go` added `dgsLabel`, `currentPhaseRange`, `phaseRangeLabel`. `web.go` added `screenProgress`; the old `page`/`Placeholder` scaffold was removed (all three screens are real now).
+- Tests (`progress_test.go`): "/ 38 hafta", "1,5" (decimal-comma hours), " soru"; zero percentage in Lichen Ink (`text-ink-3">%0`); no "deneme"/"seviye"; partial plan (week 1 only) renders and shows no 342/190; empty state.
+- Checks green (Go 1.27.3): templ generate, Tailwind, build, vet, gofmt, `go test ./internal/web/...`. Verified live at 390 and 1280: on-brand, strip + legend + tracks correct, decimal comma, single-column rebalance, console clean.

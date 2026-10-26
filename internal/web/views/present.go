@@ -569,6 +569,42 @@ type stripCell struct {
 	InkPct   int
 }
 
+// dgsLabel renders a topic group's DGS question weight, e.g. "8–10 soru" (never
+// abbreviated "s."); "" when the group carries no weight.
+func dgsLabel(gp plan.GroupProgress) string {
+	if gp.DGSMin == nil || gp.DGSMax == nil {
+		return ""
+	}
+	return numSpan(*gp.DGSMin, *gp.DGSMax) + " soru"
+}
+
+// currentPhaseRange returns the first and last plan week of the current phase,
+// from the strip, e.g. 1 and 7 for "Faz 1 · H1–7"; (0, 0) when unknown.
+func currentPhaseRange(v *plan.ProgressView) (first, last int) {
+	for _, c := range v.Strip {
+		if c.PhaseName == "" || c.PhaseName != v.CurrentPhase {
+			continue
+		}
+		if first == 0 || c.WeekNumber < first {
+			first = c.WeekNumber
+		}
+		if c.WeekNumber > last {
+			last = c.WeekNumber
+		}
+	}
+	return first, last
+}
+
+// phaseRangeLabel renders "Faz 1 · H1–7" for the current phase, or just the
+// phase short name when the week range is unknown.
+func phaseRangeLabel(v *plan.ProgressView) string {
+	first, last := currentPhaseRange(v)
+	if first == 0 {
+		return phaseShort(v.CurrentPhase)
+	}
+	return phaseShort(v.CurrentPhase) + " " + middleDot + " H" + strconv.Itoa(first) + enDash + "H" + strconv.Itoa(last)
+}
+
 // progressStrip builds the 38 columns: the current phase's weeks sit on Phase
 // Mist, later phases on Hairline; each column shows its done fraction in ink.
 func progressStrip(v *plan.ProgressView) []stripCell {

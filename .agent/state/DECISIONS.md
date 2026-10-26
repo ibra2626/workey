@@ -2,6 +2,13 @@
 
 Record accepted decisions with date, context, decision, alternatives, and consequences. Do not record proposals as accepted decisions.
 
+## 2026-10-26 — WKY-11: İlerleme layout rebalance after removing deneme/seviye
+- Context: the mockup's İlerleme had a `grid-cols-[1fr_380px]` with the topic-group panel beside a "Denemeler · net" chart, plus an "İlk ölçüm · seviye testi" panel. The v1 decision (no deneme/seviye tracking) removes both, which would leave a 380px hole.
+- Decision: İlerleme is a **single column**. The 38-week strip panel and the topic-group panel each span the full width, stacked. The desktop topic-group row keeps its `[200px_1fr_70px_48px]` grid (name, track, soru weight, %). No empty side column, no placeholder.
+- Also: the 38-week strip is drawn as full-height phase-tinted columns (current phase Phase Mist, later Hairline) with a Forest-Ink overlay for each week's done fraction, rather than the mockup's literal short-bar-per-week; this reads as honest progress and reuses the volume-bar idea. Denominators (hours, seans, weeks) come from the saved plan only — the mockup's 342/190 are never hard-coded.
+- Alternatives: keep the two-column grid and widen the topic-group panel to `1fr` with an empty second column (rejected — leaves a visible gap); move a summary card into the freed space (rejected — nothing honest to put there in v1).
+- Consequences: DESIGN.md's İlerleme description (two side panels) is superseded for v1; WKY-14 aligns the wording.
+
 ## 2026-10-26 — WKY-09: Bugün screen and web screen wiring (`internal/web`)
 - Context: the first real screen. Web handlers needed the plan service; the session profile needed a shape for `uzun_blok`/`deneme`; completion needed an htmx path with a no-JS fallback.
 - Decisions:
