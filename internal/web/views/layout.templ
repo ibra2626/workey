@@ -2,8 +2,9 @@ package views
 
 // Layout is the base HTML shell: Turkish document, embedded CSS and htmx, the
 // desktop rail and the mobile bottom tab bar, and a slot for page content.
-// active is one of "bugun", "hafta", "ilerleme".
-templ Layout(title string, active string) {
+// active is one of "bugun", "hafta", "ilerleme". csrf is the per-session CSRF
+// token, attached to <body> via hx-headers so every htmx request carries it.
+templ Layout(title string, active string, csrf string) {
 	<!DOCTYPE html>
 	<html lang="tr">
 		<head>
@@ -13,7 +14,7 @@ templ Layout(title string, active string) {
 			<link rel="stylesheet" href={ asset("/static/app.css") }/>
 			<script defer src={ asset("/static/htmx.min.js") }></script>
 		</head>
-		<body class="min-h-screen">
+		<body class="min-h-screen" { hxHeaders(csrf)... }>
 			@iconSprite()
 			<div class="md:flex md:min-h-screen">
 				@rail(active)

@@ -1,35 +1,32 @@
-# CURRENT — WKY-07 done, MCP server live at /mcp
+# CURRENT — WKY-08 done, web auth live
 
 Updated 2026-10-26.
 
-Active task: .agent/work/workey-v1/tasks/WKY-07.md (done; not committed)
+Active task: .agent/work/workey-v1/tasks/WKY-08.md (done; not committed)
 
 - Feature: `workey-v1` — Go + templ + htmx + Tailwind single binary; REST `/api/v1`, MCP `/mcp` and web share the one business-logic layer `internal/plan`; SQLite (modernc). Local Windows only; WKY-12 deploy remains blocked by the user.
 - Plan: `.agent/work/workey-v1/TASKS.md`; shared rules: `.agent/work/workey-v1/README.md`. Product: `PRODUCT.md`; visuals: `DESIGN.md`; decisions: `.agent/state/DECISIONS.md`.
-- WKY-01..06 committed; HEAD `a2ff624` (WKY-06). WKY-07 done; this working tree is the WKY-07 change set, about to be committed. No push performed.
+- WKY-01..07 committed; HEAD `97ca6d2` (WKY-07). WKY-08 done; this working tree is the WKY-08 change set, not yet committed. No push performed.
 
-## WKY-07 result
+## WKY-08 result (web auth: Giriş, session cookie, CSRF)
 
-MCP server in `internal/mcpserver` on the official Go SDK `github.com/modelcontextprotocol/go-sdk` v1.8.0, mounted at `/mcp` (Streamable HTTP, stateful default), wrapped with `httpx.SecurityHeaders` + `httpx.BearerAuth` using the same `WORKEY_API_TOKEN` as REST (one user, one token; token is a `New` argument so it can split later).
+Single-user login protecting all web pages; REST/MCP stay Bearer-only.
 
-- `internal/mcpserver/mcpserver.go`: `New(svc, examDate, token) (http.Handler, error)`; registers six typed tools via `mcp.AddTool`; `mapError` renders plan errors as the REST JSON envelope (same `code`/`fields` paths) so they return as tool errors with `IsError` (handler returns a Go error → SDK packs it, output not marshalled).
-- `internal/mcpserver/schema.go`: schemas inferred with `jsonschema.For` then enriched — `book` enum M1/M2/M3/G1/G2, `kind` enum aksam/uzun_blok/deneme, `YYYY-MM-DD` and `HH:MM` patterns, min/max bounds, English descriptions (Europe/Istanbul, references-only). `complete_session.done` optional, schema default `true`.
-- Tools (mirror the service 1:1): `get_plan(from,to)`, `save_plan(SavePlanRequest)`, `complete_session(session_id, done=true)`, `get_outline()`, `save_outline(SaveOutlineRequest)`, `get_progress()`. Inputs reuse `plan` request types for the writes (zero mapping) + small local structs for the two simple reads; outputs are the service view/result types (structured output schemas). Chose `get_outline`/`save_outline` over the task's 3-tool split (recorded).
-- `cmd/workey/main.go`: builds the MCP handler and mounts `/mcp`; `newMux(apiHandler, mcpHandler)`. `cmd/workey/main_test.go` updated for the second argument.
+- `internal/web/password.go`: stdlib `crypto/pbkdf2` SHA-256, 600000 iter, 16-byte salt, 32-byte key; encoding `pbkdf2-sha256$iter$b64salt$b64hash`; `HashPassword`/`VerifyPassword` (constant-time).
+- `internal/web/auth.go`: `Auth` + `NewAuth(passwordHash, sessionKey, cookieSecure, dev)`. Signed session cookie `b64url(sid16||expiry8).b64url(HMAC)`, `HttpOnly`/`Secure`/`SameSite=Lax`/`Path=/`, 30-day. CSRF token = `b64url(HMAC(key,"csrf"||sid))`; `requireAuth` (redirect unauth GET → `/giris` 303, else 401; stores token in ctx), `requireCSRF` (non-GET needs `X-CSRF-Token`). `throttle` (backoff after 3 fails, 30s cap). Dev-open: `WORKEY_DEV=1` + no hash bypasses login.
+- `internal/web/web.go`: `Auth.Handler()` builds a ServeMux wrapped in `http.CrossOriginProtection`; public `GET/POST /giris`, `GET /static/`; protected `GET /{$}|/hafta|/ilerleme`, `POST /cikis`. Mounted at `/` in `cmd/workey` (specific `/healthz`,`/api/v1/`,`/mcp` still win). `newMux` now takes a third `webHandler`.
+- `internal/web/views/login.templ`: self-contained Giriş page (Trail Ground, white panel, Workey wordmark, Parola field, dark ink pill "Giriş yap", plain error, no shadows, centered). `layout.templ` Layout gained a `csrf` param → `hx-headers` on `<body>`; `Placeholder` threads it.
+- `cmd/workey/main.go`: `hash-password` subcommand reads stdin (no console echo on Windows via `golang.org/x/sys/windows`; `password_windows.go` + `password_other.go` fallback), prints only the hash. Builds `web.NewAuth` from config and mounts its handler.
+- Config already had `PasswordHash`/`SessionKey`/`CookieSecure`/`Dev` (WKY-06); unchanged.
 
-## Verification
+## Verification (Go 1.27.3, 2026-10-26, all passed)
 
-Go 1.27.3; all passed on 2026-10-26:
-
-- `go test ./internal/mcpserver/... ./internal/api/... ./internal/plan/... ./cmd/...` — pass. mcpserver tests use an in-process SDK client over Streamable HTTP: list tools, save_outline+save_plan, save_plan again (all unchanged), get_plan, complete_session (today), get_progress, default-done, tool-error code (`future`), and 401 without a token.
-- `go vet ./...` — exit 0.
-- `gofmt -l .` — empty, exit 0.
-- `go build ./...` — exit 0.
-- `CGO_ENABLED=0 go build ./...` — exit 0.
-- No templ/Tailwind regeneration: no UI source changed. `go.mod`/`go.sum` grew (go-sdk + jsonschema-go v0.4.3 + oauth2/time/jwt/segmentio transitive deps); `go mod tidy` run.
+- `go test ./internal/web/... ./cmd/...` — pass. `web_test.go`: wrong/right password, cookie flags, expired + tampered cookie rejected, POST /cikis without CSRF → 403 (with token → 303 + cookie cleared), unauth page → 303 /giris, login public/Turkish, static public, dev-open bypass. `password_test.go`: round trip, fresh salt, malformed-hash errors.
+- `go vet ./...` 0; `gofmt -l .` empty; `go build ./...` 0; `CGO_ENABLED=0 go build ./...` 0. `go mod tidy` promoted `golang.org/x/sys` to a direct dependency (go.mod/go.sum changed).
+- Live at `http://127.0.0.1:8080` with real-auth env (not dev-open): Giriş verified at 390 and 1280 (on-brand, Turkish ş/İ, sentence case, dark pill, no shadows). Correct password → Bugün; `document.cookie` empty (HttpOnly); `hx-headers` carries CSRF; `POST /cikis` → Giriş. Secure cookie accepted over plain http on 127.0.0.1.
 
 ## Next step
 
-WKY-08: Web auth (Giriş screen, session cookie, CSRF), depends on WKY-02, WKY-03. Start a new session with `WKY-08 görevine devam et`; read the index and that task. Note WKY-09/10/11 (screens) and WKY-13 (end-to-end Claude Code MCP writes a week) depend on this MCP work.
+WKY-09: Bugün screen (mobile + desktop), depends on WKY-05, WKY-06, WKY-08. Start a new session: `WKY-09 görevine başla`; read the index and that task. Screens render behind `requireAuth` and read the CSRF token from the layout; use dev-open (`WORKEY_DEV=1`) for preview.
 
-WKY-07 paths (committed with this change set): `internal/mcpserver/`, `cmd/workey/main.go`+`main_test.go`, `go.mod`, `go.sum`, and the `.agent/` records. Push and PR still require an explicit user request.
+WKY-08 paths (not yet committed): `internal/web/` (password.go, auth.go, web.go, *_test.go, views/login.templ + generated, layout.templ/pages.templ/views.go + generated), `cmd/workey/` (main.go, main_test.go, password_windows.go, password_other.go), `go.mod`, `go.sum`, `web/static/app.css`, `.agent/` records. Commit/push/PR require an explicit user request.

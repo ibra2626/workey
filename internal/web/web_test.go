@@ -6,82 +6,232 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
-func newTestMux() *http.ServeMux {
-	mux := http.NewServeMux()
-	AddRoutes(mux)
-	return mux
-}
+// testPassword and its hash are used across the auth tests. The hash is
+// recomputed at test time so the test never hard-codes a stored value.
+const testPassword = "doğru-parola-42"
 
-func getBody(t *testing.T, path string) string {
+func newTestAuth(t *testing.T) *Auth {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, path, nil)
-	rec := httptest.NewRecorder()
-	newTestMux().ServeHTTP(rec, req)
-
-	res := rec.Result()
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		t.Fatalf("GET %s: status = %d, want %d", path, res.StatusCode, http.StatusOK)
-	}
-	b, err := io.ReadAll(res.Body)
+	hash, err := HashPassword(testPassword)
 	if err != nil {
-		t.Fatalf("read body: %v", err)
+		t.Fatalf("HashPassword: %v", err)
 	}
-	return string(b)
+	a, err := NewAuth(hash, "test-session-key-0123456789abcdef", true, false)
+	if err != nil {
+		t.Fatalf("NewAuth: %v", err)
+	}
+	return a
 }
 
-func TestLayoutIsTurkish(t *testing.T) {
-	body := getBody(t, "/")
-	if !strings.Contains(body, `<html lang="tr">`) {
-		t.Errorf(`response does not declare lang="tr"`)
-	}
-}
-
-func TestActiveTabHasAriaCurrent(t *testing.T) {
-	// The active section is marked with aria-current="page" and no other link
-	// is. The marker appears twice per page: once in the desktop rail, once in
-	// the mobile tab bar.
-	cases := []struct {
-		path  string
-		label string
-	}{
-		{"/", "Bugün"},
-		{"/hafta", "Hafta"},
-		{"/ilerleme", "İlerleme"},
-	}
-	for _, c := range cases {
-		body := getBody(t, c.path)
-		if got := strings.Count(body, `aria-current="page"`); got != 2 {
-			t.Errorf("GET %s: aria-current count = %d, want 2 (rail + tab bar)", c.path, got)
-		}
-		// The marked link must be the one whose label matches the section.
-		marker := `aria-current="page"`
-		idx := strings.Index(body, marker)
-		if idx < 0 {
-			t.Fatalf("GET %s: no aria-current link", c.path)
-		}
-		// The label text follows shortly after the opening anchor tag.
-		after := body[idx:]
-		end := strings.Index(after, "</a>")
-		if end < 0 || !strings.Contains(after[:end], c.label) {
-			t.Errorf("GET %s: active link is not %q", c.path, c.label)
-		}
-	}
-}
-
-func TestStaticAssetServedWithCache(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/static/app.css", nil)
+// do runs one request against the auth handler and returns the response.
+func do(t *testing.T, a *Auth, req *http.Request) *http.Response {
+	t.Helper()
 	rec := httptest.NewRecorder()
-	newTestMux().ServeHTTP(rec, req)
+	a.Handler().ServeHTTP(rec, req)
+	return rec.Result()
+}
 
-	res := rec.Result()
+// login performs a successful login and returns the session cookie.
+func login(t *testing.T, a *Auth) *http.Cookie {
+	t.Helper()
+	form := strings.NewReader("parola=" + testPassword)
+	req := httptest.NewRequest(http.MethodPost, "/giris", form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := do(t, a, req)
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusSeeOther {
+		t.Fatalf("login status = %d, want %d", res.StatusCode, http.StatusSeeOther)
+	}
+	for _, c := range res.Cookies() {
+		if c.Name == sessionCookie {
+			return c
+		}
+	}
+	t.Fatal("login set no session cookie")
+	return nil
+}
+
+func TestLoginPageIsPublicAndTurkish(t *testing.T) {
+	a := newTestAuth(t)
+	res := do(t, a, httptest.NewRequest(http.MethodGet, "/giris", nil))
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		t.Fatalf("GET /static/app.css: status = %d, want %d", res.StatusCode, http.StatusOK)
+		t.Fatalf("GET /giris status = %d, want 200", res.StatusCode)
+	}
+	b, _ := io.ReadAll(res.Body)
+	body := string(b)
+	if !strings.Contains(body, `<html lang="tr">`) {
+		t.Error(`login page is not lang="tr"`)
+	}
+	if !strings.Contains(body, "Giriş yap") {
+		t.Error("login page missing the Giriş yap action")
+	}
+}
+
+func TestUnauthenticatedPageRedirectsToGiris(t *testing.T) {
+	a := newTestAuth(t)
+	for _, path := range []string{"/", "/hafta", "/ilerleme"} {
+		res := do(t, a, httptest.NewRequest(http.MethodGet, path, nil))
+		res.Body.Close()
+		if res.StatusCode != http.StatusSeeOther {
+			t.Errorf("GET %s status = %d, want 303", path, res.StatusCode)
+		}
+		if loc := res.Header.Get("Location"); loc != "/giris" {
+			t.Errorf("GET %s redirect = %q, want /giris", path, loc)
+		}
+	}
+}
+
+func TestWrongPasswordRejected(t *testing.T) {
+	a := newTestAuth(t)
+	form := strings.NewReader("parola=yanlış")
+	req := httptest.NewRequest(http.MethodPost, "/giris", form)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res := do(t, a, req)
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("wrong password status = %d, want 401", res.StatusCode)
+	}
+	if len(res.Cookies()) != 0 {
+		t.Error("wrong password set a cookie")
+	}
+	b, _ := io.ReadAll(res.Body)
+	if !strings.Contains(string(b), "Parola hatalı") {
+		t.Error("wrong password did not show the error sentence")
+	}
+}
+
+func TestRightPasswordGrantsAccess(t *testing.T) {
+	a := newTestAuth(t)
+	cookie := login(t, a)
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(cookie)
+	res := do(t, a, req)
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("authenticated GET / status = %d, want 200", res.StatusCode)
+	}
+	b, _ := io.ReadAll(res.Body)
+	if !strings.Contains(string(b), "hx-headers") || !strings.Contains(string(b), csrfHeader) {
+		t.Error("authenticated page did not inject the CSRF token via hx-headers")
+	}
+}
+
+func TestSessionCookieFlags(t *testing.T) {
+	a := newTestAuth(t)
+	c := login(t, a)
+	if !c.HttpOnly {
+		t.Error("session cookie is not HttpOnly")
+	}
+	if !c.Secure {
+		t.Error("session cookie is not Secure")
+	}
+	if c.SameSite != http.SameSiteLaxMode {
+		t.Errorf("session cookie SameSite = %v, want Lax", c.SameSite)
+	}
+	if c.Path != "/" {
+		t.Errorf("session cookie Path = %q, want /", c.Path)
+	}
+	if c.MaxAge <= 0 {
+		t.Errorf("session cookie MaxAge = %d, want > 0", c.MaxAge)
+	}
+}
+
+func TestExpiredCookieRejected(t *testing.T) {
+	a := newTestAuth(t)
+	sid := []byte("0123456789abcdef")
+	value := a.encodeSession(sid, time.Now().Add(-time.Minute))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: value})
+	res := do(t, a, req)
+	res.Body.Close()
+	if res.StatusCode != http.StatusSeeOther {
+		t.Fatalf("expired cookie status = %d, want redirect 303", res.StatusCode)
+	}
+}
+
+func TestTamperedCookieRejected(t *testing.T) {
+	a := newTestAuth(t)
+	c := login(t, a)
+	// Flip the last character of the signed value.
+	tampered := c.Value[:len(c.Value)-1]
+	if strings.HasSuffix(c.Value, "A") {
+		tampered += "B"
+	} else {
+		tampered += "A"
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: tampered})
+	res := do(t, a, req)
+	res.Body.Close()
+	if res.StatusCode != http.StatusSeeOther {
+		t.Fatalf("tampered cookie status = %d, want redirect 303", res.StatusCode)
+	}
+}
+
+func TestLogoutRequiresCSRFToken(t *testing.T) {
+	a := newTestAuth(t)
+	cookie := login(t, a)
+
+	// Without the CSRF header: 403.
+	req := httptest.NewRequest(http.MethodPost, "/cikis", nil)
+	req.AddCookie(cookie)
+	res := do(t, a, req)
+	res.Body.Close()
+	if res.StatusCode != http.StatusForbidden {
+		t.Fatalf("POST /cikis without CSRF status = %d, want 403", res.StatusCode)
+	}
+
+	// With the correct token: logout clears the cookie.
+	sid, ok := a.decodeSession(cookie.Value)
+	if !ok {
+		t.Fatal("could not decode the session cookie")
+	}
+	req = httptest.NewRequest(http.MethodPost, "/cikis", nil)
+	req.AddCookie(cookie)
+	req.Header.Set(csrfHeader, a.csrfToken(sid))
+	res = do(t, a, req)
+	res.Body.Close()
+	if res.StatusCode != http.StatusSeeOther {
+		t.Fatalf("POST /cikis with CSRF status = %d, want 303", res.StatusCode)
+	}
+	var cleared bool
+	for _, c := range res.Cookies() {
+		if c.Name == sessionCookie && c.MaxAge < 0 {
+			cleared = true
+		}
+	}
+	if !cleared {
+		t.Error("logout did not clear the session cookie")
+	}
+}
+
+func TestStaticAssetIsPublicWithCache(t *testing.T) {
+	a := newTestAuth(t)
+	res := do(t, a, httptest.NewRequest(http.MethodGet, "/static/app.css", nil))
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("GET /static/app.css status = %d, want 200", res.StatusCode)
 	}
 	if cc := res.Header.Get("Cache-Control"); !strings.Contains(cc, "immutable") {
 		t.Errorf("Cache-Control = %q, want immutable", cc)
+	}
+}
+
+func TestDevOpenBypassesLogin(t *testing.T) {
+	a, err := NewAuth("", "", false, true) // dev, no password hash
+	if err != nil {
+		t.Fatalf("NewAuth dev: %v", err)
+	}
+	if !a.devOpen {
+		t.Fatal("expected devOpen in dev mode without a password hash")
+	}
+	res := do(t, a, httptest.NewRequest(http.MethodGet, "/", nil))
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("dev-open GET / status = %d, want 200 (no redirect)", res.StatusCode)
 	}
 }

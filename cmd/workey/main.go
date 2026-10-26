@@ -3,16 +3,18 @@
 // Usage:
 //
 //	workey [serve]        start the HTTP server (default)
-//	workey hash-password  print a bcrypt hash of a password (added in WKY-08)
+//	workey hash-password  read a password from stdin and print its PBKDF2 hash
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/ibra2626/workey/internal/api"
@@ -42,9 +44,10 @@ func main() {
 			os.Exit(1)
 		}
 	case "hash-password":
-		// Implemented in WKY-08 (single-user web auth).
-		fmt.Fprintln(os.Stderr, "workey: hash-password is not implemented yet")
-		os.Exit(1)
+		if err := runHashPassword(); err != nil {
+			fmt.Fprintln(os.Stderr, "workey:", err)
+			os.Exit(1)
+		}
 	default:
 		fmt.Fprintf(os.Stderr, "workey: unknown command %q (use \"serve\" or \"hash-password\")\n", cmd)
 		os.Exit(2)
@@ -77,10 +80,14 @@ func runServe() error {
 	if err != nil {
 		return err
 	}
+	auth, err := web.NewAuth(cfg.PasswordHash, cfg.SessionKey, cfg.CookieSecure, cfg.Dev)
+	if err != nil {
+		return err
+	}
 
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           newMux(apiHandler, mcpHandler),
+		Handler:           newMux(apiHandler, mcpHandler, auth.Handler()),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -108,9 +115,10 @@ func runServe() error {
 }
 
 // newMux builds the HTTP router. Kept separate from runServe so handlers are
-// testable with httptest. apiHandler and mcpHandler may be nil (e.g. in tests
-// that exercise only the always-on routes).
-func newMux(apiHandler, mcpHandler http.Handler) *http.ServeMux {
+// testable with httptest. Any handler may be nil (e.g. in tests that exercise
+// only the always-on routes). The web handler is mounted at "/"; the more
+// specific /healthz, /api/v1/ and /mcp patterns still take precedence.
+func newMux(apiHandler, mcpHandler, webHandler http.Handler) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthz)
 	if apiHandler != nil {
@@ -119,8 +127,42 @@ func newMux(apiHandler, mcpHandler http.Handler) *http.ServeMux {
 	if mcpHandler != nil {
 		mux.Handle("/mcp", mcpHandler)
 	}
-	web.AddRoutes(mux)
+	if webHandler != nil {
+		mux.Handle("/", webHandler)
+	}
 	return mux
+}
+
+// runHashPassword reads a password from stdin (without terminal echo when stdin
+// is a terminal) and prints only its PBKDF2 hash, for WORKEY_PASSWORD_HASH.
+func runHashPassword() error {
+	password, err := readPassword()
+	if err != nil {
+		return err
+	}
+	if password == "" {
+		return errors.New("empty password")
+	}
+	hash, err := web.HashPassword(password)
+	if err != nil {
+		return err
+	}
+	fmt.Println(hash)
+	return nil
+}
+
+// readPassword reads one password. On a console it disables echo and prompts on
+// stderr (readConsolePassword); otherwise, or when the platform cannot suppress
+// echo, it reads a single line from stdin (e.g. a pipe).
+func readPassword() (string, error) {
+	if pw, ok, err := readConsolePassword(); ok {
+		return pw, err
+	}
+	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	if err != nil && line == "" {
+		return "", err
+	}
+	return strings.TrimRight(line, "\r\n"), nil
 }
 
 func healthz(w http.ResponseWriter, _ *http.Request) {

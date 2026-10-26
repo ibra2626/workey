@@ -3,8 +3,8 @@ package views
 // Placeholder proves the base layout before the real screens land (WKY-03+).
 // It renders a single flat panel with a heading and a sample-data note; the
 // Turkish glyphs here exercise both font subsets at render time.
-templ Placeholder(active string, title string, heading string) {
-	@Layout(title, active) {
+templ Placeholder(active string, title string, heading string, csrf string) {
+	@Layout(title, active, csrf) {
 		<div class="mx-auto max-w-[760px]">
 			<section class="rounded-panel bg-card p-5 md:p-7">
 				<p class="text-label text-ink-3">Taslak düzen · WKY-02</p>

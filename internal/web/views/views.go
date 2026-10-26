@@ -28,6 +28,16 @@ var navItems = []navItem{
 	{Href: "/ilerleme", Label: "İlerleme", Icon: "i-prog", Key: "ilerleme"},
 }
 
+// hxHeaders attaches the CSRF token to htmx requests via the hx-headers
+// attribute on <body>, so every non-GET htmx request carries X-CSRF-Token. It
+// renders nothing when csrf is empty (e.g. an unauthenticated render).
+func hxHeaders(csrf string) templ.Attributes {
+	if csrf == "" {
+		return nil
+	}
+	return templ.Attributes{"hx-headers": `{"X-CSRF-Token":"` + csrf + `"}`}
+}
+
 // ariaCurrent marks the active link with aria-current="page" and nothing on the
 // others; the visual active state is driven from that attribute in the CSS.
 func ariaCurrent(active bool) templ.Attributes {

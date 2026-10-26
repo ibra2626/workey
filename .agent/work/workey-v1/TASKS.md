@@ -11,7 +11,7 @@ Shared rules for every task: `README.md` in this folder (invariants, layout, con
 | WKY-05 | [Plan service: read models and completion](tasks/WKY-05.md) | done | WKY-04 |
 | WKY-06 | [REST API /api/v1 with Bearer auth](tasks/WKY-06.md) | done | WKY-05 |
 | WKY-07 | [MCP server (Streamable HTTP)](tasks/WKY-07.md) | done | WKY-06 |
-| WKY-08 | [Web auth: Giriş screen, session cookie, CSRF](tasks/WKY-08.md) | todo | WKY-02, WKY-03 |
+| WKY-08 | [Web auth: Giriş screen, session cookie, CSRF](tasks/WKY-08.md) | done | WKY-02, WKY-03 |
 | WKY-09 | [Bugün screen (mobile + desktop)](tasks/WKY-09.md) | todo | WKY-05, WKY-06, WKY-08 |
 | WKY-10 | [Hafta screen (mobile + desktop)](tasks/WKY-10.md) | todo | WKY-09 |
 | WKY-11 | [İlerleme screen (mobile + desktop)](tasks/WKY-11.md) | todo | WKY-09 |
