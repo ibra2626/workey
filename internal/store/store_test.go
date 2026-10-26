@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"path/filepath"
 	"testing"
 )
@@ -70,7 +71,7 @@ func TestForeignKeysOn(t *testing.T) {
 	}
 
 	// An item under a missing session violates the FK.
-	err := s.WithTx(ctx, func(tx dbtx) error {
+	err := s.WithTx(ctx, func(tx *sql.Tx) error {
 		return s.InsertSessionItem(ctx, tx, &SessionItem{
 			SessionID: 999, Ordinal: 1, Book: "M1",
 			ChapterNo: 1, ChapterTitle: "x", PageFrom: 1, PageTo: 2,
@@ -90,7 +91,7 @@ func TestSessionsByDateRangeWithItems(t *testing.T) {
 	// inside [2026-11-02, 2026-11-08] in date/time order with their items.
 	mk := func(date, start, kind string) int64 {
 		var id int64
-		err := s.WithTx(ctx, func(tx dbtx) error {
+		err := s.WithTx(ctx, func(tx *sql.Tx) error {
 			sess := &Session{
 				Date: date, StartTime: start, DurationMin: 90, Kind: kind,
 				CreatedAt: now, UpdatedAt: now,
@@ -140,7 +141,7 @@ func TestCascadeDeleteItems(t *testing.T) {
 	now := "2026-10-26T09:00:00Z"
 
 	var sessID int64
-	if err := s.WithTx(ctx, func(tx dbtx) error {
+	if err := s.WithTx(ctx, func(tx *sql.Tx) error {
 		sess := &Session{Date: "2026-11-02", StartTime: "20:00", DurationMin: 90, Kind: "aksam", CreatedAt: now, UpdatedAt: now}
 		if err := s.InsertSession(ctx, tx, sess); err != nil {
 			return err
@@ -171,14 +172,14 @@ func TestCheckConstraints(t *testing.T) {
 	now := "2026-10-26T09:00:00Z"
 
 	// Bad kind.
-	if err := s.WithTx(ctx, func(tx dbtx) error {
+	if err := s.WithTx(ctx, func(tx *sql.Tx) error {
 		return s.InsertSession(ctx, tx, &Session{Date: "2026-11-02", StartTime: "20:00", DurationMin: 90, Kind: "yok", CreatedAt: now, UpdatedAt: now})
 	}); err == nil {
 		t.Fatal("expected CHECK failure for bad kind")
 	}
 
 	// page_from > page_to.
-	err := s.WithTx(ctx, func(tx dbtx) error {
+	err := s.WithTx(ctx, func(tx *sql.Tx) error {
 		sess := &Session{Date: "2026-11-03", StartTime: "20:00", DurationMin: 90, Kind: "aksam", CreatedAt: now, UpdatedAt: now}
 		if err := s.InsertSession(ctx, tx, sess); err != nil {
 			return err
@@ -196,7 +197,7 @@ func TestUniqueDateStartTime(t *testing.T) {
 	now := "2026-10-26T09:00:00Z"
 
 	ins := func() error {
-		return s.WithTx(ctx, func(tx dbtx) error {
+		return s.WithTx(ctx, func(tx *sql.Tx) error {
 			return s.InsertSession(ctx, tx, &Session{Date: "2026-11-02", StartTime: "20:00", DurationMin: 90, Kind: "aksam", CreatedAt: now, UpdatedAt: now})
 		})
 	}
@@ -214,7 +215,7 @@ func TestMakeupSelfReferenceAndSetNull(t *testing.T) {
 	now := "2026-10-26T09:00:00Z"
 
 	var missedID, makeupID int64
-	if err := s.WithTx(ctx, func(tx dbtx) error {
+	if err := s.WithTx(ctx, func(tx *sql.Tx) error {
 		missed := &Session{Date: "2026-11-02", StartTime: "20:00", DurationMin: 90, Kind: "aksam", CreatedAt: now, UpdatedAt: now}
 		if err := s.InsertSession(ctx, tx, missed); err != nil {
 			return err
@@ -252,7 +253,7 @@ func TestAuditInsert(t *testing.T) {
 		Entity: "session", EntityID: ptrI64(7),
 		BeforeJSON: nil, AfterJSON: ptrStr(`{"id":7}`), RequestHash: ptrStr("abc123"),
 	}
-	if err := s.WithTx(ctx, func(tx dbtx) error {
+	if err := s.WithTx(ctx, func(tx *sql.Tx) error {
 		return s.InsertAudit(ctx, tx, entry)
 	}); err != nil {
 		t.Fatalf("InsertAudit: %v", err)
@@ -273,7 +274,7 @@ func TestAuditInsert(t *testing.T) {
 	}
 
 	// Bad source is rejected.
-	if err := s.WithTx(ctx, func(tx dbtx) error {
+	if err := s.WithTx(ctx, func(tx *sql.Tx) error {
 		return s.InsertAudit(ctx, tx, &AuditEntry{AtUTC: "2026-10-26T09:00:00Z", Source: "cron", Action: "x", Entity: "session"})
 	}); err == nil {
 		t.Fatal("expected CHECK failure for bad audit source")
@@ -297,7 +298,7 @@ func TestIdempotencyRoundTrip(t *testing.T) {
 		Key: "req-1", RequestHash: "hash-1",
 		ResponseJSON: `{"ok":true}`, CreatedAt: "2026-10-26T09:00:00Z",
 	}
-	if err := s.WithTx(ctx, func(tx dbtx) error {
+	if err := s.WithTx(ctx, func(tx *sql.Tx) error {
 		return s.PutIdempotency(ctx, tx, rec)
 	}); err != nil {
 		t.Fatalf("PutIdempotency: %v", err)
@@ -312,7 +313,7 @@ func TestIdempotencyRoundTrip(t *testing.T) {
 	}
 
 	// Same key again is rejected (PK), so callers must read-before-write.
-	if err := s.WithTx(ctx, func(tx dbtx) error {
+	if err := s.WithTx(ctx, func(tx *sql.Tx) error {
 		return s.PutIdempotency(ctx, tx, rec)
 	}); err == nil {
 		t.Fatal("expected PK violation on duplicate idempotency key")

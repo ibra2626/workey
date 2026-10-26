@@ -1,0 +1,19 @@
+{
+  "_comment": "SAMPLE DATA — not a real plan. Faz 1 and the five topic groups from the design mockup (design/directions/04-antrenman-gunlugu.html). The real outline is written by the AI assistant through the MCP/API interface.",
+  "phases": [
+    {
+      "key": "faz-1",
+      "ordinal": 1,
+      "name": "Faz 1 · İşlem temeli",
+      "start_date": "2026-10-26",
+      "end_date": "2026-12-13"
+    }
+  ],
+  "topic_groups": [
+    { "key": "temel-kavramlar", "name": "Temel kavramlar", "ordinal": 1, "dgs_question_min": 8, "dgs_question_max": 10 },
+    { "key": "problemler", "name": "Problemler", "ordinal": 2, "dgs_question_min": 15, "dgs_question_max": 18 },
+    { "key": "uslu-koklu-carpanlar", "name": "Üslü, köklü, çarpanlar", "ordinal": 3, "dgs_question_min": 5, "dgs_question_max": 7 },
+    { "key": "sayisal-mantik", "name": "Sayısal mantık", "ordinal": 4, "dgs_question_min": 6, "dgs_question_max": 8 },
+    { "key": "geometri", "name": "Geometri", "ordinal": 5, "dgs_question_min": 6, "dgs_question_max": 7 }
+  ]
+}

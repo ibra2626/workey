@@ -1,0 +1,69 @@
+{
+  "_comment": "SAMPLE DATA — not a real plan. Week 1 (26 Ekim – 1 Kasım 2026) from the design mockup (design/directions/04-antrenman-gunlugu.html): four weekday evening blocks and a Saturday long block. The real plan is written by the AI assistant through the MCP/API interface.",
+  "from": "2026-10-26",
+  "to": "2026-11-01",
+  "sessions": [
+    {
+      "date": "2026-10-26",
+      "start_time": "20:30",
+      "duration_min": 90,
+      "kind": "aksam",
+      "topic_group": "temel-kavramlar",
+      "items": [
+        { "book": "M1", "chapter_no": 1, "chapter_title": "Temel kavramlar", "page_from": 1, "page_to": 22 }
+      ]
+    },
+    {
+      "date": "2026-10-27",
+      "start_time": "20:30",
+      "duration_min": 90,
+      "kind": "aksam",
+      "topic_group": "temel-kavramlar",
+      "items": [
+        { "book": "M1", "chapter_no": 2, "chapter_title": "Sayı basamakları", "page_from": 23, "page_to": 40 }
+      ]
+    },
+    {
+      "date": "2026-10-28",
+      "start_time": "20:30",
+      "duration_min": 90,
+      "kind": "aksam",
+      "topic_group": "uslu-koklu-carpanlar",
+      "items": [
+        {
+          "book": "M1",
+          "chapter_no": 3,
+          "chapter_title": "Üslü ifadeler",
+          "page_from": 41,
+          "page_to": 58,
+          "konu_from": 41,
+          "konu_to": 44,
+          "soru_from": 45,
+          "soru_to": 58,
+          "antrenman_from": 1,
+          "antrenman_to": 3
+        }
+      ]
+    },
+    {
+      "date": "2026-10-29",
+      "start_time": "20:30",
+      "duration_min": 90,
+      "kind": "aksam",
+      "topic_group": "uslu-koklu-carpanlar",
+      "items": [
+        { "book": "M1", "chapter_no": 4, "chapter_title": "Köklü ifadeler", "page_from": 59, "page_to": 76 }
+      ]
+    },
+    {
+      "date": "2026-10-31",
+      "start_time": "10:00",
+      "duration_min": 180,
+      "kind": "uzun_blok",
+      "items": [
+        { "book": "M1", "chapter_no": 2, "chapter_title": "Sayı basamakları", "page_from": 23, "page_to": 40 },
+        { "book": "M1", "chapter_no": 1, "chapter_title": "Karma tekrar (1–4)", "page_from": 1, "page_to": 76 }
+      ]
+    }
+  ]
+}

@@ -5,9 +5,9 @@ Shared rules for every task: `README.md` in this folder (invariants, layout, con
 | ID | Task | Status | Depends on |
 | --- | --- | --- | --- |
 | WKY-01 | [Go skeleton, config, HTTP server](tasks/WKY-01.md) | done | — |
-| WKY-02 | [Frontend toolchain: templ, Tailwind, fonts, htmx, base layout](tasks/WKY-02.md) | todo | WKY-01 |
-| WKY-03 | [SQLite store and schema](tasks/WKY-03.md) | todo | WKY-01 |
-| WKY-04 | [Plan service: write path (save plan, outline, audit)](tasks/WKY-04.md) | todo | WKY-03 |
+| WKY-02 | [Frontend toolchain: templ, Tailwind, fonts, htmx, base layout](tasks/WKY-02.md) | done | WKY-01 |
+| WKY-03 | [SQLite store and schema](tasks/WKY-03.md) | done | WKY-01 |
+| WKY-04 | [Plan service: write path (save plan, outline, audit)](tasks/WKY-04.md) | done | WKY-03 |
 | WKY-05 | [Plan service: read models and completion](tasks/WKY-05.md) | todo | WKY-04 |
 | WKY-06 | [REST API /api/v1 with Bearer auth](tasks/WKY-06.md) | todo | WKY-05 |
 | WKY-07 | [MCP server (Streamable HTTP)](tasks/WKY-07.md) | todo | WKY-06 |

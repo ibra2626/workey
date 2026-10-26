@@ -88,6 +88,87 @@ func (s *Store) InsertSession(ctx context.Context, q dbtx, sess *Session) error 
 	return nil
 }
 
+// UpdateSession updates the mutable fields of the session with sess.ID. It does
+// not touch items; callers replace items with DeleteSessionItems +
+// InsertSessionItem.
+func (s *Store) UpdateSession(ctx context.Context, q dbtx, sess *Session) error {
+	if _, err := q.ExecContext(ctx, `
+		UPDATE sessions SET
+			duration_min = ?, kind = ?, topic_group_id = ?, makeup_of = ?, updated_at = ?
+		WHERE id = ?`,
+		sess.DurationMin, sess.Kind, sess.TopicGroupID, sess.MakeupOf,
+		sess.UpdatedAt, sess.ID,
+	); err != nil {
+		return fmt.Errorf("store: update session %d: %w", sess.ID, err)
+	}
+	return nil
+}
+
+// DeleteSession deletes the session with the given id. Its items are removed by
+// the ON DELETE CASCADE foreign key.
+func (s *Store) DeleteSession(ctx context.Context, q dbtx, id int64) error {
+	if _, err := q.ExecContext(ctx, `DELETE FROM sessions WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("store: delete session %d: %w", id, err)
+	}
+	return nil
+}
+
+// DeleteSessionItems removes every item of a session, so the caller can
+// re-insert the new set in one transaction.
+func (s *Store) DeleteSessionItems(ctx context.Context, q dbtx, sessionID int64) error {
+	if _, err := q.ExecContext(ctx, `DELETE FROM session_items WHERE session_id = ?`, sessionID); err != nil {
+		return fmt.Errorf("store: delete session items of %d: %w", sessionID, err)
+	}
+	return nil
+}
+
+// SessionByDateAndTime returns the single session at (date, start_time) with its
+// items, or (nil, nil) if there is none. UNIQUE(date, start_time) guarantees at
+// most one.
+func (s *Store) SessionByDateAndTime(ctx context.Context, q dbtx, date, startTime string) (*Session, error) {
+	var ss Session
+	err := q.QueryRowContext(ctx, `
+		SELECT id, date, start_time, duration_min, kind, topic_group_id, makeup_of,
+		       completed_at, completed_source, created_at, updated_at
+		FROM sessions WHERE date = ? AND start_time = ?`, date, startTime,
+	).Scan(
+		&ss.ID, &ss.Date, &ss.StartTime, &ss.DurationMin, &ss.Kind,
+		&ss.TopicGroupID, &ss.MakeupOf, &ss.CompletedAt, &ss.CompletedSource,
+		&ss.CreatedAt, &ss.UpdatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("store: get session %s %s: %w", date, startTime, err)
+	}
+
+	itemRows, err := q.QueryContext(ctx, `
+		SELECT id, session_id, ordinal, book, chapter_no, chapter_title,
+		       page_from, page_to, konu_from, konu_to, soru_from, soru_to,
+		       antrenman_from, antrenman_to
+		FROM session_items WHERE session_id = ? ORDER BY ordinal`, ss.ID)
+	if err != nil {
+		return nil, fmt.Errorf("store: query items of %d: %w", ss.ID, err)
+	}
+	defer itemRows.Close()
+	for itemRows.Next() {
+		var it SessionItem
+		if err := itemRows.Scan(
+			&it.ID, &it.SessionID, &it.Ordinal, &it.Book, &it.ChapterNo, &it.ChapterTitle,
+			&it.PageFrom, &it.PageTo, &it.KonuFrom, &it.KonuTo, &it.SoruFrom, &it.SoruTo,
+			&it.AntrenmanFrom, &it.AntrenmanTo,
+		); err != nil {
+			return nil, fmt.Errorf("store: scan item of %d: %w", ss.ID, err)
+		}
+		ss.Items = append(ss.Items, it)
+	}
+	if err := itemRows.Err(); err != nil {
+		return nil, fmt.Errorf("store: iterate items of %d: %w", ss.ID, err)
+	}
+	return &ss, nil
+}
+
 // InsertSessionItem inserts it under its SessionID and sets it.ID.
 func (s *Store) InsertSessionItem(ctx context.Context, q dbtx, it *SessionItem) error {
 	res, err := q.ExecContext(ctx, `

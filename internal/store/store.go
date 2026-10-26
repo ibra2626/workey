@@ -66,8 +66,10 @@ func (s *Store) Close() error { return s.db.Close() }
 func (s *Store) DB() *sql.DB { return s.db }
 
 // WithTx runs fn inside a transaction, committing on success and rolling back
-// on error or panic.
-func (s *Store) WithTx(ctx context.Context, fn func(tx dbtx) error) (err error) {
+// on error or panic. fn receives the *sql.Tx, which satisfies the dbtx that
+// every query helper accepts, so callers in other packages can compose helpers
+// without naming the unexported interface.
+func (s *Store) WithTx(ctx context.Context, fn func(tx *sql.Tx) error) (err error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("store: begin tx: %w", err)
@@ -120,7 +122,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("store: read migration %s: %w", name, err)
 		}
-		if err := s.WithTx(ctx, func(tx dbtx) error {
+		if err := s.WithTx(ctx, func(tx *sql.Tx) error {
 			if _, err := tx.ExecContext(ctx, string(body)); err != nil {
 				return fmt.Errorf("store: apply migration %s: %w", name, err)
 			}
