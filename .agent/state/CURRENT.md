@@ -1,26 +1,36 @@
-# CURRENT — WKY-05 done, plan read models + completion live
+# CURRENT — WKY-06 done, protected REST API live
 
 Updated 2026-10-26.
 
-Active task: .agent/work/workey-v1/tasks/WKY-05.md (done; not committed)
+Active task: .agent/work/workey-v1/tasks/WKY-06.md (done; not committed)
 
-- Feature: `workey-v1` — Go + templ + htmx + Tailwind single binary; Giriş / Bugün / Hafta / İlerleme; REST `/api/v1` and MCP `/mcp` over one `internal/plan` service; SQLite (modernc). Local Windows only; WKY-12 (deploy) blocked by the user.
-- Plan: `.agent/work/workey-v1/TASKS.md`; shared invariants + layout in `.agent/work/workey-v1/README.md` (read with each task). Module path `github.com/ibra2626/workey`, go1.27.3.
-- Done: WKY-01 (skeleton/config/clock/server), WKY-02 (frontend toolchain + base layout), WKY-03 (store + schema), WKY-04 (plan write path), WKY-05 (read models + completion). WKY-01..04 are committed (HEAD `0ae785d`); WKY-05 is **not committed** yet. Index statuses 02–05 set to done.
+- Feature: `workey-v1` — Go + templ + htmx + Tailwind single binary; REST `/api/v1` and MCP `/mcp` share `internal/plan`; SQLite (modernc). Local Windows only; WKY-12 deploy remains blocked by the user.
+- Plan: `.agent/work/workey-v1/TASKS.md`; shared rules: `.agent/work/workey-v1/README.md`. Product: `PRODUCT.md`; visuals: `DESIGN.md`; decisions: `.agent/state/DECISIONS.md`.
+- WKY-01..05 committed; HEAD `e5fd26e` (WKY-05). WKY-06 done, uncommitted; TASKS updated. No commit/push performed.
 
-## WKY-05 result (done, not committed)
-The read side and completion, all computed in `internal/plan` so web/REST/MCP only render.
+## WKY-06 result
 
-- **New files** — `read.go` (view models + `Day`/`Week`/`Progress`), `complete.go` (`Complete`/`Undo`), `dates.go` (Turkish calendar + formatters). Plus tests `read_test.go`, `complete_test.go`, `dates_test.go`.
-- **`Day(ctx, date)` → `DayView`**: the day's `SessionView`s, `Tomorrow` (next day's first session), week-scoped `Notes`, `IsRest`, Turkish `Heading` ("Çarşamba, 28 Ekim").
-- **`Week(ctx, date)` → `WeekView`**: 7 `DayRow`s (rest days included), `PlannedMin`/`DoneMin`, `SessionsPlanned`/`SessionsDone`, `MovedCount`, `WeekNumber` (1..38), `PhaseName`, `RangeLabel` ("26 Eki–1 Kas"), `Notes`. Planned totals count every session (incl. missed/moved); done counts only completed.
-- **`Progress(ctx, examDate)` → `ProgressView`**: `HasPlan`, `WeekNumber`/`WeeksTotal`(=38), sessions & hours done/planned (`DoneHours`/`PlannedHours`, decimal comma), `CurrentPhase`, `DaysToExam`/`AfterExam`/`ExamDate`, 5× `GroupProgress` (DGS range + completed share = done/planned minutes, `Percent`), 38× `WeekCell` strip (per-week done fraction + phase membership). `examDate` is a **parameter** (from `WORKEY_EXAM_DATE`), not a `New` arg — `New(st, clk)` unchanged.
-- **Derived `SessionState`** `planned|today|done|missed|moved`: done > (past → moved if referenced by a makeup link, else missed) > today > planned. Moved row carries `MovedTo{Date, Weekday}`; "moved" is derived from the link (`store.ListMakeupLinks`), never stored. Note line: "Salı yapılamadı; M1·2 cumartesi bloğuna eklendi." (missed weekday capitalised, makeup weekday lowercased, `Ref` of the missed first item).
-- **`Complete`/`Undo(ctx, source, sessionID)`**: today-or-past only (future → `ValidationError` code `future`; missing → `not_found`); idempotent (already in target state → no write, no audit row); audited as action `complete`/`undo` with before/after JSON and **NULL** request hash; return the updated `SessionView`.
-- **`dates.go`**: weekday/month name tables (full/lower/short, lowercase written out — no Turkish case conversion), `FormatDayHeading`, `FormatShortDate`, `FormatWeekRange` (en dash U+2013), `FormatHoursTR` (90→"1,5", 540→"9", 75→"1,25"). Civil-date math (`toDate`/`addDays`/`civilDays`) on UTC midnights — zone-free, DST-proof. `WeeksTotal = 38`; plan start = first phase's Monday (fallback earliest session's Monday).
-- **Store additions (WKY-03 layer, persistence only):** `queries.go` + `SessionByID`, `AllSessions`, `SetSessionCompletion`, `ListMakeupLinks` (+ type `MakeupLink`), private `sessionItems`; `errors.go` + code `CodeFuture = "future"` and `fieldError` helper.
-- **Checks all green:** `go test ./internal/config/... ./internal/clock/... ./internal/store/... ./internal/plan/... ./cmd/...`, `go vet ./...`, `gofmt -l .` empty, `CGO_ENABLED=0 go build ./...`. No templ/Tailwind touched (no UI files). DECISIONS entry added (WKY-05).
-- **Uncommitted now:** new `internal/plan/{read,complete,dates}.go` + their `_test.go`; modified `internal/store/queries.go`, `internal/plan/errors.go`; `.agent/` docs (TASKS index, WKY-05 Progress, DECISIONS, this file).
+- `internal/httpx/{httpx.go,httpx_test.go}`: reusable Bearer auth (SHA-256 digests + constant-time comparison; empty configured token fails closed), 401 challenge, JSON error envelope, request body cap and security headers.
+- `internal/api/{api.go,api_test.go}`: nine routes — GET/PUT plan, GET/PUT outline, GET today/week/progress, POST/DELETE session completion. Input parsing and service error mapping only; write source `api`. Optional `Idempotency-Key` header overrides the body key.
+- Errors: malformed/over-limit JSON 400; validation 422 (including field code `future`); all-not-found 404; conflicting idempotency key 409; unexpected errors generic 500. API cap 1 MiB; no-store/nosniff/no-referrer headers.
+- `internal/plan/read.go`: `Range`, `Outline`, `Today`, `TodayDate`, outline read types, exported `ParseDate`. State/notation/calendar stay in the service.
+- `cmd/workey/main.go`: opens/migrates SQLite at startup, default path `workey.db`, creates service/API and mounts `/api/v1/`. `main_test.go` adjusted for the mux argument.
+- `docs/api.md`: auth, dates/times, routes, examples, idempotency and errors. Acceptance criteria checked; handler boundaries and documented routes reviewed.
+
+## Verification
+
+Go 1.27.3; all passed on 2026-10-26:
+
+- `go test ./internal/httpx/... ./internal/api/... ./internal/plan/... ./cmd/...` — all four packages pass (fixture round trip, auth, unchanged repeat, key replay/conflict, field errors, completion/undo/future/not-found).
+- `go vet ./...` — exit 0.
+- `gofmt -l .` — empty, exit 0.
+- `go build ./...` — exit 0.
+- `CGO_ENABLED=0 go build ./...` — exit 0; PowerShell used `$env:CGO_ENABLED = '0'; go build ./...`.
+- Both builds emitted a non-fatal module stat-cache write permission warning under the user Go cache; compilation succeeded.
+- No templ/Tailwind regeneration: no UI source changed.
 
 ## Next step
-WKY-06 (REST API `/api/v1` with Bearer auth) — depends on WKY-05. Build `internal/api` + `internal/httpx` (bearer middleware, JSON errors, security headers) over `plan.Service`: write endpoints (save plan/outline, complete/undo) and read endpoints (Day/Week/Progress) that parse → call → render the service's typed results; `ValidationError` → structured JSON, `ErrIdempotencyConflict` → 409. New session → read TASKS.md index then `tasks/WKY-06.md`. Nothing is committed for WKY-05; a release session stages `internal/plan/{read,complete,dates}.go` (+tests), `internal/store/queries.go`, `internal/plan/errors.go`, and the `.agent/` docs.
+
+WKY-07: MCP server (Streamable HTTP), depending on WKY-06. Start a new session with `WKY-07 görevine devam et`; read the index and that task. Reuse `internal/httpx` and `plan.Service`; preserve the single business-logic layer and injectable Istanbul clock.
+
+Pending WKY-06 paths: `cmd/workey/main.go`, `cmd/workey/main_test.go`, `internal/plan/read.go`, new `internal/api/`, new `internal/httpx/`, new `docs/api.md`, and four updated `.agent/` records. Release actions require an explicit user request.

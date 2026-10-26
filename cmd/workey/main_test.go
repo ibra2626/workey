@@ -11,7 +11,7 @@ func TestHealthz(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rec := httptest.NewRecorder()
 
-	newMux().ServeHTTP(rec, req)
+	newMux(nil).ServeHTTP(rec, req)
 
 	res := rec.Result()
 	defer res.Body.Close()

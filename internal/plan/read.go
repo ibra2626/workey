@@ -330,7 +330,7 @@ func (s *Service) Progress(ctx context.Context, examDate clock.Date) (*ProgressV
 	donePerWeek := make([]int, WeeksTotal)
 	planPerWeek := make([]int, WeeksTotal)
 	for _, ss := range all {
-		d, ok := toDate(ss.Date)
+		d, ok := ParseDate(ss.Date)
 		if !ok {
 			continue
 		}
@@ -358,6 +358,93 @@ func (s *Service) Progress(ctx context.Context, examDate clock.Date) (*ProgressV
 		view.Strip = append(view.Strip, cell)
 	}
 	return view, nil
+}
+
+// Range returns the sessions in [from, to] (inclusive) as SessionViews with
+// derived state, resolved topic-group names and item notation, ordered by date
+// then start time. It backs GET /api/v1/plan.
+func (s *Service) Range(ctx context.Context, from, to clock.Date) ([]SessionView, error) {
+	today := clock.Today(s.clk).String()
+	db := s.st.DB()
+	tgName, tgKey, err := s.topicGroupNames(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	movedBy, err := s.movedByMissed(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	sessions, err := s.st.SessionsByDateRange(ctx, db, from.String(), to.String())
+	if err != nil {
+		return nil, err
+	}
+	views := make([]SessionView, 0, len(sessions))
+	for _, ss := range sessions {
+		views = append(views, buildSessionView(ss, today, movedBy, tgName, tgKey))
+	}
+	return views, nil
+}
+
+// Today returns the Bugün model for the clock's current date.
+func (s *Service) Today(ctx context.Context) (*DayView, error) {
+	return s.Day(ctx, clock.Today(s.clk))
+}
+
+// TodayDate returns the clock's current civil date (Istanbul). It is a read
+// accessor so callers can default a missing ?date= to today.
+func (s *Service) TodayDate() clock.Date {
+	return clock.Today(s.clk)
+}
+
+// PhaseInfo and TopicGroupInfo mirror the stored outline for read responses.
+type PhaseInfo struct {
+	Key       string `json:"key"`
+	Ordinal   int    `json:"ordinal"`
+	Name      string `json:"name"`
+	StartDate string `json:"start_date"`
+	EndDate   string `json:"end_date"`
+}
+
+// TopicGroupInfo is one topic group in an OutlineView.
+type TopicGroupInfo struct {
+	Key            string `json:"key"`
+	Name           string `json:"name"`
+	Ordinal        int    `json:"ordinal"`
+	DGSQuestionMin *int   `json:"dgs_question_min,omitempty"`
+	DGSQuestionMax *int   `json:"dgs_question_max,omitempty"`
+}
+
+// OutlineView is the saved phases and topic groups, for GET /api/v1/outline.
+type OutlineView struct {
+	Phases      []PhaseInfo      `json:"phases"`
+	TopicGroups []TopicGroupInfo `json:"topic_groups"`
+}
+
+// Outline returns the current phases and topic groups ordered by ordinal.
+func (s *Service) Outline(ctx context.Context) (*OutlineView, error) {
+	db := s.st.DB()
+	phases, err := s.st.ListPhases(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	groups, err := s.st.ListTopicGroups(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	out := &OutlineView{}
+	for _, p := range phases {
+		out.Phases = append(out.Phases, PhaseInfo{
+			Key: p.Key, Ordinal: p.Ordinal, Name: p.Name,
+			StartDate: p.StartDate, EndDate: p.EndDate,
+		})
+	}
+	for _, g := range groups {
+		out.TopicGroups = append(out.TopicGroups, TopicGroupInfo{
+			Key: g.Key, Name: g.Name, Ordinal: g.Ordinal,
+			DGSQuestionMin: g.DGSQuestionMin, DGSQuestionMax: g.DGSQuestionMax,
+		})
+	}
+	return out, nil
 }
 
 // --- shared read helpers ---
@@ -519,7 +606,7 @@ func planStartFromPhases(phases []store.Phase) (clock.Date, bool) {
 	if earliest == "" {
 		return clock.Date{}, false
 	}
-	d, ok := toDate(earliest)
+	d, ok := ParseDate(earliest)
 	if !ok {
 		return clock.Date{}, false
 	}
@@ -541,7 +628,7 @@ func planStartMonday(phases []store.Phase, sessions []store.Session) (clock.Date
 	if earliest == "" {
 		return clock.Date{}, false
 	}
-	d, ok := toDate(earliest)
+	d, ok := ParseDate(earliest)
 	if !ok {
 		return clock.Date{}, false
 	}
@@ -550,8 +637,8 @@ func planStartMonday(phases []store.Phase, sessions []store.Session) (clock.Date
 
 // --- civil-date arithmetic (zone-free; Turkey has no DST since 2016) ---
 
-// toDate parses a 'YYYY-MM-DD' string into a civil Date.
-func toDate(s string) (clock.Date, bool) {
+// ParseDate parses a 'YYYY-MM-DD' string into a civil Date.
+func ParseDate(s string) (clock.Date, bool) {
 	t, ok := parseCivil(s)
 	if !ok {
 		return clock.Date{}, false

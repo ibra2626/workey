@@ -2,6 +2,13 @@
 
 Record accepted decisions with date, context, decision, alternatives, and consequences. Do not record proposals as accepted decisions.
 
+## 2026-10-26 — WKY-06: REST transport and shared HTTP helpers
+- Context: expose the plan service through `/api/v1`, preserving one business-logic layer and reusable transport helpers for WKY-07.
+- Decision: stdlib method/path routing in `internal/api`; handlers parse, call the service with source `api`, render JSON. `internal/httpx` owns Bearer auth (SHA-256 digests + `crypto/subtle`, empty token fails closed, 401 challenge), JSON errors, body limits and security headers. API cap: 1 MiB. Validation maps to 422, all-not-found to 404, idempotency conflict to 409, unexpected failures to generic 500. `Idempotency-Key` header overrides the body key.
+- Decision: `Range`, `Outline`, `Today`, `TodayDate` and exported `ParseDate` live in `internal/plan` for reusable reads and injected-clock access. `serve` opens/migrates SQLite before HTTP, defaults an unset DB path to `workey.db`, mounts the protected API at `/api/v1/`.
+- Alternatives: persistence/state rules in handlers (duplicates domain logic); a web framework (stdlib suffices); raw token comparison (digest comparison fixes comparison length); mandatory DB path for every launch (default supports local startup).
+- Consequences: MCP can reuse helpers and service reads; web cookie auth remains WKY-08. `docs/api.md` records wire behavior. Focused tests, vet, formatting and normal/CGO-disabled builds pass with Go 1.27.3.
+
 ## 2026-10-26 — Stack: Go + templ + htmx + Tailwind standalone CLI
 - Context: greenfield single-user web app; user is a web developer.
 - Decision: server-rendered Go with templ, htmx for interactivity, Tailwind via standalone CLI, no JS framework (user's choice during `/impeccable init`).

@@ -16,13 +16,20 @@ A JSON API exposing the same operations as MCP, thin over `internal/plan`, prote
 - Non-goals: web cookie auth, MCP.
 
 ## Acceptance criteria
-- [ ] httptest suite: 401 without/with wrong token; full round trip with `testdata/sample-week.json`; PUT twice → second response reports all unchanged; idempotency key replay; validation error shape with field paths; complete future → 409/422 with code.
-- [ ] Handlers contain no business rules (review: every branch maps to a service call or an error mapping).
-- [ ] `docs/api.md` matches the implemented routes.
+- [x] httptest suite: 401 without/with wrong token; full round trip with `testdata/sample-week.json`; PUT twice → second response reports all unchanged; idempotency key replay; validation error shape with field paths; complete future → 409/422 with code.
+- [x] Handlers contain no business rules (review: every branch maps to a service call or an error mapping).
+- [x] `docs/api.md` matches the implemented routes.
 
 ## Checks
 - `go test ./internal/httpx/... ./internal/api/...`
 - `go vet ./...`
 
 ## Progress
-Not started.
+Done 2026-10-26; not committed.
+
+- `internal/httpx`: reusable Bearer auth using SHA-256 digests and constant-time comparison, fail-closed empty token, 401 challenge, JSON errors, body limit and security headers.
+- `internal/api`: all nine method/path routes; handlers parse, call `plan.Service` with source `api`, render. Validation maps to 422 (future completion has field code `future`), all-not-found to 404, idempotency conflict to 409, unexpected failures to generic 500. Body cap: 1 MiB.
+- `internal/plan/read.go`: added `Range`, `Outline`, `Today`, `TodayDate`, outline read models and exported `ParseDate`; state, notation and calendar logic stay in the service.
+- `cmd/workey`: startup opens/migrates SQLite (default `workey.db`) and mounts the protected API. `docs/api.md` checked against routes, models and fixture tests.
+- Checks passed with Go 1.27.3: `go test ./internal/httpx/... ./internal/api/... ./internal/plan/... ./cmd/...`, `go vet ./...`, `gofmt -l .` (empty), `go build ./...`, `CGO_ENABLED=0 go build ./...` (PowerShell environment assignment). Both builds exited 0 despite a non-fatal Go module stat-cache write permission warning.
+- No templ/Tailwind regeneration needed: no UI sources changed. CURRENT, DECISIONS and TASKS updated. Next: WKY-07; no commit/push performed.

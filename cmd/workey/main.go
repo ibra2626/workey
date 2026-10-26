@@ -15,9 +15,17 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/ibra2626/workey/internal/api"
+	"github.com/ibra2626/workey/internal/clock"
 	"github.com/ibra2626/workey/internal/config"
+	"github.com/ibra2626/workey/internal/plan"
+	"github.com/ibra2626/workey/internal/store"
 	web "github.com/ibra2626/workey/internal/web"
 )
+
+// defaultDBPath is used when WORKEY_DB_PATH is unset, so a local run works out
+// of the box.
+const defaultDBPath = "workey.db"
 
 func main() {
 	cmd := "serve"
@@ -48,9 +56,26 @@ func runServe() error {
 		return err
 	}
 
+	dbPath := cfg.DBPath
+	if dbPath == "" {
+		dbPath = defaultDBPath
+	}
+	st, err := store.Open(dbPath)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = st.Close() }()
+	if err := st.Migrate(context.Background()); err != nil {
+		return err
+	}
+
+	svc := plan.New(st, clock.System{})
+	examDate := clock.Date{Year: cfg.ExamDate.Year(), Month: cfg.ExamDate.Month(), Day: cfg.ExamDate.Day()}
+	apiHandler := api.New(svc, examDate, cfg.APIToken)
+
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           newMux(),
+		Handler:           newMux(apiHandler),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -78,10 +103,14 @@ func runServe() error {
 }
 
 // newMux builds the HTTP router. Kept separate from runServe so handlers are
-// testable with httptest.
-func newMux() *http.ServeMux {
+// testable with httptest. apiHandler may be nil (e.g. in tests that exercise
+// only the always-on routes).
+func newMux(apiHandler http.Handler) *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", healthz)
+	if apiHandler != nil {
+		mux.Handle("/api/v1/", apiHandler)
+	}
 	web.AddRoutes(mux)
 	return mux
 }
