@@ -1,0 +1,35 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "design/directions/04-antrenman-gunlugu.html"
+        ],
+        "createdAt": "2026-10-26T11:33:05.786Z",
+        "reason": "agent triage: flagged panels are list/table wrappers whose rows (li px-4, th/td px-7) carry their own inset; text is not flush"
+      },
+      {
+        "rule": "repeating-stripes-gradient",
+        "value": "*",
+        "files": [
+          "design/directions/04-antrenman-gunlugu.html"
+        ],
+        "createdAt": "2026-10-26T11:42:10.774Z",
+        "reason": "agent triage: the hatch is the documented 'moved session' state pattern in DESIGN.md (Volume bars), not decoration"
+      },
+      {
+        "rule": "flat-type-hierarchy",
+        "value": "*",
+        "files": [
+          "design/directions/04-antrenman-gunlugu.html"
+        ],
+        "createdAt": "2026-10-26T11:42:38.921Z",
+        "reason": "agent triage: detector reads h1/h2 before Tailwind CDN applies classes (reports h1 16px); rendered h1 is 28-44px vs 15px body"
+      }
+    ]
+  }
+}

@@ -1,0 +1,495 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-26T11:36:27+00:00",
+  "title": "Design System: Workey",
+  "extensions": {
+    "colorMeta": {
+      "ground": {
+        "role": "neutral",
+        "displayName": "Trail Ground",
+        "canonical": "#eef1ee",
+        "oklch": "oklch(95.5% 0.005 145.5)",
+        "tonalRamp": [
+          "#0a0c0a",
+          "#242624",
+          "#404340",
+          "#5f625f",
+          "#808380",
+          "#a3a6a3",
+          "#c7cac7",
+          "#ecefec"
+        ]
+      },
+      "card": {
+        "role": "neutral",
+        "displayName": "Card White",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "ink": {
+        "role": "primary",
+        "displayName": "Forest Ink",
+        "canonical": "#16302a",
+        "oklch": "oklch(28.6% 0.034 177.0)",
+        "tonalRamp": [
+          "#000f0b",
+          "#102b25",
+          "#2e4842",
+          "#4d6861",
+          "#6d8982",
+          "#8faca4",
+          "#b3d1c9",
+          "#d8f7ee"
+        ]
+      },
+      "ink-hover": {
+        "role": "primary",
+        "displayName": "Pressed Forest",
+        "canonical": "#0d211c",
+        "oklch": "oklch(22.9% 0.028 175.5)",
+        "tonalRamp": [
+          "#000f0b",
+          "#162a24",
+          "#324741",
+          "#516760",
+          "#718881",
+          "#94aba4",
+          "#b7cfc8",
+          "#dcf5ed"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Moss Ink",
+        "canonical": "#4a5d57",
+        "oklch": "oklch(46.1% 0.025 174.0)",
+        "tonalRamp": [
+          "#010f0a",
+          "#182924",
+          "#344741",
+          "#536660",
+          "#738881",
+          "#96aaa4",
+          "#b9cfc8",
+          "#def4ed"
+        ]
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Lichen Ink",
+        "canonical": "#5f706a",
+        "oklch": "oklch(52.9% 0.022 172.1)",
+        "tonalRamp": [
+          "#020e0a",
+          "#1a2924",
+          "#364641",
+          "#556660",
+          "#758781",
+          "#98aaa3",
+          "#bbcec7",
+          "#e0f4ed"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#d5ddd8",
+        "oklch": "oklch(89.0% 0.011 158.8)",
+        "tonalRamp": [
+          "#070d09",
+          "#212723",
+          "#3d4440",
+          "#5c635f",
+          "#7d8480",
+          "#a0a7a2",
+          "#c3cbc6",
+          "#e9f1ec"
+        ]
+      },
+      "line-strong": {
+        "role": "neutral",
+        "displayName": "Strong Hairline",
+        "canonical": "#b8c4be",
+        "oklch": "oklch(80.9% 0.016 164.6)",
+        "tonalRamp": [
+          "#060d09",
+          "#1e2823",
+          "#3b4540",
+          "#59645f",
+          "#7a8580",
+          "#9da8a2",
+          "#c0ccc6",
+          "#e6f2ec"
+        ]
+      },
+      "z1": {
+        "role": "secondary",
+        "displayName": "Easy-Pace Teal",
+        "canonical": "#66a69d",
+        "oklch": "oklch(67.9% 0.067 184.5)",
+        "tonalRamp": [
+          "#000f0c",
+          "#022c28",
+          "#0a4d46",
+          "#2b6e66",
+          "#4f9087",
+          "#72b3aa",
+          "#96d8ce",
+          "#bbfef4"
+        ]
+      },
+      "z2": {
+        "role": "secondary",
+        "displayName": "Recovery Blue-Grey",
+        "canonical": "#8aa7c4",
+        "oklch": "oklch(71.7% 0.053 248.6)",
+        "tonalRamp": [
+          "#000c1c",
+          "#0d273e",
+          "#2b445d",
+          "#49647e",
+          "#6985a1",
+          "#8ba8c6",
+          "#afcdeb",
+          "#e3f0fe"
+        ]
+      },
+      "z3": {
+        "role": "secondary",
+        "displayName": "Main-Set Ochre",
+        "canonical": "#d0963a",
+        "oklch": "oklch(71.3% 0.127 75.3)",
+        "tonalRamp": [
+          "#130900",
+          "#342001",
+          "#593b05",
+          "#81580e",
+          "#ae7605",
+          "#d3993d",
+          "#f9bd64",
+          "#feebd2"
+        ]
+      },
+      "z1-soft": {
+        "role": "tertiary",
+        "displayName": "Phase Mist",
+        "canonical": "#c3dcd8",
+        "oklch": "oklch(87.5% 0.027 185.1)",
+        "tonalRamp": [
+          "#000f0d",
+          "#152927",
+          "#324744",
+          "#506663",
+          "#718884",
+          "#93aba7",
+          "#b7cfcb",
+          "#dbf5f1"
+        ]
+      },
+      "z3-soft": {
+        "role": "tertiary",
+        "displayName": "Today Sand",
+        "canonical": "#f7ecd9",
+        "oklch": "oklch(94.7% 0.028 81.5)",
+        "tonalRamp": [
+          "#110a01",
+          "#2c2415",
+          "#4a4131",
+          "#696050",
+          "#8b8170",
+          "#aea492",
+          "#d2c8b5",
+          "#f8edda"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline-display": {
+        "displayName": "Headline Display",
+        "purpose": "Tonight's chapter title on desktop Bugün only."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Chapter title on mobile Bugün, page titles on desktop."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Date headers, list item names, topic-group names, button text (17px)."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Descriptions, table cells, notes."
+      },
+      "meta": {
+        "displayName": "Meta",
+        "purpose": "Page ranges and times under a title, side context in headers; Lichen Ink."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Names a measurement, column or panel. Sentence case, never uppercase or tracked."
+      },
+      "numeral-display": {
+        "displayName": "Numeral Display",
+        "purpose": "Headline figure of a panel (weekly volume, plan week, net, days to exam). Scales 40-64px."
+      },
+      "numeral-stat": {
+        "displayName": "Numeral Stat",
+        "purpose": "The three stat tiles on mobile Bugün."
+      },
+      "numeral-inline": {
+        "displayName": "Numeral Inline",
+        "purpose": "Durations, percentages, day-of-month numbers, the book reference above a chapter title. 16-20px."
+      },
+      "numeral-unit": {
+        "displayName": "Numeral Unit",
+        "purpose": "Denominator or unit after a figure, in Lichen Ink. 16-22px. Weight 500 is the condensed default."
+      },
+      "numeral-hero": {
+        "displayName": "Numeral Hero",
+        "purpose": "Desktop Hafta weekly-volume figure, 64px."
+      },
+      "numeral-rail": {
+        "displayName": "Numeral Rail",
+        "purpose": "Days-to-exam figure at the foot of the desktop rail, 40px."
+      },
+      "numeral-page": {
+        "displayName": "Numeral Page",
+        "purpose": "Page range beside the chapter title on desktop Bugün, 36px."
+      },
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "\"Workey\" at the top of the desktop rail, 24px condensed semibold."
+      },
+      "numeral-profile": {
+        "displayName": "Numeral Profile",
+        "purpose": "Durations inside the desktop session-profile blocks, 22px, Forest Ink."
+      },
+      "numeral-inline-lg": {
+        "displayName": "Numeral Inline Large",
+        "purpose": "Book reference above the desktop chapter title and day numbers in the mobile week list, 20px."
+      },
+      "title-lg": {
+        "displayName": "Title Large",
+        "purpose": "Item names in desktop side panels (Yarın), 16px semibold."
+      },
+      "body-small": {
+        "displayName": "Body Small",
+        "purpose": "Notes, table detail and the sample-data line, 14px."
+      }
+    },
+    "shadows": [
+      {
+        "name": "today-ring",
+        "value": "inset 0 0 0 2px #d0963a",
+        "purpose": "State stroke marking today's bar in weekly volume charts. Not elevation."
+      },
+      {
+        "name": "moved-ring",
+        "value": "inset 0 0 0 1px #b8c4be",
+        "purpose": "State stroke around the hatched 'moved' bar. Not elevation."
+      }
+    ],
+    "patterns": [
+      {
+        "name": "hatch-moved",
+        "value": "repeating-linear-gradient(135deg, #d5ddd8 0 3px, transparent 3px 6px)",
+        "purpose": "Fill of a moved or missed session's bar; always paired with a plain sentence saying where it went."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-expo",
+        "value": "cubic-bezier(.16,1,.3,1)",
+        "purpose": "Background colour transition on the primary button."
+      },
+      {
+        "name": "duration-state",
+        "value": "200ms",
+        "purpose": "Hover state change on the primary button."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "mobile-reference",
+        "value": "390px",
+        "purpose": "Reference width of the mobile artboards; bottom tab bar layout."
+      },
+      {
+        "name": "desktop-reference",
+        "value": "1280px",
+        "purpose": "Reference width of the desktop artboards; 232px left rail layout. The switch-over breakpoint is not yet decided."
+      }
+    ],
+    "icons": {
+      "style": "stroked SVG",
+      "strokeWidth": 1.8,
+      "lineCap": "round",
+      "lineJoin": "round",
+      "sizes": {
+        "tab": "22px",
+        "rail": "20px",
+        "button": "20px",
+        "table": "16px"
+      }
+    }
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single dark pill per surface; one tap marks tonight's session done.",
+      "html": "<button class=\"ds-btn-primary\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg>Tamamlandı</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 56px; padding: 0 40px; background: #16302a; color: #ffffff; font-family: Barlow, system-ui, sans-serif; font-size: 17px; font-weight: 600; border: none; border-radius: 9999px; cursor: pointer; transition: background 200ms cubic-bezier(.16,1,.3,1); } .ds-btn-primary:hover { background: #0d211c; } .ds-btn-primary:focus-visible { outline: 2px solid #16302a; outline-offset: 3px; } .ds-btn-primary:active { background: #0d211c; }"
+    },
+    {
+      "name": "Panel with stat",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Flat white panel on the ground; a label names the measurement, a condensed figure states it.",
+      "html": "<div class=\"ds-ground\"><section class=\"ds-panel\"><p class=\"ds-label\">Bu hafta</p><p class=\"ds-figure\"><span class=\"ds-figure-num\">90</span> <span class=\"ds-figure-unit\">/ 540 dk</span></p></section></div>",
+      "css": ".ds-ground { background: #eef1ee; padding: 16px; } .ds-panel { background: #ffffff; color: #16302a; border-radius: 14px; padding: 24px; font-family: Barlow, system-ui, sans-serif; } .ds-label { margin: 0; font-size: 12px; font-weight: 600; color: #5f706a; } .ds-figure { margin: 4px 0 0; line-height: 1; font-family: 'Barlow Condensed', Barlow, sans-serif; font-variant-numeric: tabular-nums; } .ds-figure-num { font-size: 44px; font-weight: 600; } .ds-figure-unit { font-size: 18px; font-weight: 500; color: #5f706a; }"
+    },
+    {
+      "name": "Mobile Tab Bar",
+      "kind": "nav",
+      "refersTo": "tab-item",
+      "description": "Bottom tab bar on phones: three stroked icons over 12px labels; active tab is ink and semibold.",
+      "html": "<nav class=\"ds-tabbar\"><a href=\"#\" class=\"ds-tab\" aria-current=\"page\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M12 7.5V12l3 2\"/></svg>Bugün</a><a href=\"#\" class=\"ds-tab\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 20V12M10 20V8M15 20v-6M20 20V5\"/></svg>Hafta</a><a href=\"#\" class=\"ds-tab\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3 18c3-1 4-6 7-6s4 3 7 2 3-6 4-8\"/></svg>İlerleme</a></nav>",
+      "css": ".ds-tabbar { display: grid; grid-template-columns: repeat(3, 1fr); height: 68px; width: 390px; background: #ffffff; border-top: 1px solid #d5ddd8; font-family: Barlow, system-ui, sans-serif; } .ds-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12px; color: #5f706a; text-decoration: none; } .ds-tab svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; } .ds-tab[aria-current=\"page\"] { color: #16302a; font-weight: 600; } .ds-tab:hover { color: #16302a; } .ds-tab:focus-visible { outline: 2px solid #16302a; outline-offset: -4px; border-radius: 8px; }"
+    },
+    {
+      "name": "Desktop Rail Item",
+      "kind": "nav",
+      "refersTo": "rail-item",
+      "description": "Left rail navigation on desktop; the active item takes the ground fill.",
+      "html": "<nav class=\"ds-rail\"><p class=\"ds-rail-mark\">Workey</p><a href=\"#\" class=\"ds-rail-item\" aria-current=\"page\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M12 7.5V12l3 2\"/></svg>Bugün</a><a href=\"#\" class=\"ds-rail-item\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 20V12M10 20V8M15 20v-6M20 20V5\"/></svg>Hafta</a><a href=\"#\" class=\"ds-rail-item\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3 18c3-1 4-6 7-6s4 3 7 2 3-6 4-8\"/></svg>İlerleme</a></nav>",
+      "css": ".ds-rail { display: flex; flex-direction: column; gap: 4px; width: 232px; padding: 28px 20px; background: #ffffff; border-right: 1px solid #d5ddd8; font-family: Barlow, system-ui, sans-serif; } .ds-rail-mark { margin: 0 0 28px; padding: 0 12px; font-family: 'Barlow Condensed', Barlow, sans-serif; font-size: 24px; font-weight: 600; color: #16302a; } .ds-rail-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; font-size: 15px; color: #5f706a; text-decoration: none; } .ds-rail-item svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; } .ds-rail-item[aria-current=\"page\"] { background: #eef1ee; color: #16302a; font-weight: 600; } .ds-rail-item:hover { color: #16302a; } .ds-rail-item:focus-visible { outline: 2px solid #16302a; outline-offset: 2px; }"
+    },
+    {
+      "name": "Session Profile",
+      "kind": "custom",
+      "refersTo": "session-profile",
+      "description": "Signature: tonight's 90 minutes as an interval profile on a 20:30-22:00 axis; ink labels on zone blocks.",
+      "html": "<figure class=\"ds-profile\"><div class=\"ds-profile-bars\" role=\"img\" aria-label=\"Oturum profili: 20 dk konu, 50 dk soru, 20 dk yanlış defteri\"><div class=\"ds-zone ds-z1\"><span>Konu</span><b>20 dk</b></div><div class=\"ds-zone ds-z3\"><span>Soru</span><b>50 dk</b></div><div class=\"ds-zone ds-z2\"><span>Yanlış defteri</span><b>20 dk</b></div></div><div class=\"ds-axis\"><span>20:30</span><span>21:00</span><span>21:30</span><span>22:00</span></div></figure>",
+      "css": ".ds-profile { margin: 0; width: 560px; font-family: Barlow, system-ui, sans-serif; } .ds-profile-bars { display: grid; grid-template-columns: 2fr 5fr 2fr; gap: 4px; align-items: end; height: 150px; border-bottom: 1px solid #d5ddd8; } .ds-zone { display: flex; flex-direction: column; justify-content: flex-start; padding: 12px 14px; border-radius: 6px 6px 0 0; color: #16302a; } .ds-zone span { font-size: 15px; font-weight: 600; } .ds-zone b { font-family: 'Barlow Condensed', Barlow, sans-serif; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; } .ds-z1 { background: #66a69d; height: 43%; } .ds-z1 span { font-size: 24px; } .ds-z3 { background: #d0963a; height: 93%; } .ds-z2 { background: #8aa7c4; height: 65%; } .ds-axis { display: flex; justify-content: space-between; margin-top: 8px; font-size: 13px; color: #5f706a; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Weekly Volume Bars",
+      "kind": "custom",
+      "refersTo": "bar-done",
+      "description": "Signature: daily minutes with the full state vocabulary (done, moved, today, planned, rest).",
+      "html": "<div class=\"ds-week\"><div class=\"ds-bars\"><span class=\"ds-bar ds-done\" style=\"height:30%\"></span><span class=\"ds-bar ds-moved\" style=\"height:30%\"></span><span class=\"ds-bar ds-today\" style=\"height:30%\"></span><span class=\"ds-bar ds-planned\" style=\"height:30%\"></span><span class=\"ds-bar ds-rest\"></span><span class=\"ds-bar ds-planned\" style=\"height:60%\"></span><span class=\"ds-bar ds-rest\"></span></div><div class=\"ds-days\"><span>Pzt</span><span>Sal</span><span class=\"ds-days-today\">Çar</span><span>Per</span><span>Cum</span><span>Cmt</span><span>Paz</span></div></div>",
+      "css": ".ds-week { width: 340px; background: #ffffff; padding: 20px; border-radius: 14px; font-family: Barlow, system-ui, sans-serif; } .ds-bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: end; height: 120px; } .ds-bar { display: block; border-radius: 4px; } .ds-done { background: #16302a; } .ds-moved { background: repeating-linear-gradient(135deg, #d5ddd8 0 3px, transparent 3px 6px); box-shadow: inset 0 0 0 1px #b8c4be; } .ds-today { background: #f7ecd9; box-shadow: inset 0 0 0 2px #d0963a; } .ds-planned { background: #d5ddd8; } .ds-rest { background: #d5ddd8; height: 3px; border-radius: 9999px; } .ds-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-top: 6px; text-align: center; font-size: 12px; color: #5f706a; } .ds-days-today { color: #16302a; font-weight: 600; }"
+    },
+    {
+      "name": "Week List Rows",
+      "kind": "custom",
+      "refersTo": "row-today",
+      "description": "Mobile week list inside one panel: done, moved, today and rest rows separated by hairlines.",
+      "html": "<ul class=\"ds-list\"><li class=\"ds-row\"><span class=\"ds-day\">26</span><div class=\"ds-row-body\"><p class=\"ds-row-title\">M1·1 Temel kavramlar</p><p class=\"ds-row-meta\">s. 1–22 · 90 dk</p></div><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-label=\"tamamlandı\"><path d=\"M20 6 9 17l-5-5\"/></svg></li><li class=\"ds-row\"><span class=\"ds-day ds-muted\">27</span><div class=\"ds-row-body\"><p class=\"ds-row-title ds-regular\">M1·2 Sayı basamakları</p><p class=\"ds-row-meta\">s. 23–40 · cumartesiye taşındı</p></div></li><li class=\"ds-row ds-row-today\"><span class=\"ds-day\">28</span><div class=\"ds-row-body\"><p class=\"ds-row-title\">M1·3 Üslü ifadeler</p><p class=\"ds-row-meta\">s. 41–58 · bugün 20:30</p></div></li><li class=\"ds-row ds-muted\"><span class=\"ds-day\">30</span><p class=\"ds-rest\">Dinlenme</p></li></ul>",
+      "css": ".ds-list { list-style: none; margin: 0; padding: 0; width: 366px; background: #ffffff; border-radius: 14px; overflow: hidden; color: #16302a; font-family: Barlow, system-ui, sans-serif; } .ds-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; } .ds-row + .ds-row { border-top: 1px solid #d5ddd8; } .ds-day { width: 36px; text-align: center; line-height: 1; font-family: 'Barlow Condensed', Barlow, sans-serif; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; } .ds-row-body { flex: 1; } .ds-row-title { margin: 0; font-size: 15px; font-weight: 600; } .ds-regular { font-weight: 400; } .ds-row-meta { margin: 0; font-size: 13px; color: #5f706a; font-variant-numeric: tabular-nums; } .ds-row-today { background: #f7ecd9; } .ds-row-today .ds-row-meta { color: #4a5d57; } .ds-muted { color: #5f706a; } .ds-rest { margin: 0; font-size: 14px; }"
+    },
+    {
+      "name": "Progress Track",
+      "kind": "custom",
+      "refersTo": "progress-track",
+      "description": "Topic-group completion: hairline track, ink fill, condensed percentage.",
+      "html": "<div class=\"ds-track-row\"><span class=\"ds-track-name\">Temel kavramlar</span><span class=\"ds-track-pct\">%13</span><div class=\"ds-track\"><span style=\"width:13%\"></span></div><span class=\"ds-track-meta\">8–10 soru</span></div>",
+      "css": ".ds-track-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; width: 326px; align-items: center; color: #16302a; font-family: Barlow, system-ui, sans-serif; } .ds-track-name { font-size: 15px; font-weight: 600; } .ds-track-pct { font-family: 'Barlow Condensed', Barlow, sans-serif; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; } .ds-track { height: 6px; border-radius: 4px; background: #d5ddd8; } .ds-track span { display: block; height: 100%; border-radius: 4px; background: #16302a; } .ds-track-meta { font-size: 12px; color: #5f706a; text-align: right; font-variant-numeric: tabular-nums; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Training Log",
+    "overview": "Workey reads like the log of a calm, well-coached runner. The 38-week DGS plan is periodised like marathon preparation: phases (Faz), weekly volume in minutes, a fixed number of sessions (seans). Each evening session is drawn the way a training app draws an interval workout, as three blocks of intensity on a time axis. Numbers do the talking, set large in a narrow condensed face like a sports-watch display; words explain them in a plain humanist sans.\n\nThe world is light and quiet: a pale grey-green ground, white panels, dark forest-green ink, and exactly three zone colours that belong to the three parts of a session (konu, soru, yanlış defteri). Nothing else is coloured. A missed evening is a measurement, not a verdict: it is hatched, labelled \"cumartesiye taşındı\", and the weekly total is shown unchanged. Streak and volume are figures in the log, never rewards.\n\nDensity is moderate and glanceable. On the phone at 20:30 the first panel answers the whole question: book reference, chapter title, page range, the session profile, one dark pill button.",
+    "keyCharacteristics": [
+      "Flat white panels on a pale grey-green ground; no shadows, no nesting.",
+      "Three zone colours, each bound to one session part; everything else is ink, greys and line.",
+      "Condensed tabular numerals for every figure; humanist sans for every sentence.",
+      "State is carried by fill and pattern (ink, hatch, ochre outline, line grey, 3px rest stub), never by badges.",
+      "One primary action per surface: the dark ink pill \"Tamamlandı\"."
+    ],
+    "rules": [
+      {
+        "name": "The Three Zones Rule",
+        "body": "z1, z2 and z3 mean konu, yanlış defteri and soru, in every chart, legend and swatch. They are never used for decoration, status, buttons or links. The only extra job allowed is z3's ochre outline marking today.",
+        "section": "colors"
+      },
+      {
+        "name": "The Soft Token Rule",
+        "body": "Tints are explicit tokens (z1-soft, z3-soft), never opacity modifiers on a variable colour. The production stack (templ + Tailwind standalone CLI) cannot compile `bg-[color:var(--z1)]/35`; add a named soft token instead.",
+        "section": "colors"
+      },
+      {
+        "name": "The Step-Up Rule",
+        "body": "On Today Sand, secondary text uses Moss Ink, never Lichen Ink (Lichen on Sand is 4.47:1, under the floor). The build already does this in today's list row.",
+        "section": "colors"
+      },
+      {
+        "name": "The Ink Label Rule",
+        "body": "Labels on zone-coloured blocks are Forest Ink, never white. White on Teal is 3.17:1. Ink on Ochre (5.44:1) and on Blue-Grey (5.64:1) pass; and ink on Teal (5.04:1, after z1 was retuned from #5b9c93) pass, so every zone block can carry a body-size Forest Ink label.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Widths Rule",
+        "body": "If it is a number the user reads as a quantity (minutes, days, weeks, pages, percentages, nets), it is Barlow Condensed with tabular figures. If it is a sentence, it is Barlow. Times and page ranges inside running text keep Barlow with `tnum`.",
+        "section": "typography"
+      },
+      {
+        "name": "The Exact Notation Rule",
+        "body": "Book references are written in the user's notation, `M2·17, s. 210–225`: middle dot between book and chapter, \"s.\" only for sayfa, en dash in ranges, decimal comma (\"8,5\", \"1,5\").",
+        "section": "typography"
+      },
+      {
+        "name": "The Sentence Case Rule",
+        "body": "No uppercase transforms anywhere. Turkish casing stays correct by never asking CSS to do it; if uppercase is ever unavoidable the element must sit under `lang=\"tr\"` so i maps to İ.",
+        "section": "typography"
+      },
+      {
+        "name": "The First Panel Rule",
+        "body": "On Bugün, at any width, the first panel contains book reference, chapter, page range, session profile and \"Tamamlandı\" with no scrolling on a 390 x 844 screen.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat Ledger Rule",
+        "body": "If a surface needs to stand out, change its fill (Today Sand) or its content, never lift it with a shadow, blur or gradient.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do answer \"Bugün ne çalışacağım?\" in the first panel: book reference, chapter title, page range, session profile, then \"Tamamlandı\".",
+      "Do keep completion to one tap on the single Forest Ink pill.",
+      "Do state a missed or moved session plainly in words (\"Salı yapılamadı; M1·2 cumartesi bloğuna eklendi.\") alongside the hatched bar, and show weekly totals unchanged.",
+      "Do set every quantity in Barlow Condensed with tabular figures, and every sentence in Barlow.",
+      "Do write Turkish with correct ş ğ ı İ ç ö ü, sentence case, decimal comma, and the `M2·17, s. 210–225` notation.",
+      "Do put Forest Ink labels on zone blocks and keep all text at 4.5:1 or above; on Today Sand use Moss Ink for secondary text.",
+      "Do use the explicit soft tokens (z1-soft, z3-soft) for tints, and reference tokens instead of hard-coded hex in SVG fills.",
+      "Do use stroked SVG icons (1.8 stroke, round caps) and give every interactive element a visible focus state.",
+      "Do label sample figures as sample data until the plan arrives through the API."
+    ],
+    "donts": [
+      "Don't use purple-blue gradients, or any colour gradient on a surface (the moved-bar hatch is a stripe pattern, not a gradient).",
+      "Don't use glassmorphism, backdrop blur or drop shadows on product surfaces.",
+      "Don't use emoji as icons.",
+      "Don't add badges, streak rewards, celebrations or confetti; Seri and hacim are measurements only.",
+      "Don't nest panels inside panels; use dividers inside a panel.",
+      "Don't ship lorem ipsum or other filler text.",
+      "Don't colour anything with z1, z2 or z3 that is not the matching session part (today's ochre ring excepted).",
+      "Don't put white text on a zone colour.",
+      "Don't use opacity modifiers on CSS-variable colours (`/35`); they do not compile in the production Tailwind CLI.",
+      "Don't mark a missed day in red or with warning icons; hatching plus a plain sentence is the whole treatment.",
+      "Don't abbreviate \"soru\" as \"s.\"; \"s.\" means sayfa.",
+      "Don't uppercase labels or rely on CSS case transforms for Turkish text."
+    ]
+  }
+}

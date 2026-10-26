@@ -1,0 +1,12 @@
+# Claude Code personal settings
+.claude/settings.local.json
+
+# Secrets and local runtime files
+.env
+
+# Build output
+/bin/
+
+# SQLite databases (and WAL/SHM sidecars)
+*.db
+*.db-*
