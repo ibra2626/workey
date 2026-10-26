@@ -16,10 +16,10 @@ A tested persistence layer on modernc.org/sqlite with embedded migrations holdin
 - Non-goals: validation, freezing logic, HTTP.
 
 ## Acceptance criteria
-- [ ] Migrations run on an empty DB and are no-ops on a migrated DB.
-- [ ] CHECK constraints for enums and `page_from <= page_to`; FK cascade from sessions to items.
-- [ ] Tests on a temp-dir DB: sessions with items by date range, audit insert, idempotency key round trip.
-- [ ] DECISIONS entry: modernc.org/sqlite (no CGO, single binary) and the migration approach.
+- [x] Migrations run on an empty DB and are no-ops on a migrated DB.
+- [x] CHECK constraints for enums and `page_from <= page_to`; FK cascade from sessions to items.
+- [x] Tests on a temp-dir DB: sessions with items by date range, audit insert, idempotency key round trip.
+- [x] DECISIONS entry: modernc.org/sqlite (no CGO, single binary) and the migration approach.
 
 ## Checks
 - `go test ./internal/store/...`
@@ -27,4 +27,4 @@ A tested persistence layer on modernc.org/sqlite with embedded migrations holdin
 - `CGO_ENABLED=0 go build ./...`
 
 ## Progress
-Not started.
+Done (2026-10-26). `internal/store` on `modernc.org/sqlite` v1.61.0 (pure Go). `Open` sets WAL + `foreign_keys=ON` + `busy_timeout(5000)` via DSN pragmas and `MaxOpenConns(1)` (single-writer). Embedded `migrations/0001_init.sql` (all six v1 tables + `schema_migrations`); `Migrate` is idempotent. Query helpers (`InsertSession`, `InsertSessionItem`, `SessionsByDateRange`, `InsertAudit`, `Get/PutIdempotency`) take a `dbtx`; `WithTx` wraps a transaction; no business rules. Tests on a temp-dir DB cover: migrate idempotency + table presence, FK on + cascade + makeup SET NULL, CHECK enums/page order, UNIQUE(date,start_time), date-range query with items, audit insert, idempotency round trip. Checks green: `go test ./internal/store/...`, `go vet ./...`, `CGO_ENABLED=0 go build ./...`, `gofmt -l .` (clean). DECISIONS entry added. Nothing committed.
