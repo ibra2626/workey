@@ -9,13 +9,20 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ibra2626/workey/internal/apidoc"
 	"github.com/ibra2626/workey/internal/web/views"
 )
 
 func TestUsagePagesAndDownload(t *testing.T) {
 	a := newTestAuth(t)
 	cookie := login(t, a)
-	for _, path := range []string{"/kullanim", "/kullanim/mcp", "/kullanim/api", "/kullanim/api/openapi.json", "/kullanim/mcp?view=markdown", "/kullanim/api?view=markdown", "/kullanim/api?view=unknown"} {
+	paths := []string{"/kullanim", "/kullanim/mcp", "/kullanim/api", "/kullanim/api/openapi.json", "/kullanim/mcp?view=markdown", "/kullanim/api?view=markdown", "/kullanim/api?view=unknown"}
+	for _, client := range []string{"codex-desktop", "codex-cli", "claude-code"} {
+		for _, view := range []string{"", "markdown"} {
+			paths = append(paths, "/kullanim/mcp?client="+client+"&view="+view)
+		}
+	}
+	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
 			r := httptest.NewRequest("GET", path, nil)
 			unauth := do(t, a, r)
@@ -33,6 +40,11 @@ func TestUsagePagesAndDownload(t *testing.T) {
 			if strings.HasSuffix(path, ".json") {
 				if !strings.Contains(res.Header.Get("Content-Disposition"), "attachment") || !strings.Contains(string(b), `"openapi": "3.1.0"`) {
 					t.Fatal("invalid download")
+				}
+				contract := httptest.NewRecorder()
+				apidoc.ServeHTTP(contract, httptest.NewRequest("GET", "/api/v1/openapi.json", nil))
+				if res.Header.Get("Cache-Control") != "no-store" || string(b) != contract.Body.String() {
+					t.Fatal("download must be uncached and match the current contract")
 				}
 				return
 			}

@@ -22,4 +22,4 @@ Shared rules for every task: `README.md` in this folder (invariants, layout, con
 | WKY-16 | [Markdown görünümü ve kopyalama kontrolleri](tasks/WKY-16.md) | done | WKY-15 |
 | WKY-17 | [MCP rehberini istemci seçimine göre sadeleştir](tasks/WKY-17.md) | done | WKY-16 |
 | WKY-18 | [Sınava kadar çalışma planı oluşturma promptu](tasks/WKY-18.md) | done | WKY-17 |
-| WKY-19 | [Kullanım rehberleri kabul kontrolleri ve dokümantasyon](tasks/WKY-19.md) | todo | WKY-18 |
+| WKY-19 | [Kullanım rehberleri kabul kontrolleri ve dokümantasyon](tasks/WKY-19.md) | done | WKY-18 |

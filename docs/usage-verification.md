@@ -1,5 +1,54 @@
 # MCP/API kullanım doğrulaması — 27 Ekim 2026
 
+## WKY-19 — birleşik rehber kabulü
+
+27 Ekim 2026'da uygulama içi tarayıcıda ayrı, boş SQLite test veritabanıyla
+`/kullanim/mcp` ve `/kullanim/api` yeniden kontrol edildi. Mevcut `.env`, token,
+kullanıcı planı veya kalıcı istemci ayarları kullanılmadı. Önizleme ayrı çalışma
+dizininde `WORKEY_DEV=1` ile yalnızca loopback üzerinde çalıştı.
+
+| Kontrol | Sonuç / kanıt |
+| --- | --- |
+| 390×844 ve 1280×800 | İki sayfanın Rehber ve Markdown görünümleri incelendi. MCP'de üç istemci ve tüm kapalı/açık bölümler kontrol edildi. Belge genişliği sırasıyla 375 ve 1265 px; sayfa yatay taşmadı. |
+| Uzun içerik | Mobil API'de açılan 11 endpoint ve 12 taşan kod kutusu kendi alanında kaldı; masaüstünde altı kod kutusu kendi içinde kaydırılabilir. MCP'nin uzun Claude komutu masaüstünde de kendi kutusunda kaldı. Uzun plan istemi kendi metin alanında kaydırıldı. |
+| Klavye | Görünüm ve istemci bağlantıları Enter ile, açılır bölümler Enter/Boşluk ile çalıştı. Tab ile kod kutusuna ulaşıldı. Metin alanında görünür 2 px odak, kodda tarayıcının 1 px odağı görüldü. Salt okunur metin Ctrl+A ile tamamen seçildi. |
+| Başarılı kopyalama | MCP'nin tam Markdown'ı ve altı ayrı istemi, API'nin tam Markdown'ı panodan okunup textarea değerleriyle eşleşti. Windows satır sonları karşılaştırmada LF'ye normalize edildi. Başarı bildirimi beklenerek okundu. |
+| Pano hatası | Test vekili `copy.js` öncesinde `writeText` için `NotAllowedError` üretti; ikinci senaryo Clipboard API'yi kaldırdı. Her iki sayfanın tam Markdown'ı ve sınav isteminde alan görünür/odaklı/tam seçili oldu, düğme yeniden etkinleşti; yalnızca elle kopyalama mesajı çıktı. |
+| Betiksiz kullanım | Test yanıtlarına `Content-Security-Policy: script-src 'none'` eklenerek tüm sayfa betikleri engellendi. Üç istemci, görünüm bağlantıları, native açılır bölümler ve Markdown/plan istemi için gerçek Ctrl+A/Ctrl+C ile pano eşitliği geçti. Kopyalama düğmeleri gizli kaldı. |
+| HTTP ve sözleşme | Tüm istemci/görünüm kombinasyonlarında oturumsuz erişim 303; oturumlu erişim 200/no-store. OpenAPI indirmesi no-store, attachment ve mevcut sözleşmeyle bayt eşitliği kontrollerini geçti. |
+| Dinamik içerik | İstanbul gece sınırı, alternatif sınav tarihi, ortak HTML/Markdown kaynakları, API örneklerinin sözleşmeyle eşitliği ve tüm istemlerin kaynak metniyle eşitliği Go testleriyle geçti. |
+
+Çalıştırılan kontroller (Go 1.27.3):
+
+```powershell
+go tool templ generate
+go test ./internal/web/... ./internal/apidoc/...
+go test ./internal/api/...
+go vet ./...
+go build ./...
+$env:CGO_ENABLED = '0'
+go build ./...
+gofmt -l .
+git diff --check
+```
+
+templ üretimi değişiklik oluşturmadı. Sınıf/token veya uygulama kaynağı
+değişmediğinden CSS yeniden derlenmedi. Build'ler başarılı; Go'nun modül stat
+önbelleğine yazarken verdiği erişim uyarısı çıkış kodunu etkilemedi.
+Eklenen regresyon testleri: `TestUsagePagesAndDownload` için tüm istemciler ve
+indirme başlıkları/sözleşme eşitliği; `TestAllUsagePromptTargets` için üç istemcide
+altı ayrı textarea'nın ortak kaynak metinleriyle tam eşitliği.
+
+Sınırlar: pano reddi test betiğiyle üretildi; tarayıcının kalıcı izin ayarı
+değiştirilmedi. Betiksiz kabul CSP ile yapıldı, tarayıcı ayarından JavaScript
+kapatılmadı. Ayrı ekran okuyucu, Safari/Firefox veya macOS testi yapılmadı.
+Görseller araç çıktılarında incelendi; repoya ekran görüntüsü eklenmedi.
+Önizleme dosyaları `bin/wky19-preview` altında Git dışında tutuldu.
+Bu çalışma yeni bir AI plan yazma/istemci kurulum kabulü değildir; aşağıdaki
+gerçek Codex CLI kabulü ve Desktop sınırı ayrı sonuçlardır. Tüm paket testleri
+ve güvenlik taraması bu rehber kabulünde yeniden çalıştırılmadı.
+WKY-12 deploy beklemesi korunur; commit, push ve deploy yapılmadı.
+
 ## Otomatik kontroller
 
 - Rehber sayfaları ve OpenAPI indirmesi web oturumu ister; API rehberi ve sözleşme Bearer doğrulaması ister.

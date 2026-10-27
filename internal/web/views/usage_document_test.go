@@ -187,6 +187,34 @@ func TestUsageMCPClientsAndPrompts(t *testing.T) {
 	}
 }
 
+// Every separate copy target must preserve the shared source exactly, including
+// prompts nested in initially closed disclosures and Turkish punctuation.
+func TestAllUsagePromptTargets(t *testing.T) {
+	doc := NewUsageDocument("mcp", plan.AgentGuide{})
+	want := map[string]string{}
+	walkBlocks(doc.Blocks, func(b UsageBlock) {
+		if b.Kind == UsagePrompt {
+			want["usage-prompt-"+b.ID] = b.Text
+		}
+	})
+	pattern := regexp.MustCompile(`(?s)<textarea[^>]*id="(usage-prompt-[^"]+)"[^>]*>(.*?)</textarea>`)
+	for _, client := range []string{"codex-desktop", "codex-cli", "claude-code"} {
+		var rendered bytes.Buffer
+		if err := Usage("mcp", "csrf", doc.SelectClient(client), false).Render(context.Background(), &rendered); err != nil {
+			t.Fatal(err)
+		}
+		matches := pattern.FindAllStringSubmatch(rendered.String(), -1)
+		if len(matches) != len(want) {
+			t.Fatalf("%s: got %d copy targets, want %d", client, len(matches), len(want))
+		}
+		for _, match := range matches {
+			if text, ok := want[match[1]]; !ok || html.UnescapeString(match[2]) != text {
+				t.Errorf("%s: changed prompt %s", client, match[1])
+			}
+		}
+	}
+}
+
 func TestExamPlanPrompt(t *testing.T) {
 	svc := plan.New(nil, clock.Fake{Current: time.Date(2030, 2, 4, 22, 30, 0, 0, time.UTC)})
 	doc := NewUsageDocument("mcp", svc.AgentGuide(clock.Date{Year: 2031, Month: 7, Day: 20}))

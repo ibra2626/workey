@@ -14,10 +14,10 @@ Markdown kontrolleri, sade MCP rehberi ve sınava kadar plan promptunun birlikte
 - TASKS.md durumlarını ve `.agent/state/CURRENT.md` devir bilgisini gerçekleşen sonuçlara göre güncelle. WKY-12 deploy beklemesini koru; deploy/commit/push bu işin kapsamında değil.
 
 ## Acceptance criteria
-- [ ] HTTP/içerik testleri tüm görünüm, auth, dinamik tarih, API örneği ve prompt senaryolarını kapsıyor ve geçiyor.
-- [ ] Mobil/masaüstü, klavye, kopyalama ve pano hatası kontrollerinin sonuçları kaydedildi.
-- [ ] Kullanım belgeleri nihai davranışla uyumlu; gerçek token veya kullanıcı planı test verisi olarak kullanılmadı.
-- [ ] Generated templ/CSS güncel; build ve vet başarılı; sınırlamalar açıkça raporlandı.
+- [x] HTTP/içerik testleri tüm görünüm, auth, dinamik tarih, API örneği ve prompt senaryolarını kapsıyor ve geçiyor.
+- [x] Mobil/masaüstü, klavye, kopyalama ve pano hatası kontrollerinin sonuçları kaydedildi.
+- [x] Kullanım belgeleri nihai davranışla uyumlu; gerçek token veya kullanıcı planı test verisi olarak kullanılmadı.
+- [x] Generated templ/CSS güncel; build ve vet başarılı; sınırlamalar açıkça raporlandı.
 
 ## Checks
 - `go tool templ generate`
@@ -29,4 +29,40 @@ Markdown kontrolleri, sade MCP rehberi ve sınava kadar plan promptunun birlikte
 - Yukarıdaki tarayıcı kabul senaryoları; mevcut kişisel veriden ayrı geçici test ortamı kullan.
 
 ## Progress
-Todo. Test sonuçları, tarayıcı kanıtı ve varsa doğrulanamayan davranışlar tamamlandığında buraya yazılacak.
+Completed 2026-10-27. docs/mcp.md ve docs/api.md görünüm, tam/ayrı istem
+kopyalama, istemci seçimi, betiksiz kullanım ve plan şablonu akışıyla güncellendi.
+Tarih/kuralların asıl kaynağı AgentGuide ve ortak içerik modeli olarak korundu.
+
+TestUsagePagesAndDownload üç istemci × iki görünüm için auth/no-store
+kontrolünü genişletir; OpenAPI attachment/no-store ve sözleşme bayt eşitliğini
+doğrular. TestAllUsagePromptTargets üç istemcide altı ayrı istemin textarea ve
+ortak kaynak eşitliğini doğrular. Mevcut testler dinamik İstanbul/sınav tarihini,
+tam Markdown'ı, API örneklerini ve kritik sınav istemi talimatlarını kapsar.
+
+Passed (Go 1.27.3): templ generate (no diff), go test ./internal/web/...
+./internal/apidoc/..., go test ./internal/api/..., go vet ./..., go build ./...,
+CGO_ENABLED=0 go build ./..., gofmt -l . (empty), git diff --check.
+Build modül stat-cache erişim uyarısı verdi; çıkış kodları 0.
+Sınıf/token değişmedi; CSS rebuild gerekmedi, generated dosyalar değişmedi.
+
+Uygulama içi tarayıcıda 390×844 ve 1280×800: iki sayfa, iki görünüm, tüm MCP
+istemcileri ve kapalı/açık bölümler geçti. Sayfa genişliği 375/1265 px, yatay
+taşma yok; uzun kod kendi alanında kayar. Enter/Boşluk/Tab, görünür odak,
+readonly seçim ve canlı durum metinleri doğrulandı. MCP tam Markdown + altı
+istem ve API tam Markdown pano geri okumasıyla eşleşti (CRLF → LF).
+Pano reddi ve destek yokluğu test vekiliyle üretildi: doğru elle kopyalama
+bildirimi, tam seçim/odak, tekrar etkin düğme; yanlış başarı bildirimi yok.
+Tüm betikler CSP ile engellendiğinde istemci/görünüm bağlantıları, açılır
+bölümler ve Ctrl+A/Ctrl+C ile manuel pano eşitliği geçti.
+
+Ayrıntılı kanıt/matris: docs/usage-verification.md, WKY-19 bölümü.
+Gerçek .env/token/plan kullanılmadı; ayrı boş DB ve loopback sunucuları,
+Git dışındaki bin/wky19-preview altında. İlk sandbox sunucusuna tarayıcı
+erişemedi; aynı ayrı sunucu sandbox dışında çalıştırılarak testler tamamlandı.
+
+Sınırlar: tarayıcının kalıcı pano/JavaScript ayarı değiştirilmedi; reddetme
+test betiğiyle, betiksizlik CSP ile üretildi. Ayrı ekran okuyucu, diğer tarayıcı
+motorları/macOS, yeni AI plan yazımı/kurulumu, tüm paket testleri ve güvenlik
+taraması çalıştırılmadı. Ekran görüntüleri araç çıktılarında incelendi.
+Uygulama hatası bulunmadı; değişiklikler belgeler ve regresyon testleriyle sınırlı.
+WKY-12 beklemesi korunur; deploy/commit/push yapılmadı.

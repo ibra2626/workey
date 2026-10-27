@@ -4,6 +4,44 @@ Menüde **MCP Kullanımı** (`/kullanim/mcp`), mobilde **Kullanım** sekmesi alt
 Claude Code, Codex CLI ve Codex Desktop bağlantı adımları bulunur. Sayfalar web
 oturumu ister; ortak kurallar doğrudan ajan rehberiyle aynı kaynaktan gelir.
 
+## Rehber görünümü, istemci seçimi ve kopyalama
+
+Sayfa Codex Desktop seçili açılır. **Codex CLI** veya **Claude Code** bağlantısını
+seçtiğinizde yalnızca o istemcinin kurulum adımları gösterilir. Seçim URL'deki
+`client` parametresinde tutulur; görünüm değiştirirken korunur. Teknik ayrıntılar
+ve ek örnekler başlangıçta kapalıdır; başlıklarına tıklayarak ya da klavyeyle
+odaklayıp Enter/Boşluk ile açabilirsiniz.
+
+**Rehber** biçimlendirilmiş adımları, **Markdown** salt okunur tam metni gösterir.
+**Markdown olarak kopyala**, seçili istemciden bağımsız olarak tüm istemcileri,
+kapalı bölümleri ve istemleri içeren rehberi kopyalar. **İstemi kopyala** ve
+**Promptu kopyala** düğmeleri yalnızca yanlarındaki istemi kopyalar. İşlem
+tamamlandığında ilgili düğmenin yanında **Kopyalandı** bildirimi görünür.
+
+Pano erişimi yoksa veya reddedilirse metin görünür hale gelir, odaklanır ve
+seçilir; elle Ctrl+C (macOS: ⌘C) kullanın. Başarı bildirimi verilmez.
+JavaScript kapalıyken kopyalama düğmeleri gizlidir; görünüm/istemci bağlantıları
+ve açılır bölümler çalışır. Markdown görünümündeki ya da ayrı istem alanındaki
+metni odaklayıp Ctrl+A ve Ctrl+C ile elle kopyalayabilirsiniz. Uzun kodlar kendi
+kutusunda yatay, uzun istemler metin alanında dikey kaydırılır.
+
+## Sınava kadar plan şablonu
+
+Dördüncü adımda **Sınava kadar çalışma planımı oluştur** alanındaki
+**Promptu kopyala** düğmesini kullanın. Kopyayı asistanınıza göndermeden önce
+köşeli parantezli hedef/seviye, uygun gün/saat, süre, dinlenme ve doğrulanabilir
+kitap/bölüm/sayfa alanlarını doldurun. Önerilen çalışma ritmini kendinize göre
+düzenleyin. Sayfa yalnızca metin kopyalar; plan yazmak için Workey'e bağlı
+asistanınızla devam edin.
+
+Güncel tarihler ve işlem kuralları için asistan önce `get_agent_guide` çağırır;
+sayfada gösterilen sınav tarihi de aynı kaynaktan gelir. Şablonun asıl metni
+uygulamadaki ortak içerik modelidir (`internal/web/views/usage_content.go`);
+bu belgeye ayrı bir tarih veya şablon kopyası eklenmez. Eksik referanslar
+netleşmeden yazma başlamaz. Mevcut plan okunur, korunacak açık kayıtlar her
+haftanın tam listesine dahil edilir ve her yazma tekrar okumayla doğrulanır.
+Kısmi sonuçlar ve hatalar asistan tarafından açıklanmalıdır.
+
 ## Codex CLI ve Desktop
 
 İstemciyi başlatacağınız PowerShell 7 terminalinde sunucuyla aynı tokenı girin:

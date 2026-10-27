@@ -6,6 +6,21 @@ Menüden **API Kullanımı** (`/kullanim/api`) sayfasına ulaşılır. Sayfa otu
 doğrulaması ister; endpoint listesi, tam temsili yanıtlar, PowerShell/curl.exe
 komutları ve ortak ajan kurallarını gösterir. Mobilde **Kullanım** sekmesini açın.
 
+**Rehber** görünümünde endpoint başlıkları kapalı açılır bölümlerdir; tıklama,
+Enter veya Boşluk ile tam yanıt örneklerini açın. Uzun komutlar ve JSON örnekleri
+kendi kod kutusunda yatay kaydırılır; kutular klavyeyle odaklanabilir.
+**Markdown** bağlantısı salt okunur tam rehberi açar.
+**Markdown olarak kopyala**, kapalı endpoint örnekleri dahil tüm Markdown'ı
+kopyalar; başarıdan sonra **Kopyalandı** bildirimi görünür. Bu işlem API isteği
+göndermez. OpenAPI indirme bağlantısı ayrı makine sözleşmesini indirir.
+
+Pano desteklenmiyorsa veya erişim reddedilirse Markdown alanı açılıp odaklanır
+ve metin seçilir; hata bildiriminin ardından Ctrl+C (macOS: ⌘C) ile elle
+kopyalayın. JavaScript kapalıyken düğme gizlenir; **Markdown** bağlantısı ve
+native açılır bölümler kullanılabilir. Salt okunur alanda Ctrl+A ve Ctrl+C
+ile tam metni seçip kopyalayabilirsiniz. Her iki görünüm ve OpenAPI indirmesi
+web oturumu ister ve `Cache-Control: no-store` döner.
+
 - `GET /api/v1/agent-guide`: Bearer korumalı, salt okunur ajan başlangıç rehberi.
   `today`, `timezone`, `exam_date`, `books`, `session_kinds`, `rules`, `workflow`
   döner. Tarih, plan yazımıyla aynı enjekte edilebilir İstanbul saatinden gelir.
