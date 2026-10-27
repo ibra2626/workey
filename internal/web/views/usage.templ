@@ -60,8 +60,14 @@ templ usageBlocks(blocks []UsageBlock) {
 			case UsagePrompt:
 				<div class="space-y-3" data-prompt={ block.ID }>
 					<label for={ "usage-prompt-" + block.ID } class="text-title font-semibold text-ink">Asistanınıza gönderin</label>
-					<textarea id={ "usage-prompt-" + block.ID } readonly rows="3" spellcheck="false" class="usage-markdown">{ block.Text }</textarea>
-					<button type="button" class="usage-control" data-copy-target={ "usage-prompt-" + block.ID } data-copy-status={ "usage-prompt-status-" + block.ID } hidden>İstemi kopyala</button>
+					<textarea id={ "usage-prompt-" + block.ID } readonly rows={ promptRows(block.ID) } spellcheck="false" class="usage-markdown">{ block.Text }</textarea>
+					<button type="button" class="usage-control" data-copy-target={ "usage-prompt-" + block.ID } data-copy-status={ "usage-prompt-status-" + block.ID } hidden>
+						if block.ID == "exam-plan" {
+							Promptu kopyala
+						} else {
+							İstemi kopyala
+						}
+					</button>
 					<p id={ "usage-prompt-status-" + block.ID } role="status" aria-live="polite" aria-atomic="true" class="text-meta text-ink-3"></p>
 				</div>
 			case UsageLink:

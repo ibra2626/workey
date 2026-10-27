@@ -1,6 +1,9 @@
 package views
 
-import "github.com/ibra2626/workey/internal/apidoc"
+import (
+	"github.com/ibra2626/workey/internal/apidoc"
+	"github.com/ibra2626/workey/internal/plan"
+)
 
 func usageTitle(key string) string {
 	switch key {
@@ -23,7 +26,7 @@ var mcpToolDescriptions = []struct{ Name, Description string }{
 	{"get_progress", "Seans, dakika, konu grubu ve 38 haftalık ilerlemeyi oku."},
 }
 
-func mcpSections() []UsageBlock {
+func mcpSections(guide plan.AgentGuide) []UsageBlock {
 	const tokenInput = `$env:WORKEY_API_TOKEN = Read-Host 'Workey API tokenı' -MaskInput`
 	const codexAdd = `codex mcp add workey --url http://127.0.0.1:8080/mcp --bearer-token-env-var WORKEY_API_TOKEN
 codex mcp list`
@@ -64,10 +67,35 @@ bearer_token_env_var = "WORKEY_API_TOKEN"`, "toml", "")
 		section("2. İstemcinizi bağlayın", desktop, cli, claude),
 		section("3. Bağlantıyı deneyin", paragraph("Yeni sohbette bu istemi gönderin. Asistanın get_agent_guide çağrısıyla sunucu tarihini ve kuralları okuyabildiğini doğrulayın."),
 			UsageBlock{Kind: UsagePrompt, ID: "connection", Text: "Workey MCP bağlantısını kullanarak ajan rehberini oku ve bağlantıyı doğrula"}),
-		section("4. Planınızı oluşturun", paragraph("Bağlantı hazır. Sınava kadar çalışma planı oluşturma istemi bir sonraki adımda eklenecek.")),
+		section("4. Sınava kadar çalışma planımı oluştur",
+			paragraph("Sınav tarihi: "+guide.ExamDate+". Promptu kopyalayın, köşeli parantezli alanları doldurun ve Workey'e bağlı asistanınıza gönderin. Çalışma ritmi düzenlenebilir bir başlangıç önerisidir. Bu düğme yalnızca metni kopyalar; sayfa plan üretmez veya MCP çağrısı yapmaz."),
+			paragraph("Dikkat: save_plan, seçilen aralıktaki açık seansları tam listeyle değiştirir. Listede bulunmayan açık seanslar silinir; korunacak açık seanslar da her haftanın isteğine dahil edilmelidir. Geçmiş ve tamamlanmış kayıtlar korunur."),
+			UsageBlock{Kind: UsagePrompt, ID: "exam-plan", Text: examPlanPrompt},
+		),
 		alternative, troubleshooting,
 	}
 }
+
+const examPlanPrompt = `Workey MCP bağlantısını kullanarak bugünden sınava kadar çalışma planımı hazırla ve kaydet.
+
+Dolduracağım bilgiler:
+- Hedefim ve mevcut seviyem: [hedef, güçlü/zayıf konular, bitirdiğim bölümler]
+- Uygun gün ve saatlerim: [günler ve saat aralıkları; başlangıç önerisi: hafta içi seçtiğim dört akşam 20:30–22:00 ve seçtiğim bir hafta sonu günü üç saat]
+- Seans sürelerim: [başlangıç önerisi: dört akşam × 90 dakika, bir hafta sonu × 180 dakika; bana göre düzenle]
+- Dinlenme günlerim: [çalışmayacağım günler ve diğer kısıtlar]
+- Kitap/bölüm/sayfa referanslarım: [her kitap için kitap kodu, bölüm numarası, bölüm adı, sayfa başlangıcı ve sonu; varsa konu/soru/antrenman aralıkları; doğrulanabilir içindekiler veya kaynak ekle]
+
+Şu sırayla ilerle:
+1. Önce get_agent_guide çağır. Güncel today, timezone ve exam_date değerlerini yeniden oku; dönem ve saatleri bunlara göre belirle. Sabit örnek tarihleri kullanma. Sınav geçmişse yazma, kullanıcıyla hedefi netleştir.
+2. get_outline → ilgili get_plan → get_progress sırasıyla mevcut fazları, konu gruplarını, bugünden sınava kadar planı ve ilerlemeyi oku. Aralık büyükse get_plan okumalarını haftalara böl. Mevcut bağlantıları anlamak için gerekirse geçmişteki ilgili seansları da oku.
+3. Hedefimi, seviyemi, gün/saatleri, süreleri, dinlenme günlerini ve referanslarımı benimle netleştir. Doldurulmamış alanlarla yazmaya başlama. Eksik kitap içeriği, bölüm veya sayfa referansı uydurma; eksikleri sor ve yanıtımı bekle. Çalışma ritmini otomatik kabul etme. Mevcut seanslarla çakışmayı ve yetişmeyecek kapsamı bildir; kararı benimle netleştir.
+4. Bugünden sınava kadar faz, konu grubu ve seansları doğrulanmış referanslarla hazırla. Gerekliyse save_outline çağrısına korunacak mevcut faz ve grupları da içeren TAM listeyi gönder; seansların kullandığı grupları silme. Outline sonuçlarındaki created/updated/deleted/unchanged listelerini incele ve get_outline ile doğrula.
+5. Planı Pazartesi–Pazar haftalarına göre haftalık, çakışmayan from–to dahil aralıklarla save_plan üzerinden yaz. İlk aralığın başlangıcı today, son aralığın bitişi exam_date olsun; kısmi ilk/son haftayı bu sınırlara kırp. Bugünden önceye veya sınavdan sonraya seans yazma.
+6. HER haftayı yazmadan hemen önce o aralığı get_plan ile yeniden oku. save_plan açık seansların TAM listesini değiştirir: korunacak açık seansları tüm items referanslarıyla isteğe dahil et; listeden çıkarılan açık seanslar silinir. Değiştirme veya silme kararını kullanıcıyla netleştir. Geçmiş ve tamamlanmış kayıtları koru; tamamlanmış seansın date + start_time konumuna yeni seans koyma.
+7. Okumadaki topic_group_key değerini yazmada topic_group alanına taşı; id, state, completed ve notation okuma alanlarını gönderme. Telafi bağlantılarını koru: gerekirse kaynak get_plan sonucundaki moved_to ile makeup_of değerini doğrula; bağlantı belirsizse sor ve yazmayı durdur.
+8. Her save_plan yanıtındaki created/updated/deleted/unchanged/skipped listelerini incele. skipped kayıtlarını başarı diye sunma; reason değerini açıkla. Her yazmadan sonra ilgili get_plan ve get_progress çağrılarıyla tarih, saat, süre, referans, korunacak kayıtlar ve değişiklikleri doğrula. Planlananın uygulanmasını engelleyen skipped sonucunda da dur ve kalan haftalara geçme.
+9. Başarısız hafta, outline hatası veya tekrar okuma/doğrulama hatasında DUR. Sonraki haftaları yazma. Tamamlanan ve kalan aralıkları, hatayı ve gerekli kullanıcı bilgisini bildir. Belirsiz yazma sonucunda önce mevcut durumu oku; körlemesine tekrar yazma. Tekrar denemede aynı gövde ve idempotency_key kullan; değişen içerik için yeni anahtar seç.
+10. Sonucu Türkçe özetle: güncel dönem ve saat dilimi, hazırlanan seanslar, created/updated/deleted/unchanged/skipped sayıları ve ilgili kayıtlar, silinen/atlanan kayıtların nedenleri, doğrulanan haftalar ve kalan iş. Kısmi çalışmayı bütünü tamamlandı diye bildirme. Bu planlama işlemi sırasında complete_session çağırma; seansları tamamlanmış işaretleme.`
 
 func apiSections() []UsageBlock {
 	return []UsageBlock{

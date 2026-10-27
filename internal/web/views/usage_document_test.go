@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"html"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -181,8 +182,58 @@ func TestUsageMCPClientsAndPrompts(t *testing.T) {
 			t.Errorf("missing client %s", client)
 		}
 	}
-	if len(ids) != 5 {
+	if len(ids) != 6 {
 		t.Errorf("got %d prompts", len(ids))
+	}
+}
+
+func TestExamPlanPrompt(t *testing.T) {
+	svc := plan.New(nil, clock.Fake{Current: time.Date(2030, 2, 4, 22, 30, 0, 0, time.UTC)})
+	doc := NewUsageDocument("mcp", svc.AgentGuide(clock.Date{Year: 2031, Month: 7, Day: 20}))
+	var prompt string
+	walkBlocks(doc.Blocks, func(b UsageBlock) {
+		if b.Kind == UsagePrompt && b.ID == "exam-plan" {
+			prompt = b.Text
+		}
+	})
+	if prompt == "" {
+		t.Fatal("exam plan prompt missing")
+	}
+	for _, want := range []string{
+		"Hedefim ve mevcut seviyem: [", "Uygun gün ve saatlerim: [", "Seans sürelerim: [", "Dinlenme günlerim: [", "Kitap/bölüm/sayfa referanslarım: [",
+		"dört akşam × 90 dakika", "bir hafta sonu × 180 dakika", "today, timezone ve exam_date", "get_outline → ilgili get_plan → get_progress",
+		"Doldurulmamış alanlarla yazmaya başlama", "referansı uydurma", "yanıtımı bekle", "save_outline", "korunacak mevcut faz ve grupları da içeren TAM liste",
+		"Pazartesi–Pazar", "çakışmayan", "İlk aralığın başlangıcı today, son aralığın bitişi exam_date", "HER haftayı yazmadan hemen önce", "listeden çıkarılan açık seanslar silinir",
+		"Geçmiş ve tamamlanmış kayıtları koru", "topic_group_key", "makeup_of", "created/updated/deleted/unchanged/skipped", "skipped kayıtlarını başarı diye sunma",
+		"Her yazmadan sonra ilgili get_plan ve get_progress", "doğrulama hatasında DUR", "Sonraki haftaları yazma", "Tamamlanan ve kalan aralıkları", "Türkçe özetle", "complete_session çağırma",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Errorf("missing planning instruction %q", want)
+		}
+	}
+	if regexp.MustCompile(`\d{4}-\d{2}-\d{2}`).MatchString(prompt) {
+		t.Fatal("prompt must read dates at execution time")
+	}
+	for _, client := range []string{"codex-desktop", "codex-cli", "claude-code"} {
+		var rendered bytes.Buffer
+		if err := Usage("mcp", "csrf", doc.SelectClient(client), false).Render(context.Background(), &rendered); err != nil {
+			t.Fatal(err)
+		}
+		body := rendered.String()
+		target := regexp.MustCompile(`(?s)<textarea[^>]*id="usage-prompt-exam-plan"[^>]*>(.*?)</textarea>`).FindStringSubmatch(body)
+		if len(target) != 2 || html.UnescapeString(target[1]) != prompt || !strings.Contains(doc.Markdown(), "```\n"+prompt+"\n```") {
+			t.Fatal("displayed/copy prompt and Markdown differ")
+		}
+		// Check visible guidance independently of the hidden full Markdown.
+		visible := regexp.MustCompile(`(?s)<div id="usage-markdown-panel".*?</div>`).ReplaceAllString(html.UnescapeString(body), "")
+		for _, want := range []string{"Sınav tarihi: 2031-07-20", "Sunucu tarihi: 2030-02-05", "açık seansları tam listeyle değiştirir", `data-copy-target="usage-prompt-exam-plan"`, `data-copy-status="usage-prompt-status-exam-plan"`, "Promptu kopyala"} {
+			if !strings.Contains(visible, want) {
+				t.Errorf("missing visible guidance/control %q", want)
+			}
+		}
+		if strings.Contains(visible, "hx-post") || strings.Contains(visible, "hx-put") {
+			t.Fatal("guide must not write a plan")
+		}
 	}
 }
 

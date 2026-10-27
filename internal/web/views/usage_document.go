@@ -88,6 +88,13 @@ func code(text, language string) UsageBlock {
 	return UsageBlock{Kind: UsageCode, Text: text, Language: language}
 }
 
+func promptRows(id string) string {
+	if id == "exam-plan" {
+		return "18"
+	}
+	return "3"
+}
+
 func exampleResponse(name string) string {
 	return apidoc.OperationResponseJSON(apidoc.Operation{Output: name})
 }
@@ -101,7 +108,7 @@ func NewUsageDocument(key string, guide plan.AgentGuide) UsageDocument {
 	switch key {
 	case "mcp":
 		doc.Blocks = []UsageBlock{paragraph("Asistanınız Workey’e bağlanır, çalışma planınızı kaydeder ve ilerlemenizi okur.")}
-		doc.Blocks = append(doc.Blocks, mcpSections()...)
+		doc.Blocks = append(doc.Blocks, mcpSections(guide)...)
 		tools := section("Araçlar")
 		tools.Kind = UsageDetails
 		for _, tool := range mcpToolDescriptions {

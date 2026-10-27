@@ -124,7 +124,7 @@ func TestUsageMCPClientSelection(t *testing.T) {
 					}
 				}
 				if view != "markdown" {
-					for _, want := range []string{"1. Workey", "2. İstemcinizi", "3. Bağlantıyı", "4. Planınızı", `data-copy-target="usage-prompt-connection"`, "Workey MCP bağlantısını kullanarak ajan rehberini oku ve bağlantıyı doğrula"} {
+					for _, want := range []string{"1. Workey", "2. İstemcinizi", "3. Bağlantıyı", "4. Sınava kadar çalışma planımı oluştur", `data-copy-target="usage-prompt-exam-plan"`, `data-copy-target="usage-prompt-connection"`, "Workey MCP bağlantısını kullanarak ajan rehberini oku ve bağlantıyı doğrula"} {
 						if !strings.Contains(body, want) {
 							t.Errorf("missing %q", want)
 						}

@@ -16,11 +16,11 @@ Kullanıcı, doldurup bağlı asistanına gönderebileceği tek bir promptla bug
 - Sonuç Türkçe özetlensin: dönem, seanslar, değişen/silinen/atlanan kayıtlar ve kalan iş. complete_session çağrısı istenmesin; doldurulmamış alanlarla yazmaya başlanmasın.
 
 ## Acceptance criteria
-- [ ] Şablon tüm kullanıcı alanlarını, güncel sınav tarihini ve değiştirilebilir çalışma ritmini içeriyor.
-- [ ] Okuma → eksikleri sorma → outline → haftalık plan yazımı → tekrar okuma sırası açık.
-- [ ] Tam liste semantiği, kayıtları koruma, referans uydurmama ve hata halinde durma talimatları mevcut.
-- [ ] Kopyalanan prompt ile gösterilen prompt aynı; tam rehber Markdown'ında da bulunuyor.
-- [ ] Seans tamamlama veya sayfa üzerinden otomatik plan yazma yok.
+- [x] Şablon tüm kullanıcı alanlarını, güncel sınav tarihini ve değiştirilebilir çalışma ritmini içeriyor.
+- [x] Okuma → eksikleri sorma → outline → haftalık plan yazımı → tekrar okuma sırası açık.
+- [x] Tam liste semantiği, kayıtları koruma, referans uydurmama ve hata halinde durma talimatları mevcut.
+- [x] Kopyalanan prompt ile gösterilen prompt aynı; tam rehber Markdown'ında da bulunuyor.
+- [x] Seans tamamlama veya sayfa üzerinden otomatik plan yazma yok.
 
 ## Checks
 - Sahte saat/sınav tarihiyle prompt içeriği ve kritik talimatlar için odaklı testler ekle.
@@ -29,4 +29,31 @@ Kullanıcı, doldurup bağlı asistanına gönderebileceği tek bir promptla bug
 - Mevcut veriyi okuma, eksik referans, kısmi son hafta, skipped ve yarıda kalan yazma senaryolarını prompt metni üzerinden gözden geçir. Gerçek plana yazma yapma.
 
 ## Progress
-Todo. Sonraki görev: WKY-19.
+Completed 2026-10-27. Step four now contains the exam-plan prompt, editable
+placeholders and a separate Promptu kopyala control. The shared UsagePrompt
+block supplies the displayed text, copy target and full Markdown. ExamDate is
+read from AgentGuide for visible guidance; the prompt reads current dates via
+get_agent_guide at execution time. Existing shorter prompts retain three rows;
+the planning prompt uses eighteen rows and the existing copy.js behavior.
+
+Passed on Go 1.27.3: go tool templ generate; Tailwind rebuild (no CSS diff);
+go test ./internal/web/...; go vet ./internal/web/...;
+go build -o bin/wky18-preview/workey.exe ./cmd/workey; gofmt; git diff --check.
+Build emitted a module stat-cache access warning but exited successfully.
+Focused tests use a fake Istanbul midnight and alternate exam date, cover
+critical instructions and confirm prompt/Markdown/copy-target parity for all clients.
+Headless Edge at 390x844 and 1280x844 passed all clients, keyboard/touch,
+clipboard readback (Windows CRLF normalized), Markdown parity, no overflow,
+closed details and JS-disabled manual selection. Screenshots visually inspected.
+The first sandboxed browser launch failed; browser and disposable test server
+then ran together outside the sandbox. Both test servers stopped. Temporary
+binaries, DBs, checks and screenshots are ignored under bin/wky18-preview.
+
+Prompt scenarios reviewed: existing open sessions are reread before each week
+and preserved in the full list; missing references stop before writes; partial
+last week ends at exam_date; skipped entries are reported and blocking skips
+stop subsequent writes; interrupted writes report verified and remaining ranges.
+No real plan writes, secrets or real DB access. Full suite, CGO-disabled build
+and vulnerability scan not run for this guide-only change. User requested a local
+commit after verification; no push requested.
+Next task: WKY-19.
