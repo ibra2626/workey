@@ -57,6 +57,14 @@ templ fontPreloads(study bool) {
 	}
 }
 
+// Crop only the source image's outer whitespace in the viewport; preserve the
+// supplied logo's pixels and proportions. Both placements sit on Card White.
+templ brandLogo(sizeClass string) {
+	<svg class={ "block max-w-full", sizeClass } viewBox="140 325 1260 334" role="img" aria-label="Workey" focusable="false">
+		<image href={ asset("/static/workey.png") } width="1536" height="1024"></image>
+	</svg>
+}
+
 // Shared feedback for navigation and requests, outside swapped content.
 templ requestFeedback() {
 	<div class="request-progress" aria-hidden="true"><span></span></div>
@@ -96,7 +104,9 @@ templ icon(id string, sizeClass string) {
 // Its foot carries the days-to-exam figure (DESIGN.md desktop rail).
 templ rail(p LayoutProps) {
 	<nav class="hidden md:flex md:w-[232px] md:shrink-0 md:flex-col gap-1 bg-card border-r border-line px-5 pt-7 pb-7">
-		<p class="cn mb-7 px-3 text-wordmark font-semibold text-ink">Workey</p>
+		<div class="mb-7 px-3">
+			@brandLogo("h-auto w-full")
+		</div>
 		for _, it := range append(append([]navItem(nil), navItems...), usageNavItems...) {
 			<a
 				href={ templ.SafeURL(it.Href) }

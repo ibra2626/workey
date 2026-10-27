@@ -73,12 +73,20 @@ func Login(errMsg string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<main class=\"flex min-h-screen items-center justify-center px-5 py-10\"><div class=\"w-full max-w-[400px] rounded-panel bg-card p-7 md:p-8\"><p class=\"cn text-wordmark font-semibold text-ink\">Workey</p><h1 class=\"mt-5 text-title-lg font-semibold text-ink\">Giriş</h1><form method=\"post\" action=\"/giris\" class=\"mt-5\"><label for=\"parola\" class=\"block text-label font-semibold text-ink-3\">Parola</label> <input id=\"parola\" name=\"parola\" type=\"password\" autocomplete=\"current-password\" autofocus required class=\"mt-2 block w-full rounded-nav border border-line bg-card px-3 py-[10px] text-body text-ink focus:border-ink focus:outline-2 focus:outline-ink focus:[outline-offset:2px]\"> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<main class=\"flex min-h-screen items-center justify-center px-5 py-10\"><div class=\"w-full max-w-[400px] rounded-panel bg-card p-7 md:p-8\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = brandLogo("h-auto w-[200px]").Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<h1 class=\"mt-5 text-title-lg font-semibold text-ink\">Giriş</h1><form method=\"post\" action=\"/giris\" class=\"mt-5\"><label for=\"parola\" class=\"block text-label font-semibold text-ink-3\">Parola</label> <input id=\"parola\" name=\"parola\" type=\"password\" autocomplete=\"current-password\" autofocus required class=\"mt-2 block w-full rounded-nav border border-line bg-card px-3 py-[10px] text-body text-ink focus:border-ink focus:outline-2 focus:outline-ink focus:[outline-offset:2px]\"> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if errMsg != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<p class=\"mt-3 text-body-small text-ink-2\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<p class=\"mt-3 text-body-small text-ink-2\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -91,12 +99,12 @@ func Login(errMsg string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<button type=\"submit\" class=\"action-button primary-action mt-5 flex h-[54px] w-full items-center justify-center rounded-pill bg-ink px-10 text-title font-semibold text-card hover:bg-ink-hover focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:3px]\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<button type=\"submit\" class=\"action-button primary-action mt-5 flex h-[54px] w-full items-center justify-center rounded-pill bg-ink px-10 text-title font-semibold text-card hover:bg-ink-hover focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:3px]\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -104,7 +112,7 @@ func Login(errMsg string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</button></form></div></main></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</button></form></div></main></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

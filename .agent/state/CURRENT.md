@@ -85,3 +85,15 @@ returned stale tool state; initializing the test clipboard then copying confirme
 it changed to the code length. Preview fixtures stopped. No templ/CSS changes,
 no full install against personal .env, no commit/push for this follow-up.
 The earlier actual 200% zoom acceptance remains open.
+
+## Follow-up — supplied logo (2026-10-27)
+
+Integrated user-provided web/workey.png into the desktop rail and login screen
+through shared brandLogo markup. The original is preserved; an identical copy
+in web/static is embedded and cache-versioned with the application. An SVG
+viewport hides outer whitespace without changing image pixels or proportions;
+the accessible image name is Workey. Mobile study-page geometry is unchanged.
+Passed templ/Tailwind generation, focused web tests, normal and CGO-disabled
+builds, focused vet, gofmt and diff whitespace checks. Visually verified login
+at 390x844 and desktop rail at 1280x800 using a disposable render-only server;
+server stopped and temporary source removed. No commit/push or deployment.
