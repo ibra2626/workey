@@ -1,11 +1,20 @@
-# CURRENT — local Windows v1 checks complete
+# CURRENT — WKY-15 shared usage guide model complete
 
 Updated 2026-10-27.
 
 Active task: none. WKY-01..11 were already complete. WKY-13/14 completed this
-session. WKY-12 Linux deploy remains blocked by the user's explicit hold.
+session. WKY-15 completed 2026-10-27: shared HTML/Markdown usage guide model.
+Next task: `.agent/work/workey-v1/tasks/WKY-16.md` (Markdown view/copy controls).
+WKY-12 Linux deploy remains blocked by the user's explicit hold.
 
 ## Results
+
+- WKY-15: `views.NewUsageDocument` builds one guide tree for HTML and Markdown.
+  Includes client metadata, prompt IDs, all closed API disclosures and shared
+  apidoc examples. Runtime dates/catalog/workflow/rules come from AgentGuide.
+  Focused renderer, fake-clock, syntax/code and contract example tests pass;
+  templ/CSS regenerated, focused vet and normal/CGO-off builds passed.
+  Details in WKY-15.md.
 
 - WKY-13: real Streamable HTTP integration test: MCP writes outline/plan, web
   completes/undoes with CSRF, MCP reads shared progress; repeat requests add no
@@ -36,7 +45,7 @@ motion-emulation certification.
 ## Remaining / handoff
 
 Local Windows implementation and technical v1 checks complete with the client
-substitution above. No unblocked implementation task remains. WKY-12 must stay
+substitution above. WKY-16..19 are pending; WKY-15 is complete. WKY-12 must stay
 held until the user lifts it. Optional external acceptance: Claude Code model
 session using tools/list alone; separate Codex Desktop model acceptance also
 remains unverified. User authorized committing the completed changes after test

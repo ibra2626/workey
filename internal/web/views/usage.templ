@@ -1,102 +1,60 @@
 package views
 
-import (
-	"github.com/ibra2626/workey/internal/plan"
-	"github.com/ibra2626/workey/internal/apidoc"
-)
-
-templ usageCode(code string) {
-	<pre tabindex="0" aria-label="Kod örneği" class="max-w-full overflow-x-auto rounded-nav border border-line bg-ground p-4 text-meta leading-relaxed"><code>{ code }</code></pre>
+templ usageCode(code string, language string) {
+	<pre tabindex="0" aria-label="Kod örneği" class="max-w-full overflow-x-auto rounded-nav border border-line bg-ground p-4 text-meta leading-relaxed"><code class={ "language-" + language }>{ code }</code></pre>
 }
 
-templ Usage(key string, csrf string, guide plan.AgentGuide) {
-	@Layout(LayoutProps{Title: usageTitle(key) + " · Workey", Active: key, CSRF: csrf}) {
+templ Usage(key string, csrf string, doc UsageDocument) {
+	@Layout(LayoutProps{Title: doc.Title + " · Workey", Active: key, CSRF: csrf}) {
 		<article class="mx-auto min-w-0 max-w-3xl space-y-8 text-body text-ink-2">
 			<header class="space-y-3">
 				<p class="text-meta text-ink-3">Workey / Kullanım</p>
-				<h1 class="text-headline font-semibold text-ink">{ usageTitle(key) }</h1>
-				<p>Yapay zeka asistanınız planı hazırlar; Workey kitap, bölüm ve sayfa referanslarını saklar ve ilerlemeyi izler.</p>
+				<h1 class="text-headline font-semibold text-ink">{ doc.Title }</h1>
 				<nav aria-label="Kullanım rehberleri" class="flex flex-wrap gap-4">
 					<a href="/kullanim/mcp" class="underline underline-offset-4" { ariaCurrent(key == "mcp")... }>MCP Kullanımı</a>
 					<a href="/kullanim/api" class="underline underline-offset-4" { ariaCurrent(key == "api")... }>API Kullanımı</a>
 				</nav>
 			</header>
-			if key == "kullanim" {
-				<section class="space-y-3">
-					<h2 class="text-title font-semibold text-ink">Nasıl bağlanacaksınız?</h2>
-					<p>Claude veya Codex kullanıyorsanız MCP rehberiyle başlayın. Kendi istemciniz veya otomasyonunuz için REST API rehberini kullanın. İkisi de aynı plan üzerinde çalışır.</p>
-					<p>Web sayfaları oturum çereziyle, MCP ve API ise Bearer token ile korunur. Web oturumu API tokenı yerine geçmez.</p>
-				</section>
-			}
-			if key == "mcp" {
-				for _, section := range mcpSections() {
-					@usageSection(section)
-				}
-				<section class="space-y-3">
-					<h2 class="text-title font-semibold text-ink">Araçlar</h2>
-					for _, tool := range mcpToolDescriptions {
-						<p><strong class="font-semibold text-ink">{ tool.Name }</strong>{ " — " + tool.Description }</p>
-					}
-				</section>
-				<section class="space-y-3">
-					<h2 class="text-title font-semibold text-ink">Örnek istemler</h2>
-					<p>“Önce ajan rehberini ve mevcut planı oku. Verdiğim kitap/bölüm/sayfa referanslarıyla bu haftayı düzenle. Korunacak seansları koru, yazdıktan sonra tekrar okuyup sonucu bildir.”</p>
-					<p>“Yapılamayan seansı hafta sonuna telafi olarak ekle. Var olan hafta sonu seanslarını koru ve bağlantıyı doğrula.”</p>
-					<p>“Bugünkü seansımı tamamla; ardından güncel ilerlemeyi oku.” / “Son tamamlamayı geri al.”</p>
-					<a class="underline underline-offset-4" href="https://learn.chatgpt.com/docs/extend/mcp">OpenAI resmî MCP dokümantasyonu</a>
-				</section>
-			}
-			if key == "api" {
-				<section class="space-y-3">
-					<h2 class="text-title font-semibold text-ink">Sözleşme ve kimlik doğrulama</h2>
-					<p>Taban yol /api/v1. Tüm endpoint’ler Authorization: Bearer token ister. Gövdeler JSON, üst sınır 1 MiB. Yanıtlar önbelleğe alınmaz.</p>
-					<a href="/kullanim/api/openapi.json" class="underline underline-offset-4">OpenAPI 3.1 dosyasını indir</a>
-					<p>Ajan aynı sözleşmeyi Bearer doğrulamasıyla GET /api/v1/openapi.json üzerinden alabilir. Şema tüm istek/yanıt alanlarını ve zorunluluklarını içerir.</p>
-					for _, op := range apidoc.Operations() {
-						<details class="min-w-0 border-b border-line py-3">
-							<summary class="cursor-pointer break-words"><strong class="font-semibold text-ink">{ op.Method + " /api/v1" + op.Path }</strong>{ " — " + op.Summary }</summary>
-							if op.Output != "" {
-								<p class="py-3 text-meta">26 Ekim 2026 tarihli temsili senaryonun tam yanıtı. POST tamamlamada completed=true ve state=done olur; DELETE geri almada tarihine göre state tekrar hesaplanır.</p>
-								@usageCode(apidoc.OperationResponseJSON(op))
-							}
-							if op.Output == "" {
-								<a href="/kullanim/api/openapi.json" class="underline underline-offset-4">Sözleşmeyi indir</a>
-							}
-						</details>
-					}
-				</section>
-				for _, section := range apiSections() {
-					@usageSection(section)
-				}
-			}
-			<section class="space-y-3">
-				<h2 class="text-title font-semibold text-ink">Ajanın izleyeceği işlem sırası</h2>
-				<p>{ "Sunucu tarihi: " + guide.Today + " · " + guide.Timezone + " · Sınav: " + guide.ExamDate }</p>
-				<ol class="list-decimal space-y-3 pl-6">
-					for _, step := range guide.Workflow {
-						<li>{ step }</li>
-					}
-				</ol>
-			</section>
-			<section class="space-y-3">
-				<h2 class="text-title font-semibold text-ink">Ortak işlem kuralları</h2>
-				<p>Kitaplar: M1, M2, M3, G1, G2. Seans türleri: aksam, uzun_blok, deneme.</p>
-				for _, rule := range guide.Rules {
-					<p>{ rule }</p>
-				}
-			</section>
+			@usageBlocks(doc.Blocks)
 		</article>
 	}
 }
 
-templ usageSection(s usageSectionData) {
-	<section class="min-w-0 space-y-3">
-		<h2 class="text-title font-semibold text-ink">{ s.Title }</h2>
-		for _, paragraph := range s.Paragraphs {
-			<p>{ paragraph }</p>
+templ usageBlocks(blocks []UsageBlock) {
+	for _, block := range blocks {
+		switch block.Kind {
+			case UsageSection:
+				<section class="min-w-0 space-y-3" data-client={ block.Client }>
+					<h2 class="text-title font-semibold text-ink">{ block.Text }</h2>
+					@usageBlocks(block.Children)
+				</section>
+			case UsageParagraph:
+				<p>{ block.Text }</p>
+			case UsageCode:
+				@usageCode(block.Text, block.Language)
+			case UsagePrompt:
+				<p data-prompt={ block.ID }>{ block.Text }</p>
+			case UsageLink:
+				<a href={ templ.SafeURL(block.URL) } class="underline underline-offset-4">{ block.Text }</a>
+			case UsageDetails:
+				<details class="min-w-0 border-b border-line py-3">
+					<summary class="cursor-pointer break-words"><strong class="font-semibold text-ink">{ block.Text }</strong></summary>
+					@usageBlocks(block.Children)
+				</details>
+			case UsageList:
+				if block.Ordered {
+					<ol class="list-decimal space-y-3 pl-6">
+						for _, item := range block.Items {
+							<li>{ item }</li>
+						}
+					</ol>
+				} else {
+					<ul class="list-disc space-y-3 pl-6">
+						for _, item := range block.Items {
+							<li>{ item }</li>
+						}
+					</ul>
+				}
 		}
-		if s.Code != "" {
-			@usageCode(s.Code)
-		}
-	</section>
+	}
 }

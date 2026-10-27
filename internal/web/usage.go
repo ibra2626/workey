@@ -13,8 +13,8 @@ func (a *Auth) screenUsage(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/kullanim/api" {
 		key = "api"
 	}
-	guide := a.svc.AgentGuide(a.examDate)
+	doc := views.NewUsageDocument(key, a.svc.AgentGuide(a.examDate))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	_ = views.Usage(key, csrfTokenFromRequest(r), guide).Render(r.Context(), w)
+	_ = views.Usage(key, csrfTokenFromRequest(r), doc).Render(r.Context(), w)
 }

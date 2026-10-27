@@ -33,7 +33,10 @@ func TestUsagePagesAndDownload(t *testing.T) {
 				return
 			}
 			body := string(b)
-			for _, want := range []string{"MCP Kullanımı", "API Kullanımı", "grid-cols-4", "2026-10-28", `href="/kullanim"`, `aria-current="page"`} {
+			if res.Header.Get("Cache-Control") != "no-store" {
+				t.Fatal("usage page must not be cached")
+			}
+			for _, want := range []string{"MCP Kullanımı", "API Kullanımı", "grid-cols-4", "2026-10-28", "2027-07-18", `href="/kullanim"`, `aria-current="page"`} {
 				if !strings.Contains(body, want) {
 					t.Errorf("missing %q", want)
 				}
