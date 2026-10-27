@@ -1,91 +1,145 @@
 package views
 
-templ usageCode(code string, language string) {
-	<pre tabindex="0" aria-label="Kod örneği" class="max-w-full overflow-x-auto rounded-nav border border-line bg-ground p-4 text-meta leading-relaxed"><code class={ "language-" + language }>{ code }</code></pre>
-}
+
 
 templ Usage(key string, csrf string, doc UsageDocument, markdown bool) {
 	@Layout(LayoutProps{Title: doc.Title + " · Workey", Active: key, CSRF: csrf}) {
-		<article class="mx-auto min-w-0 max-w-3xl space-y-8 text-body text-ink-2">
-			<header class="space-y-3">
-				<p class="text-meta text-ink-3">Workey / Kullanım</p>
-				<h1 class="text-headline font-semibold text-ink">{ doc.Title }</h1>
-				<nav aria-label="Kullanım rehberleri" class="flex flex-wrap gap-4">
-					<a href="/kullanim/mcp" class="underline underline-offset-4" { ariaCurrent(key == "mcp")... }>MCP Kullanımı</a>
-					<a href="/kullanim/api" class="underline underline-offset-4" { ariaCurrent(key == "api")... }>API Kullanımı</a>
+		<article class="usage-page text-body text-ink-2">
+			<header class="usage-header">
+				<h1 class="text-headline font-bold text-ink">{ doc.Title }</h1>
+				<p class="usage-prose">{ doc.Intro() }</p>
+				<nav aria-label="Kullanım rehberleri" class="usage-guides">
+					<a href="/kullanim/mcp" class="usage-control" { ariaCurrent(key == "mcp")... }>MCP Kullanımı</a>
+					<a href="/kullanim/api" class="usage-control" { ariaCurrent(key == "api")... }>API Kullanımı</a>
 				</nav>
-				if key == "mcp" || key == "api" {
-					<nav aria-label="Rehber görünümü" class="flex flex-wrap items-center gap-3">
-						<a href={ templ.SafeURL(doc.ViewURL(key, false)) } class="usage-control" { ariaCurrent(!markdown)... }>Rehber</a>
-						<a href={ templ.SafeURL(doc.ViewURL(key, true)) } class="usage-control" { ariaCurrent(markdown)... }>Markdown</a>
-						<button type="button" class="usage-control" data-copy-target="usage-markdown" data-copy-status="usage-copy-status" hidden>Markdown olarak kopyala</button>
-					</nav>
-					<p id="usage-copy-status" role="status" aria-live="polite" aria-atomic="true" class="text-meta text-ink-3"></p>
-				}
-				if key == "mcp" {
-					<nav aria-label="MCP istemcisi" class="flex flex-wrap gap-3">
-						for _, client := range []struct{ ID, Name string }{{"codex-desktop", "Codex Desktop"}, {"codex-cli", "Codex CLI"}, {"claude-code", "Claude Code"}} {
-							<a href={ templ.SafeURL(doc.SelectClient(client.ID).ViewURL(key, markdown)) } class="usage-control" { ariaCurrent(doc.SelectClient(doc.Client).Client == client.ID)... }>{ client.Name }</a>
-						}
-					</nav>
-				}
 			</header>
 			if key == "mcp" || key == "api" {
-				<div id="usage-markdown-panel" data-copy-panel hidden?={ !markdown } class="space-y-3">
-					<label for="usage-markdown" class="text-title font-semibold text-ink">Ham Markdown rehberi</label>
-					<p id="usage-markdown-help" class="text-meta text-ink-3">Metni seçip Ctrl+C (macOS: ⌘C) ile kopyalayabilirsiniz.</p>
+				<div class="usage-toolbar">
+					<nav aria-label="Rehber görünümü" class="flex flex-wrap gap-2">
+						<a href={ templ.SafeURL(doc.ViewURL(key, false)) } class="usage-control" { ariaCurrent(!markdown)... }>Rehber</a>
+						<a href={ templ.SafeURL(doc.ViewURL(key, true)) } class="usage-control" { ariaCurrent(markdown)... }>Markdown</a>
+					</nav>
+					<button type="button" class="usage-control" data-copy-target="usage-markdown" data-copy-status="usage-copy-status" hidden>Markdown olarak kopyala</button>
+					<p class="usage-scope">Tam Markdown tüm bölümleri{ clientScope(key) } içerir.</p>
+					<p id="usage-copy-status" role="status" aria-live="polite" aria-atomic="true" class="usage-status"></p>
+				</div>
+				<div id="usage-markdown-panel" data-copy-panel hidden?={ !markdown } class="usage-panel usage-stack">
+					<label for="usage-markdown" class="text-title-lg font-semibold text-ink">Ham Markdown rehberi</label>
+					<p id="usage-markdown-help">Metni seçip Ctrl+C (macOS: ⌘C) ile kopyalayabilirsiniz.</p>
 					<textarea id="usage-markdown" readonly rows="24" spellcheck="false" aria-describedby="usage-markdown-help" class="usage-markdown">{ doc.Markdown() }</textarea>
 				</div>
 				<script defer src={ asset("/static/copy.js") }></script>
 			}
 			if !markdown || (key != "mcp" && key != "api") {
-				@usageBlocks(doc.GuideBlocks())
+				<div class="usage-layout">
+					<aside class="usage-index">
+						<nav aria-label="Bu sayfada" class="usage-index-wide">
+							<p class="font-semibold text-ink">Bu sayfada</p>
+							@usageIndex(doc.Sections())
+						</nav>
+						<details class="usage-index-compact">
+							<summary>Bu sayfada</summary>
+							<nav aria-label="Bölüm listesi">@usageIndex(doc.Sections())</nav>
+						</details>
+					</aside>
+					<div class="usage-sections">
+						@usageBlockList(doc.Sections(), 2, doc, key)
+					</div>
+				</div>
 			}
 		</article>
 	}
 }
 
+templ usageIndex(blocks []UsageBlock) {
+	<ul>
+		for _, block := range blocks {
+			if block.Kind == UsageSection || block.Kind == UsageDetails {
+				<li><a href={ templ.SafeURL("#" + block.ID) }>{ block.Text }</a></li>
+			}
+		}
+	</ul>
+}
+
 templ usageBlocks(blocks []UsageBlock) {
+	@usageBlockList(blocks, 2, UsageDocument{}, "")
+}
+
+templ usageHeading(text string, level int) {
+	if level == 2 {
+		<h2>{ text }</h2>
+	} else if level == 3 {
+		<h3>{ text }</h3>
+	} else {
+		<h4>{ text }</h4>
+	}
+}
+
+templ usagePromptText(block UsageBlock) {
+	<label for={ "usage-prompt-" + block.ID }>Asistanınıza gönderin</label>
+	<p id={ "usage-prompt-help-" + block.ID } class="text-meta">Metni seçip Ctrl+C (macOS: ⌘C) ile elle de kopyalayabilirsiniz.</p>
+	<textarea id={ "usage-prompt-" + block.ID } readonly rows={ promptRows(block.ID) } spellcheck="false" aria-describedby={ "usage-prompt-help-" + block.ID } class="usage-markdown">{ block.Text }</textarea>
+}
+
+templ usageCopyButton(target, status, label string) {
+	<button type="button" class="usage-control" data-copy-target={ target } data-copy-status={ status } hidden>{ label }</button>
+}
+
+templ usageBlockList(blocks []UsageBlock, level int, doc UsageDocument, key string) {
 	for _, block := range blocks {
 		switch block.Kind {
 			case UsageSection:
-				<section class="min-w-0 space-y-3" data-client={ block.Client }>
-					<h2 class="text-title font-semibold text-ink">{ block.Text }</h2>
-					@usageBlocks(block.Children)
+				<section id={ block.ID } class={ "usage-stack", templ.KV("usage-panel", level == 2), templ.KV("usage-subsection", level > 2) } data-client={ block.Client }>
+					@usageHeading(block.Text, level)
+					if block.ID == "connect" {
+						<nav aria-label="MCP istemcisi" class="flex flex-wrap gap-2">
+							for _, client := range []struct{ ID, Name string }{{"codex-desktop", "Codex Desktop"}, {"codex-cli", "Codex CLI"}, {"claude-code", "Claude Code"}} {
+								<a href={ templ.SafeURL(doc.SelectClient(client.ID).ViewURL(key, false) + "#connect") } class="usage-control" { ariaCurrent(doc.SelectClient(doc.Client).Client == client.ID)... }>{ client.Name }</a>
+							}
+						</nav>
+					}
+					@usageBlockList(block.Children, level+1, doc, key)
 				</section>
 			case UsageParagraph:
-				<p>{ block.Text }</p>
+				<p class="usage-prose">{ block.Text }</p>
 			case UsageCode:
-				@usageCode(block.Text, block.Language)
+				<div class="usage-code">
+					<div class="usage-code-tools">
+						<span>{ block.Language }</span>
+						@usageCopyButton("usage-code-" + block.ID, "usage-code-status-" + block.ID, "Kodu kopyala")
+					</div>
+					<pre id={ "usage-code-" + block.ID } tabindex="0" aria-label={ block.Language + " kod örneği" }><code class={ "language-" + block.Language }>{ block.Text }</code></pre>
+					<p id={ "usage-code-status-" + block.ID } role="status" aria-live="polite" aria-atomic="true" class="usage-status"></p>
+				</div>
 			case UsagePrompt:
-				<div class="space-y-3" data-prompt={ block.ID }>
-					<label for={ "usage-prompt-" + block.ID } class="text-title font-semibold text-ink">Asistanınıza gönderin</label>
-					<textarea id={ "usage-prompt-" + block.ID } readonly rows={ promptRows(block.ID) } spellcheck="false" class="usage-markdown">{ block.Text }</textarea>
-					<button type="button" class="usage-control" data-copy-target={ "usage-prompt-" + block.ID } data-copy-status={ "usage-prompt-status-" + block.ID } hidden>
-						if block.ID == "exam-plan" {
-							Promptu kopyala
-						} else {
-							İstemi kopyala
-						}
-					</button>
-					<p id={ "usage-prompt-status-" + block.ID } role="status" aria-live="polite" aria-atomic="true" class="text-meta text-ink-3"></p>
+				<div class="usage-stack" data-prompt={ block.ID }>
+					@usageCopyButton("usage-prompt-" + block.ID, "usage-prompt-status-" + block.ID, "İstemi kopyala")
+					<p id={ "usage-prompt-status-" + block.ID } role="status" aria-live="polite" aria-atomic="true" class="usage-status"></p>
+					if block.ID == "exam-plan" {
+						<details class="usage-disclosure">
+							<summary>İstemin tamamını göster</summary>
+							<div class="usage-stack">@usagePromptText(block)</div>
+						</details>
+					} else {
+						@usagePromptText(block)
+					}
 				</div>
 			case UsageLink:
-				<a href={ templ.SafeURL(block.URL) } class="underline underline-offset-4">{ block.Text }</a>
+				<a href={ templ.SafeURL(block.URL) } class="usage-link">{ block.Text }</a>
 			case UsageDetails:
-				<details class="min-w-0 border-b border-line py-3">
-					<summary class="cursor-pointer break-words"><strong class="font-semibold text-ink">{ block.Text }</strong></summary>
-					@usageBlocks(block.Children)
+				<details id={ block.ID } class={ "usage-disclosure", templ.KV("usage-panel", level == 2) }>
+					<summary>@usageHeading(block.Text, level)</summary>
+					<div class="usage-stack">@usageBlockList(block.Children, level+1, doc, key)</div>
 				</details>
 			case UsageList:
 				if block.Ordered {
-					<ol class="list-decimal space-y-3 pl-6">
+					<ol class="usage-list">
 						for _, item := range block.Items {
 							<li>{ item }</li>
 						}
 					</ol>
 				} else {
-					<ul class="list-disc space-y-3 pl-6">
+					<ul class="usage-list">
 						for _, item := range block.Items {
 							<li>{ item }</li>
 						}

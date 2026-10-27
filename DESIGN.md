@@ -110,6 +110,16 @@ typography:
     fontSize: "14px"
     fontWeight: 400
     lineHeight: 1.45
+  guide-section:
+    fontFamily: "Barlow, system-ui, sans-serif"
+    fontSize: "20px"
+    fontWeight: 600
+    lineHeight: 1.4
+  code:
+    fontFamily: "monospace"
+    fontSize: "13px"
+    fontWeight: 400
+    lineHeight: 1.6
   numeral-unit:
     fontFamily: "Barlow Condensed, Barlow, sans-serif"
     fontSize: "18px"
@@ -134,7 +144,7 @@ components:
   button-primary:
     backgroundColor: "{colors.ink}"
     textColor: "{colors.card}"
-    typography: "{typography.title}"
+    typography: "{typography.title-lg}"
     rounded: "{rounded.pill}"
     height: "54px"
     padding: "0 40px"
@@ -182,6 +192,31 @@ components:
     backgroundColor: "{colors.line}"
     rounded: "{rounded.bar}"
     height: "6px"
+  input-password:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.nav}"
+    padding: "10px 12px"
+  usage-control:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body}"
+    rounded: "{rounded.nav}"
+    padding: "8px 12px"
+  usage-control-selected:
+    backgroundColor: "{colors.ground}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.nav}"
+  guide-selected:
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.card}"
+    rounded: "{rounded.nav}"
+  usage-code:
+    backgroundColor: "{colors.ground}"
+    textColor: "{colors.ink}"
+    typography: "{typography.code}"
+    padding: "16px"
 ---
 
 # Design System: Workey
@@ -255,6 +290,7 @@ A cool, low-chroma forest palette with three muted "heart-rate zone" accents res
 - **Body** (400, 15px, normal; relaxed for notes): descriptions, table cells, notes.
 - **Meta** (400, 13px, tabular, Lichen Ink): page ranges and times under a title, side context in headers.
 - **Label** (600, 12px, Lichen Ink, sentence case): names a measurement, column or panel ("Bu hafta", "Sınava", "Haftalık hacim", table headers). Never uppercase, never tracked.
+- **Guide section** (600, 20px, line-height 1.4): guide panel h2 headings. Nested headings and disclosure headings use 16px semibold. Guide prose stays 15px with line-height 1.6 and a maximum measure of 72ch; code uses the system monospace stack at 13px, line-height 1.6.
 
 ### Named Rules
 **The Two Widths Rule.** If it is a number the user reads as a quantity (minutes, days, weeks, pages, percentages), it is Barlow Condensed with tabular figures. If it is a sentence, it is Barlow. Times and page ranges inside running text keep Barlow with `tnum`.
@@ -270,6 +306,14 @@ Mobile (reference width 390px): a single column. A 20px-inset header line (date 
 Desktop (reference width 1280px): a 232px left rail plus a main area with 32px padding and 20px gaps. Bugün uses a two-column grid (main panel plus a 340px side column of small panels: Bu hafta, Yarın, Not) with a full-width phase panel below. İlerleme stacks the plan strip and topic groups in one column; v1 has no score or deneme-results side panels. Hafta stacks a volume panel (260px figure column plus chart) above a full-width table. Panel padding is 24-32px (larger for the main session panel).
 
 Rhythm: 8px between small units, 12px between mobile panels and list items, 20px between desktop panels. Figures sit with `leading-none` and 4px above them for their label.
+
+The app shell switches from the fixed bottom bar to the desktop rail at 768px.
+Usage pages retain the same shell in a maximum 1200px reading container. Their
+panels use 20px padding below 768px and 28px above it, with 12/20px gaps. At
+1200px viewport width, a 180px contents column sits beside the flexible reading
+column, separated by 24px; below that, the contents list is a native disclosure.
+Long code lines scroll locally. The mobile main area reserves 88px below its
+content for the 68px fixed navigation.
 
 **The First Panel Rule.** On Bugün, at any width, the first panel contains book reference, chapter, page range, session profile and "Tamamlandı" with no scrolling on a 390 x 844 screen.
 
@@ -288,9 +332,9 @@ Soft but not bubbly. Panels have generously rounded corners (14px). Chart bars a
 ### Buttons
 Decisive and singular: one dark pill per surface.
 - **Shape:** full pill.
-- **Primary ("Tamamlandı"):** Forest Ink fill, white 17px semibold text, a 20px check icon before the label, 54px tall full-width on mobile, 56px tall with 40px side padding on desktop.
-- **Hover / Focus:** background eases to Pressed Forest over 200ms (`cubic-bezier(.16,1,.3,1)`); focus-visible is a 2px Forest Ink outline offset 3px (a teal ring would be only 2.5:1 against the ground).
-- **Secondary:** none exists yet. Do not invent one in a zone colour.
+- **Primary ("Tamamlandı"):** Forest Ink fill, white 16px semibold text, a 20px check icon before the label, 54px tall full-width on mobile, 56px tall with 40px side padding on desktop. The login action uses the same pill at 54px and 15px semibold text.
+- **Hover / Focus:** background eases to Pressed Forest over 200ms using the compiled Tailwind default ease; focus-visible is a 2px Forest Ink outline offset 3px (a teal ring would be only 2.5:1 against the ground). Reduced motion reduces transition and animation duration to 0.01ms.
+- **Secondary:** guide controls are flat white rectangles with an 8px radius, 1px Hairline border and a minimum 44px height. Padding is 8px by 12px; hover changes the border to Forest Ink and the fill to Trail Ground. Selected view/client links use the ground fill, ink border and semibold text; selected guide navigation uses ink fill and white text. Focus is a 2px ink outline offset 2px. Copy controls are hidden until JavaScript attaches them; disabled controls use a wait cursor.
 
 After completion, replace the pill with a plain Tamamlandı status and a quiet Geri al form button. Completion and undo refresh the session, mobile summary, desktop weekly volume and phase blocks together.
 
@@ -302,17 +346,38 @@ After completion, replace the pill with a plain Tamamlandı status and a quiet G
 - **Internal Padding:** 20px mobile, 24-32px desktop; stat tiles 14px.
 - Panels sit side by side or stacked, never inside one another. A list or table inside a panel uses dividers, not inner cards.
 
+### Inputs and selectable text
+The password input is Card White with Forest Ink text, a 1px Hairline border,
+8px corners, 10px by 12px padding and 15px body text. Its label is 12px semibold
+Lichen Ink. Focus changes the border to ink and adds a 2px ink outline offset 2px.
+Readonly guide textareas use 13px monospace at line-height 1.6, 16px padding,
+8px corners, a Hairline border and vertical resizing. They retain native text
+selection and the same visible focus treatment.
+
 ### Lists and tables
 - **Week list (mobile):** rows 12px x 16px, condensed day number (20px) in a 36px column, title + meta line. Done rows end with a check icon; moved rows say "cumartesiye taşındı" in meta; rest rows are a single Lichen Ink "Dinlenme" line.
 - **Week table (desktop):** label-style header row over a hairline, 15px body, hairline dividers, tabular figures. A "Durum" column carries words: "Tamamlandı" with check, "Cumartesiye taşındı", "Bugün 20:30", "Planlı".
 - **Today row:** Today Sand background, semibold, secondary text stepped up to Moss Ink.
 
 ### Navigation
-- **Mobile bottom tab bar:** Card White, top hairline, three equal tabs (Bugün, Hafta, İlerleme) with a 22px stroked icon over a 12px label. Inactive Lichen Ink; hover turns Forest Ink over 150ms; active Forest Ink and semibold, marked with `aria-current="page"`. Every tab is a real link (`href`) and shows a 2px Forest Ink inset focus ring (offset -2px, 8px corners) on focus-visible.
-- **Desktop left rail:** 232px, Card White, right hairline. "Workey" wordmark in Barlow Condensed 24px semibold, then three items (20px icon, 15px label, 10px x 12px padding, 8px corners). Active item gets a Trail Ground fill and Forest Ink semibold text. Hover and focus-visible follow the tab bar: Forest Ink text on hover, 2px Forest Ink inset ring on focus. The rail's foot holds the days-to-exam figure.
+- **Mobile bottom tab bar:** Card White, top hairline, four equal tabs (Bugün, Hafta, İlerleme, Kullanım) with a 22px stroked icon over a 12px label. Inactive Lichen Ink; hover turns Forest Ink over 150ms; active Forest Ink and semibold, marked with `aria-current="page"`. Every tab is a real link (`href`) and shows a 2px Forest Ink inset focus ring (offset -2px, 8px corners) on focus-visible.
+- **Desktop left rail:** 232px, Card White, right hairline. "Workey" wordmark in Barlow Condensed 24px semibold, then five items: Bugün, Hafta, İlerleme, MCP Kullanımı and API Kullanımı (20px icon, 15px label, 10px x 12px padding, 8px corners). Active item gets a Trail Ground fill and Forest Ink semibold text. Hover and focus-visible follow the tab bar: Forest Ink text on hover, 2px Forest Ink outline offset 2px. The rail's foot holds the days-to-exam figure on study screens.
+
+### Guide reading controls
+Guide pages use sibling white panels and internal dividers. Native disclosures
+have minimum 44px summary targets; their 16px semibold headings stay inline with
+the native disclosure marker. The wide contents list is sticky 24px from the
+top and scrolls within the viewport when long; section links are real fragments.
+Code blocks have a language/copy toolbar above an ink-on-ground preformatted
+area. The area is keyboard focusable and scrolls horizontally without widening
+the page. Copy success/failure uses 13px Lichen Ink live text rather than a zone
+colour. On failure, hidden text is revealed, focused and selected for manual
+copying. The long plan prompt keeps its copy button and replacement warning
+outside its initially closed preview. Full Markdown explicitly includes all
+clients, while formatted content shows only the selected client.
 
 ### Session profile (signature)
-Tonight's 90 minutes drawn as an interval workout on a 20:30-22:00 axis (ticks every 30 minutes, 12-13px tabular Lichen Ink). Three blocks share the width in proportion to their minutes (20 / 50 / 20) and stand at heights that read as intensity: konu low (about 43% of the chart height, Easy-Pace Teal), soru tall (about 92%, Main-Set Ochre), yanlış defteri mid (about 64%, Recovery Blue-Grey), with a 3-4px gap between them. On desktop each block carries its name (Barlow 15px semibold) and duration (Barlow Condensed 22px semibold) in Forest Ink, with dashed hairline gridlines at the half hours. On mobile the blocks are unlabelled and a three-row legend below pairs a 10px zone swatch, the part name with its pages, and the condensed duration.
+Tonight's 90 minutes drawn as an interval workout on a 20:30-22:00 axis (ticks every 30 minutes, 12-13px tabular Lichen Ink). Three blocks share the width in proportion to their minutes (20 / 50 / 20) and stand at heights that read as intensity: konu low (about 43% of the chart height, Easy-Pace Teal), soru tall (about 92%, Main-Set Ochre), yanlış defteri mid (about 64%, Recovery Blue-Grey), with a 4px gap between them. On desktop each block carries its name (Barlow 15px semibold) and duration (Barlow Condensed 22px semibold) in Forest Ink; the profile is 150px tall. On mobile the 92px profile blocks are unlabelled and a three-row legend below pairs a 10px zone swatch, the part name with its pages, and the condensed duration.
 
 For uzun_blok and deneme, use one Phase Mist block with the full duration and start/end ticks; do not invent a 20/50/20 split. Multi-source sessions list every book/chapter/page reference in flat rows inside the session panel. The deneme session kind remains valid input, but v1 has no deneme score tracking.
 

@@ -6,7 +6,7 @@ oturumu ister; ortak kurallar doğrudan ajan rehberiyle aynı kaynaktan gelir.
 
 ## Rehber görünümü, istemci seçimi ve kopyalama
 
-Sayfa Codex Desktop seçili açılır. **Codex CLI** veya **Claude Code** bağlantısını
+Sayfa Codex Desktop seçili açılır. **İstemcinizi bağlayın** bölümünde **Codex CLI** veya **Claude Code** bağlantısını
 seçtiğinizde yalnızca o istemcinin kurulum adımları gösterilir. Seçim URL'deki
 `client` parametresinde tutulur; görünüm değiştirirken korunur. Teknik ayrıntılar
 ve ek örnekler başlangıçta kapalıdır; başlıklarına tıklayarak ya da klavyeyle
@@ -14,8 +14,8 @@ odaklayıp Enter/Boşluk ile açabilirsiniz.
 
 **Rehber** biçimlendirilmiş adımları, **Markdown** salt okunur tam metni gösterir.
 **Markdown olarak kopyala**, seçili istemciden bağımsız olarak tüm istemcileri,
-kapalı bölümleri ve istemleri içeren rehberi kopyalar. **İstemi kopyala** ve
-**Promptu kopyala** düğmeleri yalnızca yanlarındaki istemi kopyalar. İşlem
+kapalı bölümleri ve istemleri içeren rehberi kopyalar. **İstemi kopyala**
+düğmeleri yalnızca yanlarındaki istemi, **Kodu kopyala** yalnızca ilgili kodu kopyalar. İşlem
 tamamlandığında ilgili düğmenin yanında **Kopyalandı** bildirimi görünür.
 
 Pano erişimi yoksa veya reddedilirse metin görünür hale gelir, odaklanır ve
@@ -25,10 +25,17 @@ ve açılır bölümler çalışır. Markdown görünümündeki ya da ayrı iste
 metni odaklayıp Ctrl+A ve Ctrl+C ile elle kopyalayabilirsiniz. Uzun kodlar kendi
 kutusunda yatay, uzun istemler metin alanında dikey kaydırılır.
 
+Ana bölümler uygulamanın beyaz panellerinde gösterilir. **Bu sayfada** dizini
+geniş ekranda sağdadır; dar ekranda açılır listedir. Bölüm bağlantıları JS
+olmadan da çalışır. İstemci seçimi sizi bağlantı bölümünde tutar.
+
 ## Sınava kadar plan şablonu
 
 Dördüncü adımda **Sınava kadar çalışma planımı oluştur** alanındaki
-**Promptu kopyala** düğmesini kullanın. Kopyayı asistanınıza göndermeden önce
+**İstemi kopyala** düğmesini kullanın. Tam metin **İstemin tamamını göster**
+önizlemesindedir; düğme kapalı önizlemeden de eksiksiz kopyalar. Pano hatasında
+önizleme açılır ve metin elle kopyalamak üzere seçilir. Tam-liste değiştirme
+uyarısı önizlemenin dışında görünür kalır. Kopyayı asistanınıza göndermeden önce
 köşeli parantezli hedef/seviye, uygun gün/saat, süre, dinlenme ve doğrulanabilir
 kitap/bölüm/sayfa alanlarını doldurun. Önerilen çalışma ritmini kendinize göre
 düzenleyin. Sayfa yalnızca metin kopyalar; plan yazmak için Workey'e bağlı

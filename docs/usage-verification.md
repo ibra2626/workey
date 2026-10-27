@@ -108,3 +108,58 @@ go build ./...
 
 Görsel inceleme için `docs/mcp.md` içindeki geçici önizleme yönergesini kullanın.
 Commit, push, yayınlama ve kalıcı istemci kurulumu bu çalışmanın parçası değildir.
+
+## WKY-20 — rehber düzeni ve içerik hiyerarşisi (2026-10-27)
+
+Uygulama tamamlandı; gerçek tarayıcı %200 yakınlaştırma kabulü bekliyor.
+Önceki WKY-19 kanıtları bu düzenin yerine kullanılmadı.
+
+- Başlangıç: güncel örnek-verili Bugün, Hafta, İlerleme ve iki rehber uygulama içi
+  tarayıcıda karşılaştırıldı. Yeni rehberler aynı Barlow, gri-yeşil zemin, beyaz
+  14px paneller, 20/28px iç boşluk, 12/32px dış boşlukları kullanıyor. Kardeş
+  paneller ve içeride ayırıcılar var; iç içe beyaz panel yok.
+- MCP: istemci seçimi bağlantı bölümünde, alt başlık h3. Kısa doğrulama beklenen
+  sonuç olarak anlatılıyor. 3945 karakterlik plan istemi kapalı önizlemeden tam
+  kopyalandı; tam-liste uyarısı dışarıda görünür. İstem metni değiştirilmedi.
+- API: ilk okuma ve token girişi referanstan önce; okuma/yazma/korunacak kayıtlar/
+  tam-liste uyarısı/tekrar okuma gruplandı. Sözleşmeden gelen JSON örnekleri aynı.
+  OpenAPI indirmesi referansın başında; endpoint yanıtları kapalı açılır içerik.
+- Bölüm bağlantıları benzersiz ve doğru; geniş ekranda sağdaki dizin, dar ekranda
+  native details listesi. Görünüm bağlantıları istemciyi, istemci seçimi #connect
+  konumunu koruyor. Markdown tüm istemcileri ve kapalı içerikleri kapsıyor.
+- 320×844, 390×844, 1280×800: üç MCP istemcisi × iki görünüm ve iki API görünümü
+  tarandı. Belge scrollWidth/clientWidth eşit: 305/375/1265px. Uzun satırlar
+  yalnız pre içinde kayıyor. 390×844 ve 1280×800 görüntüleri görsel olarak
+  incelendi; mobil sayfa sonunda metin alt gezinmenin üzerinde kalıyor.
+- Klavye: bölüm listesi, bölüm bağlantısı, istemci seçimi, görünüm değişimi,
+  istem önizlemesi ve endpoint disclosures Enter ile çalıştı. Odak çizgisi
+  görünür. Görünen rehber a/button/summary hedeflerinde 44px altı yükseklik yok.
+  DOM üzerinden ölçülen metin renklerinde en düşük kontrast 4,60:1; h1 28px,
+  gövde 15px. Başlıklar h1 → h2 → h3; API örnek başlıkları da h3.
+- Başarı: iki tam Markdown, altı ayrı istem ve 22 kod hedefi (toplam 30) gerçek
+  pano okumasıyla kaynak metne eşit; CRLF normalleştirildi. Diğer istemcilerin
+  kod hedefleri ve altı istemin tüm istemcilerde kaynak eşitliği Go testiyle
+  kontrol edildi. Kapalı istem önizlemesinden kopyalama ayrıca doğrulandı.
+- Hata: loopback proxy Clipboard writeText reddi ve API yokluğunu zorladı.
+  Kod, tam Markdown ve uzun istem için doğru odak/seçim, hata metni, yeniden
+  etkin düğme ve başarı bildirimi yokluğu doğrulandı. Kapalı istem açıldı ve
+  3945 karakter seçildi; tam Markdown paneli açıldı; kod Range ile seçildi.
+- Scriptsiz: CSP script-src 'none' altında sıfır görünür kopyalama düğmesi.
+  Mobil bölüm/istemci/görünüm gezinmesi ve API yanıt açılımı çalıştı; ayrı istem
+  ve tam Markdown gerçek Ctrl+A/Ctrl+C sonrası pano metniyle eşleşti.
+
+Go 1.27.3: templ ve Tailwind üretimi; go test ./internal/web/... ./internal/apidoc/...;
+go build ./...; CGO_ENABLED=0 go build ./...; go vet ./...; gofmt -l . (boş);
+git diff --check geçti. Bölüm/kod hedefi/istem sözleşmesi regresyonları eklendi;
+oturumsuz erişim, no-store ve OpenAPI eşitliği mevcut test matrisinde geçti.
+Impeccable layout detector boş sonuç verdi; görsel kontrolün yerine sayılmadı.
+
+Sınır: IAB Ctrl+plus girişinden sonra innerWidth ve devicePixelRatio değişmedi;
+gerçek %200 zoom doğrulanmadı. 1280×800 için eşdeğer 640×400 yeniden akış alanında
+iki rehber okunur ve yatay taşmasız (625px belge genişliği) incelendi. Bu eşdeğer
+kontrol gerçek zoom kabulünün yerine geçirilmedi; WKY-20 done işaretlenmedi.
+Ekran okuyucu, diğer tarayıcı motorları, tam test paketi ve güvenlik taraması bu
+görevde çalıştırılmadı. Pano ret/yokluk durumları kontrollü enjeksiyondur; JS
+kapalılığı CSP ile sağlandı. Gerçek kullanıcı .env, token ve planına dokunulmadı.
+Örnek fixture sunucuları ve proxy'ler kabul bitiminde kapatıldı. Commit/push/deploy
+bu görevin kapsamında değil; WKY-12 beklemesi sürüyor.

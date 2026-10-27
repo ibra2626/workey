@@ -289,3 +289,56 @@
   outline: 2px solid var(--color-ink);
   outline-offset: 2px;
 }
+
+/* Read surfaces: sibling panels, measured prose and local code scrolling. */
+.usage-page { max-width: 1200px; margin-inline: auto; min-width: 0; overflow-wrap: anywhere; }
+.usage-header { display: grid; gap: 12px; margin-bottom: 20px; }
+.usage-guides { display: flex; flex-wrap: wrap; gap: 8px; }
+.usage-guides .usage-control[aria-current="page"] { background: var(--color-ink); color: var(--color-card); }
+.usage-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding-block: 16px; margin-bottom: 20px; border-block: 1px solid var(--color-line); }
+.usage-scope, .usage-status { flex-basis: 100%; color: var(--color-ink-3); font-size: var(--text-meta); }
+.usage-status:empty { display: none; }
+.usage-layout, .usage-sections { display: grid; min-width: 0; gap: 12px; }
+.usage-panel { min-width: 0; padding: var(--spacing-panel-mobile); border-radius: var(--radius-panel); background: var(--color-card); scroll-margin-block: 20px 88px; }
+.usage-stack > * + * { margin-top: 12px; }
+.usage-stack > .usage-status:empty + * { margin-top: 0; }
+.usage-stack h2 { font-size: 20px; line-height: 1.4; font-weight: 600; color: var(--color-ink); }
+.usage-stack h3, .usage-stack h4 { font-size: 16px; line-height: 1.5; font-weight: 600; color: var(--color-ink); }
+.usage-prose, .usage-list { max-width: 72ch; line-height: 1.6; }
+.usage-subsection { min-width: 0; padding-top: 20px; border-top: 1px solid var(--color-line); }
+.usage-list { padding-left: 24px; list-style: disc; }
+ol.usage-list { list-style: decimal; }
+.usage-list li + li { margin-top: 12px; }
+.usage-disclosure { min-width: 0; border-bottom: 1px solid var(--color-line); }
+.usage-disclosure.usage-panel { border: 0; }
+.usage-disclosure summary, .usage-index-compact summary { min-height: 44px; padding-block: 10px; cursor: pointer; color: var(--color-ink); font-weight: 600; }
+.usage-disclosure summary > :is(h2,h3,h4) { display: inline; font-size: 16px; line-height: 1.5; }
+.usage-disclosure[open] > .usage-stack { margin-top: 12px; padding-bottom: 12px; }
+.usage-link { display: inline-flex; align-items: center; min-height: 44px; text-decoration: underline; text-underline-offset: 4px; }
+.usage-code { min-width: 0; border-block: 1px solid var(--color-line); }
+.usage-code-tools { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-block: 8px; color: var(--color-ink-3); font-size: var(--text-meta); }
+.usage-code pre { max-width: 100%; overflow-x: auto; padding: 16px; background: var(--color-ground); color: var(--color-ink); font-size: 13px; line-height: 1.6; white-space: pre; overflow-wrap: normal; margin: 0; }
+.usage-code .usage-status:not(:empty) { padding-block: 12px; }
+.usage-code-tools .usage-control { font-family: var(--font-sans); }
+.usage-control { max-width: 100%; text-align: left; }
+.usage-control:hover { border-color: var(--color-ink); background: var(--color-ground); }
+.usage-control[aria-current="page"] { border-color: var(--color-ink); }
+.usage-page :is(a,button,summary,pre,textarea):focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; }
+.usage-page :is(a,button,summary,pre,textarea) { scroll-margin-block: 20px 88px; }
+.usage-index { min-width: 0; }
+.usage-index-wide { display: none; }
+.usage-index-compact { padding: 0 12px; border-block: 1px solid var(--color-line); }
+.usage-index ul { margin-top: 8px; }
+.usage-index a { display: flex; align-items: center; min-height: 44px; padding: 8px 0; color: var(--color-ink-2); font-size: 14px; line-height: 1.45; }
+.usage-index a:hover { text-decoration: underline; text-underline-offset: 4px; }
+@media (min-width: 768px) {
+  .usage-panel { padding: var(--spacing-panel-lg); }
+  .usage-layout, .usage-sections { gap: 20px; }
+}
+@media (min-width: 1200px) {
+  .usage-layout { grid-template-columns: minmax(0, 1fr) 180px; gap: 24px; align-items: start; }
+  .usage-sections { grid-column: 1; grid-row: 1; }
+  .usage-index { grid-column: 2; grid-row: 1; position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow-y: auto; }
+  .usage-index-wide { display: block; }
+  .usage-index-compact { display: none; }
+}

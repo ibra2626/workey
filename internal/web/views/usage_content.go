@@ -60,15 +60,15 @@ bearer_token_env_var = "WORKEY_API_TOKEN"`, "toml", "")
 	}, "", "", "")
 	troubleshooting.Kind = UsageDetails
 	return []UsageBlock{
-		usageSection("1. Workey'i hazırlayın", []string{
+		withSectionID("prepare", usageSection("1. Workey'i hazırlayın", []string{
 			"Proje dizininde .env.example dosyasından .env hazırlayın ve gerekli değerleri doldurun. Mevcut .env dosyanız varsa üzerine yazmayın. Gerçek tokenları paylaşmayın veya Git'e eklemeyin.",
 			"Varsayılan bağlantı http://127.0.0.1:8080/mcp. WORKEY_ADDR değiştiyse aşağıdaki bağlantı komutlarında ve config.toml örneğinde 8080 portunu kendi portunuzla değiştirin. Yerel HTTP için WORKEY_COOKIE_SECURE=false kullanın. Sunucuyu başlatın ve çalışır durumda bırakın.",
-		}, "go run ./cmd/workey serve", "powershell", ""),
-		section("2. İstemcinizi bağlayın", desktop, cli, claude),
-		section("3. Bağlantıyı deneyin", paragraph("Yeni sohbette bu istemi gönderin. Asistanın get_agent_guide çağrısıyla sunucu tarihini ve kuralları okuyabildiğini doğrulayın."),
+		}, "go run ./cmd/workey serve", "powershell", "")),
+		namedSection("connect", "2. İstemcinizi bağlayın", desktop, cli, claude),
+		namedSection("verify", "3. Bağlantıyı doğrulayın", paragraph("Yeni sohbette bu istemi gönderin. Beklenen sonuç: asistan get_agent_guide çağrısıyla sunucu tarihini ve kuralları okur. Bu sayfa bağlantıyı sınamaz; sonucu asistanınızın yanıtında kontrol edin."),
 			UsageBlock{Kind: UsagePrompt, ID: "connection", Text: "Workey MCP bağlantısını kullanarak ajan rehberini oku ve bağlantıyı doğrula"}),
-		section("4. Sınava kadar çalışma planımı oluştur",
-			paragraph("Sınav tarihi: "+guide.ExamDate+". Promptu kopyalayın, köşeli parantezli alanları doldurun ve Workey'e bağlı asistanınıza gönderin. Çalışma ritmi düzenlenebilir bir başlangıç önerisidir. Bu düğme yalnızca metni kopyalar; sayfa plan üretmez veya MCP çağrısı yapmaz."),
+		namedSection("create-plan", "4. Sınava kadar çalışma planımı oluştur",
+			paragraph("Sınav tarihi: "+guide.ExamDate+". İstemi kopyalayın; hedefinizi, uygun saatlerinizi, sürelerinizi, dinlenme günlerinizi ve kitap referanslarınızı doldurup Workey'e bağlı asistanınıza gönderin. Çalışma ritmi düzenlenebilir bir başlangıç önerisidir. Bu düğme yalnızca metni kopyalar; sayfa plan üretmez veya MCP çağrısı yapmaz."),
 			paragraph("Dikkat: save_plan, seçilen aralıktaki açık seansları tam listeyle değiştirir. Listede bulunmayan açık seanslar silinir; korunacak açık seanslar da her haftanın isteğine dahil edilmelidir. Geçmiş ve tamamlanmış kayıtlar korunur."),
 			UsageBlock{Kind: UsagePrompt, ID: "exam-plan", Text: examPlanPrompt},
 		),
@@ -97,7 +97,38 @@ Dolduracağım bilgiler:
 9. Başarısız hafta, outline hatası veya tekrar okuma/doğrulama hatasında DUR. Sonraki haftaları yazma. Tamamlanan ve kalan aralıkları, hatayı ve gerekli kullanıcı bilgisini bildir. Belirsiz yazma sonucunda önce mevcut durumu oku; körlemesine tekrar yazma. Tekrar denemede aynı gövde ve idempotency_key kullan; değişen içerik için yeni anahtar seç.
 10. Sonucu Türkçe özetle: güncel dönem ve saat dilimi, hazırlanan seanslar, created/updated/deleted/unchanged/skipped sayıları ve ilgili kayıtlar, silinen/atlanan kayıtların nedenleri, doğrulanan haftalar ve kalan iş. Kısmi çalışmayı bütünü tamamlandı diye bildirme. Bu planlama işlemi sırasında complete_session çağırma; seansları tamamlanmış işaretleme.`
 
+func withSectionID(id string, block UsageBlock) UsageBlock {
+	block.ID = id
+	return block
+}
+
 func apiSections() []UsageBlock {
+	examples := apiExamples()
+	first := examples[0]
+	first.ID, first.Text = "first-request", "İlk API isteğiniz"
+	first.Children = append([]UsageBlock{
+		paragraph("Önce Workey sunucusunu başlatın. Taban yol varsayılan olarak http://127.0.0.1:8080/api/v1; WORKEY_ADDR değiştiyse adresi uyarlayın. Tüm endpoint’ler Authorization: Bearer token ister; web oturumu token yerine geçmez."),
+		paragraph("Workey’in .env dosyasındaki WORKEY_API_TOKEN değerini PowerShell 7 komutunun gizli girişine girin. Tokenı kod örneğine veya URL’ye yazmayın."),
+	}, first.Children...)
+	write := namedSection("read-write", "Planı okuyun ve yazın",
+		paragraph("Önce ajan rehberi → mevcut outline → ilgili from–to aralığının planı → ilerleme sırasıyla okuyun. Korunacak faz, grup ve açık seansları tüm kitap referanslarıyla yazma gövdesine dahil edin."),
+		examples[1], examples[2],
+		paragraph("Dikkat: outline faz ve grupların, plan ise seçilen aralıktaki açık seansların tam listesini değiştirir. Listede bulunmayan açık seanslar silinir; korunacak kayıtları dahil edin. Geçmiş ve tamamlanmış kayıtlar korunur."),
+		examples[3],
+		paragraph("Yazmadan sonra get_plan eşdeğeri GET /api/v1/plan ile yazdığınız from–to aralığının tamamını ve GET /api/v1/progress ile ilerlemeyi yeniden okuyun. Yukarıdaki komut yalnız bugünü okur; plan.json farklı tarihler içeriyorsa sorguyu o aralığa uyarlayın. created/updated/deleted/unchanged/skipped listelerini inceleyin; skipped sonucunu başarı diye sunmayın."),
+	)
+	responses := namedSection("examples", "Temsili yanıtlar", examples[4], examples[5])
+	responses.Kind = UsageDetails
+	complete := withSectionID("completion", examples[6])
+	complete.Text = "Tamamlama ve geri alma"
+	curl := withSectionID("curl", examples[7])
+	curl.Text, curl.Kind = "curl.exe alternatifi", UsageDetails
+	errors := withSectionID("errors", examples[8])
+	errors.Text = "Hatalar ve tekrar deneme"
+	return []UsageBlock{first, write, responses, complete, curl, errors}
+}
+
+func apiExamples() []UsageBlock {
 	return []UsageBlock{
 		usageSection("1. PowerShell ile okuma", []string{"PowerShell 7 terminalinde sunucuyla aynı tokenı girin. Gerçek token örneklerde bulunmaz."},
 			`$env:WORKEY_API_TOKEN = Read-Host 'Workey API tokenı' -MaskInput

@@ -21,6 +21,17 @@ native açılır bölümler kullanılabilir. Salt okunur alanda Ctrl+A ve Ctrl+C
 ile tam metni seçip kopyalayabilirsiniz. Her iki görünüm ve OpenAPI indirmesi
 web oturumu ister ve `Cache-Control: no-store` döner.
 
+**İlk API isteğiniz** bölümünde sunucu adresi, PowerShell 7 ve gizli token girişi
+ile ilk okuma örneği bulunur. **Planı okuyun ve yazın** bölümünde mevcut kayıtları
+okuma, tam-liste gövdeleri, silme uyarısı, yazma ve ilgili aralığın tamamını tekrar
+okuma sırası gösterilir. Ardından **Endpoint referansı** ve OpenAPI indirmesi gelir.
+Temsili yanıtlar, tamamlama/geri alma, curl alternatifi ve hatalar ayrı gruplardır.
+
+**Bu sayfada** dizini geniş ekranda sağda, dar ekranda açılır listededir; gerçek
+bölüm bağlantıları JS olmadan çalışır. Her kod örneğinin **Kodu kopyala** düğmesi
+vardır. Pano reddinde/yokluğunda kod odaklanıp seçilir ve elle kopyalama bildirimi
+gösterilir. JS kapalıyken bu düğmeler gizlidir; kod metni seçilebilir kalır.
+
 - `GET /api/v1/agent-guide`: Bearer korumalı, salt okunur ajan başlangıç rehberi.
   `today`, `timezone`, `exam_date`, `books`, `session_kinds`, `rules`, `workflow`
   döner. Tarih, plan yazımıyla aynı enjekte edilebilir İstanbul saatinden gelir.

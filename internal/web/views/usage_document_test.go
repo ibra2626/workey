@@ -92,7 +92,7 @@ func TestUsageAPIExamplesComeFromContract(t *testing.T) {
 	var details []UsageBlock
 	var codes []string
 	walkBlocks(doc.Blocks, func(b UsageBlock) {
-		if b.Kind == UsageDetails {
+		if b.Kind == UsageDetails && (strings.HasPrefix(b.Text, "GET /api/v1") || strings.HasPrefix(b.Text, "PUT /api/v1") || strings.HasPrefix(b.Text, "POST /api/v1") || strings.HasPrefix(b.Text, "DELETE /api/v1")) {
 			details = append(details, b)
 		}
 		if b.Kind == UsageCode && b.Language == "json" {
@@ -254,7 +254,7 @@ func TestExamPlanPrompt(t *testing.T) {
 		}
 		// Check visible guidance independently of the hidden full Markdown.
 		visible := regexp.MustCompile(`(?s)<div id="usage-markdown-panel".*?</div>`).ReplaceAllString(html.UnescapeString(body), "")
-		for _, want := range []string{"Sınav tarihi: 2031-07-20", "Sunucu tarihi: 2030-02-05", "açık seansları tam listeyle değiştirir", `data-copy-target="usage-prompt-exam-plan"`, `data-copy-status="usage-prompt-status-exam-plan"`, "Promptu kopyala"} {
+		for _, want := range []string{"Sınav tarihi: 2031-07-20", "Sunucu tarihi: 2030-02-05", "açık seansları tam listeyle değiştirir", `data-copy-target="usage-prompt-exam-plan"`, `data-copy-status="usage-prompt-status-exam-plan"`, "İstemi kopyala"} {
 			if !strings.Contains(visible, want) {
 				t.Errorf("missing visible guidance/control %q", want)
 			}
@@ -273,5 +273,69 @@ func TestRawUsageEscapesHTML(t *testing.T) {
 	}
 	if strings.Contains(b.String(), "<script>alert") || !strings.Contains(b.String(), "&lt;/textarea&gt;") {
 		t.Fatal("raw Markdown interpreted as HTML")
+	}
+}
+
+// Check real navigation/copy contracts rather than visual classes: unique IDs,
+// valid anchors, verbatim snippets, and selected-client targets.
+func TestUsageSectionNavigationAndCodeTargets(t *testing.T) {
+	for _, key := range []string{"mcp", "api"} {
+		for _, client := range []string{"codex-desktop", "codex-cli", "claude-code"} {
+			doc := NewUsageDocument(key, plan.AgentGuide{}).SelectClient(client)
+			var rendered bytes.Buffer
+			if err := Usage(key, "csrf", doc, false).Render(context.Background(), &rendered); err != nil {
+				t.Fatal(err)
+			}
+			body := rendered.String()
+			ids := map[string]bool{}
+			for _, m := range regexp.MustCompile(`\bid="([^"]+)"`).FindAllStringSubmatch(body, -1) {
+				if ids[m[1]] {
+					t.Errorf("duplicate ID: %s", m[1])
+				}
+				ids[m[1]] = true
+			}
+			for _, m := range regexp.MustCompile(`href="#([^"]+)"`).FindAllStringSubmatch(body, -1) {
+				if !ids[m[1]] {
+					t.Errorf("broken fragment: %s", m[1])
+				}
+			}
+			codes := map[string]string{}
+			walkBlocks(doc.GuideBlocks(), func(b UsageBlock) {
+				if b.Kind == UsageCode {
+					codes["usage-code-"+b.ID] = b.Text
+				}
+			})
+			matches := regexp.MustCompile(`(?s)<pre[^>]*id="(usage-code-[^"]+)"[^>]*><code[^>]*>(.*?)</code></pre>`).FindAllStringSubmatch(body, -1)
+			if len(matches) != len(codes) {
+				t.Fatalf("copy target count: %d, want %d", len(matches), len(codes))
+			}
+			for _, m := range matches {
+				if html.UnescapeString(m[2]) != codes[m[1]] {
+					t.Errorf("changed code %s", m[1])
+				}
+				if !strings.Contains(body, `data-copy-target="`+m[1]+`"`) {
+					t.Errorf("missing code control %s", m[1])
+				}
+			}
+			if key == "mcp" {
+				start := strings.Index(body, `id="connect"`)
+				picker := strings.Index(body, `aria-label="MCP istemcisi"`)
+				if start < 0 || picker < start {
+					t.Fatal("client selector must be in the connection section")
+				}
+				if !strings.Contains(body, `#connect"`) || !strings.Contains(body, "üç istemcinin kurulumunu") {
+					t.Fatal("missing client navigation/scope")
+				}
+				preview := regexp.MustCompile(`(?s)data-prompt="exam-plan".*?<details[^>]*>.*?<textarea[^>]*id="usage-prompt-exam-plan"`)
+				if !preview.MatchString(body) {
+					t.Fatal("exam prompt preview missing")
+				}
+				if strings.Contains(body, "Promptu kopyala") {
+					t.Fatal("inconsistent prompt label")
+				}
+			} else if strings.Index(body, `id="first-request"`) > strings.Index(body, `id="endpoints"`) {
+				t.Fatal("first request must precede endpoint reference")
+			}
+		}
 	}
 }

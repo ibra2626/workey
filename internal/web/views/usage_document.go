@@ -17,6 +17,13 @@ type UsageDocument struct {
 	Client string
 }
 
+func clientScope(key string) string {
+	if key == "mcp" {
+		return " ve üç istemcinin kurulumunu"
+	}
+	return ""
+}
+
 // SelectClient normalizes the request value without storing a preference.
 func (d UsageDocument) SelectClient(client string) UsageDocument {
 	switch client {
@@ -43,6 +50,39 @@ func (d UsageDocument) ViewURL(key string, markdown bool) string {
 
 func (d UsageDocument) GuideBlocks() []UsageBlock {
 	return clientBlocks(d.Blocks, d.SelectClient(d.Client).Client)
+}
+
+func (d UsageDocument) Intro() string {
+	if len(d.Blocks) > 0 && d.Blocks[0].Kind == UsageParagraph {
+		return d.Blocks[0].Text
+	}
+	return ""
+}
+
+func (d UsageDocument) Sections() []UsageBlock {
+	blocks := d.GuideBlocks()
+	if d.Intro() != "" {
+		return blocks[1:]
+	}
+	return blocks
+}
+
+// Presentation IDs are independent of the selected client and are never emitted
+// into Markdown. Explicit section keys keep incoming fragment links stable.
+func identifyBlocks(blocks []UsageBlock, prefix string) {
+	for i := range blocks {
+		b := &blocks[i]
+		if b.ID == "" {
+			b.ID = fmt.Sprintf("%s-%d", prefix, i+1)
+		}
+		identifyBlocks(b.Children, b.ID)
+	}
+}
+
+func namedSection(id, title string, children ...UsageBlock) UsageBlock {
+	b := section(title, children...)
+	b.ID = id
+	return b
 }
 
 func clientBlocks(blocks []UsageBlock, client string) []UsageBlock {
@@ -124,7 +164,8 @@ func NewUsageDocument(key string, guide plan.AgentGuide) UsageDocument {
 		examples.Kind = UsageDetails
 		doc.Blocks = append(doc.Blocks, tools, examples)
 	case "api":
-		contract := section("Sözleşme ve kimlik doğrulama",
+		doc.Blocks[0] = paragraph("Planınızı kendi istemcinizden okuyun, güncelleyin ve her yazmayı tekrar okuyarak doğrulayın.")
+		contract := namedSection("endpoints", "Endpoint referansı",
 			paragraph("Taban yol /api/v1. Tüm endpoint’ler Authorization: Bearer token ister. Gövdeler JSON, üst sınır 1 MiB. Yanıtlar önbelleğe alınmaz."),
 			link("OpenAPI 3.1 dosyasını indir", "/kullanim/api/openapi.json"),
 			paragraph("Ajan aynı sözleşmeyi Bearer doğrulamasıyla GET /api/v1/openapi.json üzerinden alabilir. Şema tüm istek/yanıt alanlarını ve zorunluluklarını içerir."),
@@ -141,30 +182,48 @@ func NewUsageDocument(key string, guide plan.AgentGuide) UsageDocument {
 			}
 			contract.Children = append(contract.Children, b)
 		}
+		api := apiSections()
+		doc.Blocks = append(doc.Blocks, api[:2]...)
 		doc.Blocks = append(doc.Blocks, contract)
-		doc.Blocks = append(doc.Blocks, apiSections()...)
+		doc.Blocks = append(doc.Blocks, api[2:]...)
 	default:
 		doc.Blocks = append(doc.Blocks, section("Nasıl bağlanacaksınız?",
 			paragraph("Claude veya Codex kullanıyorsanız MCP rehberiyle başlayın. Kendi istemciniz veya otomasyonunuz için REST API rehberini kullanın. İkisi de aynı plan üzerinde çalışır."),
 			paragraph("Web sayfaları oturum çereziyle, MCP ve API ise Bearer token ile korunur. Web oturumu API tokenı yerine geçmez."),
 		))
 	}
-	doc.Blocks = append(doc.Blocks, section("Ajanın izleyeceği işlem sırası",
+	doc.Blocks = append(doc.Blocks, namedSection("workflow", "Ajanın izleyeceği işlem sırası",
 		paragraph("Sunucu tarihi: "+guide.Today+" · "+guide.Timezone+" · Sınav: "+guide.ExamDate),
 		UsageBlock{Kind: UsageList, Ordered: true, Items: guide.Workflow},
 	))
-	rules := section("Ortak işlem kuralları", paragraph("Kitaplar: "+strings.Join(guide.Books, ", ")+". Seans türleri: "+strings.Join(guide.SessionKinds, ", ")+"."))
+	rules := namedSection("rules", "Ortak işlem kuralları", paragraph("Kitaplar: "+strings.Join(guide.Books, ", ")+". Seans türleri: "+strings.Join(guide.SessionKinds, ", ")+"."))
 	for _, rule := range guide.Rules {
 		rules.Children = append(rules.Children, paragraph(rule))
 	}
 	doc.Blocks = append(doc.Blocks, rules)
-	if key == "mcp" {
+	if key == "mcp" || key == "api" {
 		for i := range doc.Blocks {
 			if doc.Blocks[i].Text == "Ajanın izleyeceği işlem sırası" || doc.Blocks[i].Text == "Ortak işlem kuralları" {
 				doc.Blocks[i].Kind = UsageDetails
 			}
 		}
 	}
+	// Top-level reference panels have stable keys; all nested code targets receive
+	// deterministic IDs before client filtering.
+	for i := range doc.Blocks {
+		b := &doc.Blocks[i]
+		switch b.Text {
+		case "Araçlar":
+			b.ID = "tools"
+		case "Örnek istemler":
+			b.ID = "prompts"
+		case "Alternatif: config.toml":
+			b.ID = "config"
+		case "Bağlantı sorunları ve kapsam":
+			b.ID = "connection-help"
+		}
+	}
+	identifyBlocks(doc.Blocks, "usage")
 	return doc
 }
 

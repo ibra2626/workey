@@ -11,14 +11,27 @@
       button.disabled = true;
       try {
         if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
-        await navigator.clipboard.writeText(target.value);
+        await navigator.clipboard.writeText(target.value ?? target.textContent);
         status.textContent = "Kopyalandı";
       } catch {
         const panel = target.closest("[data-copy-panel]");
         if (panel) panel.hidden = false;
+        // A prompt can be copied while its preview is closed. Reveal every
+        // disclosure ancestor before focusing the manual-copy fallback.
+        for (let parent = target.parentElement; parent; parent = parent.parentElement) {
+          if (parent.tagName === "DETAILS") parent.open = true;
+        }
         target.hidden = false;
         target.focus();
-        target.select();
+        if (typeof target.select === "function") {
+          target.select();
+        } else {
+          const range = document.createRange();
+          range.selectNodeContents(target);
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
         status.textContent = "Otomatik kopyalama kullanılamadı. Metin seçildi; Ctrl+C (macOS: ⌘C) ile elle kopyalayın.";
       } finally {
         button.disabled = false;
