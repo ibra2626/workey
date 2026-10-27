@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/ibra2626/workey/internal/apidoc"
+
 	"github.com/ibra2626/workey/internal/clock"
 	"github.com/ibra2626/workey/internal/httpx"
 	"github.com/ibra2626/workey/internal/plan"
@@ -37,6 +39,10 @@ func New(svc *plan.Service, examDate clock.Date, apiToken string) http.Handler {
 // routes registers the method+pattern routes (Go 1.22+ routing).
 func (h *Handler) routes() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/agent-guide", func(w http.ResponseWriter, r *http.Request) {
+		httpx.WriteJSON(w, http.StatusOK, h.svc.AgentGuide(h.examDate))
+	})
+	mux.HandleFunc("GET /api/v1/openapi.json", apidoc.ServeHTTP)
 	mux.HandleFunc("GET /api/v1/plan", h.getPlan)
 	mux.HandleFunc("PUT /api/v1/plan", h.putPlan)
 	mux.HandleFunc("GET /api/v1/outline", h.getOutline)

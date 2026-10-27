@@ -20,13 +20,13 @@ templ WeekMain(p WeekPage) {
 	<div id="hafta-main">
 		<!-- Header. -->
 		<div class="flex items-baseline justify-between px-1 md:hidden">
-			<p class="text-title-lg font-semibold text-ink">
+			<h1 class="text-title-lg font-semibold text-ink">
 				if p.Week.WeekNumber > 0 {
 					Hafta { strconv.Itoa(p.Week.WeekNumber) } · { p.Week.RangeLabel }
 				} else {
 					{ p.Week.RangeLabel }
 				}
-			</p>
+			</h1>
 			if p.Week.PhaseName != "" {
 				<p class="text-meta text-ink-3">{ phaseTail(p.Week.PhaseName) }</p>
 			}

@@ -1,6 +1,7 @@
 // Package config loads and validates workey's runtime configuration from the
-// environment. Error messages name the offending variable but never include its
-// value, so secrets are not leaked to logs.
+// environment and an optional .env in the working directory. Environment
+// variables take precedence. Error messages never include configuration values,
+// so secrets are not leaked to logs.
 package config
 
 import (
@@ -29,26 +30,42 @@ const (
 	examDateLayout  = "2006-01-02"
 )
 
-// Load reads configuration from the environment and validates it. When
+// Load reads .env defaults and environment overrides, then validates them. When
 // WORKEY_DEV is not "1", the API token, password hash and session key are
 // required and Load refuses to start without them.
 func Load() (*Config, error) {
+	fileEnv, err := readDotEnv(".env")
+	if err != nil {
+		return nil, err
+	}
+	get := func(key string) string {
+		if value, exists := os.LookupEnv(key); exists {
+			return value
+		}
+		return fileEnv[key]
+	}
+	getDefault := func(key, fallback string) string {
+		if value := get(key); value != "" {
+			return value
+		}
+		return fallback
+	}
 	cfg := &Config{
-		Addr:         getenvDefault("WORKEY_ADDR", defaultAddr),
-		DBPath:       os.Getenv("WORKEY_DB_PATH"),
-		APIToken:     os.Getenv("WORKEY_API_TOKEN"),
-		PasswordHash: os.Getenv("WORKEY_PASSWORD_HASH"),
-		SessionKey:   os.Getenv("WORKEY_SESSION_KEY"),
-		Dev:          os.Getenv("WORKEY_DEV") == "1",
+		Addr:         getDefault("WORKEY_ADDR", defaultAddr),
+		DBPath:       get("WORKEY_DB_PATH"),
+		APIToken:     get("WORKEY_API_TOKEN"),
+		PasswordHash: get("WORKEY_PASSWORD_HASH"),
+		SessionKey:   get("WORKEY_SESSION_KEY"),
+		Dev:          get("WORKEY_DEV") == "1",
 	}
 
-	secure, err := parseBoolDefault("WORKEY_COOKIE_SECURE", true)
+	secure, err := parseBoolDefault("WORKEY_COOKIE_SECURE", get("WORKEY_COOKIE_SECURE"), true)
 	if err != nil {
 		return nil, err
 	}
 	cfg.CookieSecure = secure
 
-	examDate, err := time.ParseInLocation(examDateLayout, getenvDefault("WORKEY_EXAM_DATE", defaultExamDate), time.UTC)
+	examDate, err := time.ParseInLocation(examDateLayout, getDefault("WORKEY_EXAM_DATE", defaultExamDate), time.UTC)
 	if err != nil {
 		return nil, fmt.Errorf("WORKEY_EXAM_DATE: must be a date in YYYY-MM-DD form")
 	}
@@ -73,15 +90,7 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-func getenvDefault(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
-}
-
-func parseBoolDefault(key string, def bool) (bool, error) {
-	v := os.Getenv(key)
+func parseBoolDefault(key, v string, def bool) (bool, error) {
 	if v == "" {
 		return def, nil
 	}

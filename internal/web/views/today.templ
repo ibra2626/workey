@@ -12,6 +12,13 @@ import (
 // Bugün artboards of design/directions/04-antrenman-gunlugu.html.
 templ Today(p TodayPage) {
 	@Layout(LayoutProps{Title: "Workey · Bugün", Active: "bugun", CSRF: p.CSRF, DaysToExam: p.DaysToExam, HasExam: p.HasExam}) {
+		@TodayMain(p)
+	}
+}
+
+// TodayMain swaps the session together with all dependent summary figures.
+templ TodayMain(p TodayPage) {
+	<div id="bugun-main">
 		<div class="flex items-baseline justify-between px-1">
 			<p class="text-title font-semibold text-ink">{ p.Day.Heading }</p>
 			<p class="text-meta text-ink-3 tnum md:text-body-small">
@@ -70,24 +77,24 @@ templ Today(p TodayPage) {
 				</section>
 			}
 		</div>
-	}
+	</div>
 }
 
-// TodayPanel is the swappable first panel (the htmx target, re-rendered by the
-// complete/undo handlers). It holds tonight's session and its "Tamamlandı"
+// TodayPanel is the first panel inside the swappable TodayMain content.
+// It holds tonight's session and its "Tamamlandı"
 // action, or an empty / rest / after-exam state. The First Panel Rule: at
 // 390×844 everything fits without scrolling.
 templ TodayPanel(p TodayPage) {
 	<section id="bugun-panel" class="rounded-panel bg-card p-5 md:p-8">
 		switch {
 			case !p.HasPlan:
-				<p class="text-title-lg font-semibold text-ink">Plan henüz yazılmadı.</p>
-				<p class="mt-2 text-body text-ink-2">Asistan <span class="tnum font-semibold text-ink">save_outline</span> ve <span class="tnum font-semibold text-ink">save_plan</span> ile planı yazınca bu ekranda bu akşamki seans görünecek.</p>
+				<h1 class="text-title-lg font-semibold text-ink">Plan henüz yazılmadı.</h1>
+				<p class="mt-2 text-body text-ink-2">Asistan planı yazınca bu akşamki seans burada görünecek.</p>
 			case p.AfterExam:
-				<p class="text-title-lg font-semibold text-ink">Sınav tamamlandı.</p>
+				<h1 class="text-title-lg font-semibold text-ink">Sınav tamamlandı.</h1>
 				<p class="mt-2 text-body text-ink-2">Plan dönemi bitti. Yeni bir dönem için asistan yeni bir plan yazabilir.</p>
 			case p.Day.IsRest:
-				<p class="text-title-lg font-semibold text-ink">Bugün dinlenme.</p>
+				<h1 class="text-title-lg font-semibold text-ink">Bugün dinlenme.</h1>
 				<p class="mt-2 text-body text-ink-2">Bu akşam planlı seans yok. Yarın { tomorrowHint(p.Day.Tomorrow) }</p>
 			default:
 				@todaySession(firstSession(p.Day), p.CSRF)
@@ -109,6 +116,13 @@ templ todaySession(sv plan.SessionView, csrf string) {
 	<p class="mt-1 text-body text-ink-2 md:hidden">
 		{ chapterBook(sv) } · <span class="tnum font-semibold text-ink">{ headPages(sv) }</span>
 	</p>
+	if len(sv.Items) > 1 {
+		<ul class="mt-3 divide-y divide-line text-body-small text-ink-2" aria-label="Seans kaynakları">
+			for _, item := range sv.Items {
+				<li class="py-1.5">{ plan.FormatItem(item) } · { item.ChapterTitle }</li>
+			}
+		</ul>
+	}
 	<!-- Session interval profile. -->
 	<div class="mt-6">
 		<div class="flex h-[92px] items-end gap-1 md:h-[150px]">
@@ -159,11 +173,11 @@ templ todaySession(sv plan.SessionView, csrf string) {
 
 // completeControl is the single primary action. When the session is done it
 // becomes the done state with a quiet "Geri al" link; both post through htmx
-// (swapping the panel) and fall back to a normal form POST + redirect with a
+// (swapping TodayMain) and fall back to a normal form POST + redirect with a
 // hidden CSRF field for the no-JS path.
 templ completeControl(sv plan.SessionView, csrf string) {
 	if sv.State == plan.StateDone {
-		<div class="mt-6 flex items-center justify-between md:mt-8">
+		<div class="mt-6 flex items-center justify-between md:mt-8" role="status">
 			<p class="flex items-center gap-2 text-title-lg font-semibold text-ink">
 				@icon("i-check", "w-5 h-5")
 				Tamamlandı

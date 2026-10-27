@@ -145,7 +145,7 @@ func todaySessionID(t *testing.T, a *Auth) int64 {
 	return day.Sessions[0].ID
 }
 
-func TestCompleteViaHTMXSwapsPanel(t *testing.T) {
+func TestCompleteViaHTMXSwapsSummaryAndPanel(t *testing.T) {
 	st := newStore(t)
 	a := newAuthOn(t, st)
 	seedWeek(t, st)
@@ -164,16 +164,47 @@ func TestCompleteViaHTMXSwapsPanel(t *testing.T) {
 	}
 	b, _ := io.ReadAll(res.Body)
 	body := string(b)
-	// The swapped fragment is just the panel (not the whole page), in the done
-	// state with the quiet undo link.
+	// Swap all dependent figures with the panel, without replacing the shell.
+	if !strings.Contains(body, `id="bugun-main"`) || !strings.Contains(body, `hx-target="#bugun-main"`) {
+		t.Error("completion must swap the whole Today content")
+	}
 	if !strings.Contains(body, `id="bugun-panel"`) {
 		t.Error("swap response is not the first panel")
 	}
 	if strings.Contains(body, "<nav") || strings.Contains(body, "<!DOCTYPE") {
-		t.Error("swap response should be the panel fragment, not the full page")
+		t.Error("swap response should be the Today fragment, not the full page")
 	}
 	if !strings.Contains(body, "Geri al") {
 		t.Error("completed panel is missing the Geri al link")
+	}
+	// Mobile and desktop summaries must reflect the same newly completed seans.
+	for _, want := range []string{`>90</span>`, `>1<span`, `90 / 540 dk`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("updated summary missing %q", want)
+		}
+	}
+	req = httptest.NewRequest(http.MethodPost, "/oturum/"+strconv.FormatInt(id, 10)+"/geri-al", nil)
+	req.AddCookie(cookie)
+	req.Header.Set(csrfHeader, a.csrfToken(sid))
+	req.Header.Set("HX-Request", "true")
+	undo := do(t, a, req)
+	defer undo.Body.Close()
+	u := readBody(undo)
+	if undo.StatusCode != http.StatusOK || !strings.Contains(u, `0 / 540 dk`) || strings.Contains(u, `90 / 540 dk`) {
+		t.Error("undo did not refresh the summary")
+	}
+}
+
+func TestBugunShowsEverySourceInLongBlock(t *testing.T) {
+	st := newStore(t)
+	a := newAuthOn(t, st)
+	seedWeek(t, st)
+	a.svc = plan.New(st, clock.Fake{Current: timeAt(clock.Date{Year: 2026, Month: 10, Day: 31})})
+	body := getAuthed(t, a, "/")
+	for _, want := range []string{"Seans kaynakları", "M1·2, s. 23–40", "M1·1, s. 1–76", "Karma tekrar (1–4)"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("long block missing %q", want)
+		}
 	}
 }
 

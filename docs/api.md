@@ -1,5 +1,33 @@
 # Workey REST API — `/api/v1`
 
+## Uygulama içi rehber ve makine sözleşmesi
+
+Menüden **API Kullanımı** (`/kullanim/api`) sayfasına ulaşılır. Sayfa oturum
+doğrulaması ister; endpoint listesi, tam temsili yanıtlar, PowerShell/curl.exe
+komutları ve ortak ajan kurallarını gösterir. Mobilde **Kullanım** sekmesini açın.
+
+- `GET /api/v1/agent-guide`: Bearer korumalı, salt okunur ajan başlangıç rehberi.
+  `today`, `timezone`, `exam_date`, `books`, `session_kinds`, `rules`, `workflow`
+  döner. Tarih, plan yazımıyla aynı enjekte edilebilir İstanbul saatinden gelir.
+- `GET /api/v1/openapi.json`: Bearer korumalı OpenAPI 3.1 sözleşmesi. Tüm REST
+  işlemlerini, JSON alanlarını, hata zarflarını ve örnekleri kapsar.
+- `GET /kullanim/api/openapi.json`: aynı belgenin web oturumu korumalı indirmesi.
+
+Önce ajan rehberini, fazları, ilgili plan aralığını ve ilerlemeyi okuyun.
+Korunacak seansları tam yazma isteğine dahil edin; yazdıktan sonra tekrar okuyun.
+Boş olmayan `Idempotency-Key` başlığı gövdedeki `idempotency_key` alanını geçersiz
+kılar. Kaynak, istek hash'ine dahil olduğundan MCP ve REST arasında anahtar paylaşmayın.
+
+Şemalar gerçek Go taşıma tiplerinden üretilir. Boş listelerin mevcut `null`
+gösterimi korunur. REST'in bilinmeyen alanları kabul eden ve eksik koleksiyonları
+boş sayan mevcut davranışı belgelenir; bu nedenle seans/faz/grup listelerini her
+zaman açıkça gönderin. İsteğe bağlı konu/soru/antrenman aralıklarında backend
+yalnızca çift bulunmasını ve sıralamayı denetler; yeni pozitiflik kuralı eklenmez.
+
+`TestOpenAPIContract`, örnek outline/plan isteklerini geçici veritabanında çalıştırır;
+boş/dolu yanıtları JSON Schema ile doğrular ve tüm temsili başarılı yanıtları
+gerçek API sonuçlarıyla karşılaştırır. Örnekler sabit 26 Ekim 2026 senaryosudur.
+
 The REST API exposes the same plan operations as the MCP server, thin over
 `internal/plan` (source `api`). It is server-rendered JSON; there is no web
 cookie auth here (that is the Giriş screen, WKY-08).

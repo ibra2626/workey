@@ -1,0 +1,20 @@
+package web
+
+import (
+	"github.com/ibra2626/workey/internal/web/views"
+	"net/http"
+)
+
+func (a *Auth) screenUsage(w http.ResponseWriter, r *http.Request) {
+	key := "kullanim"
+	if r.URL.Path == "/kullanim/mcp" {
+		key = "mcp"
+	}
+	if r.URL.Path == "/kullanim/api" {
+		key = "api"
+	}
+	guide := a.svc.AgentGuide(a.examDate)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = views.Usage(key, csrfTokenFromRequest(r), guide).Render(r.Context(), w)
+}

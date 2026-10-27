@@ -16,5 +16,5 @@ Shared rules for every task: `README.md` in this folder (invariants, layout, con
 | WKY-10 | [Hafta screen (mobile + desktop)](tasks/WKY-10.md) | done | WKY-09 |
 | WKY-11 | [İlerleme screen (mobile + desktop)](tasks/WKY-11.md) | done | WKY-09 |
 | WKY-12 | [Deploy: Linux build, systemd unit, Nginx example](tasks/WKY-12.md) | blocked | WKY-07, WKY-08 |
-| WKY-13 | [End-to-end: Claude Code MCP writes a week](tasks/WKY-13.md) | todo | WKY-07, WKY-10, WKY-11 |
-| WKY-14 | [Visual review of all screens and v1 gate](tasks/WKY-14.md) | todo | WKY-13 |
+| WKY-13 | [End-to-end: Claude Code MCP writes a week](tasks/WKY-13.md) | done (SDK client; see Progress) | WKY-07, WKY-10, WKY-11 |
+| WKY-14 | [Visual review of all screens and v1 gate](tasks/WKY-14.md) | done | WKY-13 |

@@ -654,7 +654,7 @@ func completeForm(id int64, action string) templ.Attributes {
 	return templ.Attributes{
 		"action":    url,
 		"hx-post":   url,
-		"hx-target": "#bugun-panel",
+		"hx-target": "#bugun-main",
 		"hx-swap":   "outerHTML",
 	}
 }

@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ibra2626/workey/internal/apidoc"
+
 	"github.com/ibra2626/workey/internal/clock"
 	"github.com/ibra2626/workey/internal/plan"
 	"github.com/ibra2626/workey/internal/web/views"
@@ -35,6 +37,13 @@ func (a *Auth) Handler() http.Handler {
 	mux.HandleFunc("POST /giris", a.loginSubmit)
 
 	// Protected pages.
+	mux.Handle("GET /kullanim", a.requireAuth(http.HandlerFunc(a.screenUsage)))
+	mux.Handle("GET /kullanim/mcp", a.requireAuth(http.HandlerFunc(a.screenUsage)))
+	mux.Handle("GET /kullanim/api", a.requireAuth(http.HandlerFunc(a.screenUsage)))
+	mux.Handle("GET /kullanim/api/openapi.json", a.requireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Disposition", `attachment; filename="workey-openapi.json"`)
+		apidoc.ServeHTTP(w, r)
+	})))
 	mux.Handle("GET /{$}", a.requireAuth(http.HandlerFunc(a.screenToday)))
 	mux.Handle("GET /hafta", a.requireAuth(http.HandlerFunc(a.screenWeek)))
 	mux.Handle("GET /ilerleme", a.requireAuth(http.HandlerFunc(a.screenProgress)))
@@ -140,7 +149,7 @@ func (a *Auth) screenToday(w http.ResponseWriter, r *http.Request) {
 }
 
 // completeSession marks tonight's session done (source web). An htmx request
-// gets the swapped first panel; a plain form POST is redirected back to Bugün.
+// gets the session and refreshed summaries; a plain POST redirects to Bugün.
 func (a *Auth) completeSession(w http.ResponseWriter, r *http.Request) {
 	a.setSessionDone(w, r, true)
 }
@@ -177,7 +186,7 @@ func (a *Auth) setSessionDone(w http.ResponseWriter, r *http.Request, done bool)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = views.TodayPanel(p).Render(r.Context(), w)
+	_ = views.TodayMain(p).Render(r.Context(), w)
 }
 
 // buildTodayPage assembles the Bugün view model from the plan read models: the

@@ -192,7 +192,7 @@ components:
 
 Workey reads like the log of a calm, well-coached runner. The 38-week DGS plan is periodised like marathon preparation: phases (Faz), weekly volume in minutes, a fixed number of sessions (seans). Each evening session is drawn the way a training app draws an interval workout, as three blocks of intensity on a time axis. Numbers do the talking, set large in a narrow condensed face like a sports-watch display; words explain them in a plain humanist sans.
 
-The world is light and quiet: a pale grey-green ground, white panels, dark forest-green ink, and exactly three zone colours that belong to the three parts of a session (konu, soru, yanlış defteri). Nothing else is coloured. A missed evening is a measurement, not a verdict: it is hatched, labelled "cumartesiye taşındı", and the weekly total is shown unchanged. Streak and volume are figures in the log, never rewards.
+The world is light and quiet: a pale grey-green ground, white panels, dark forest-green ink, and exactly three zone colours that belong to the three parts of a session (konu, soru, yanlış defteri). Nothing else is coloured. A missed evening is a measurement, not a verdict: it is hatched, labelled "cumartesiye taşındı", and the weekly total is shown unchanged. Volume and completed sessions are figures in the log, never rewards. v1 has no streak, target score, or deneme-results panels.
 
 Density is moderate and glanceable. On the phone at 20:30 the first panel answers the whole question: book reference, chapter title, page range, the session profile, one dark pill button.
 
@@ -245,7 +245,7 @@ A cool, low-chroma forest palette with three muted "heart-rate zone" accents res
 **Character:** Road-sign and sports-watch legibility. Figures are narrow and large so volume, days and page ranges read at a glance; descriptions stay in normal-width Barlow so sentences stay calm.
 
 ### Hierarchy
-- **Numeral Display** (600, 44px, line-height 1): the headline figure of a panel (weekly volume, plan week, net score, days to exam on the rail at 40px). The desktop Hafta hero scales to 64px and desktop page ranges sit at 36px; same face and weight.
+- **Numeral Display** (600, 44px, line-height 1): the headline figure of a panel (weekly volume, plan week, days to exam on the rail at 40px). The desktop Hafta hero scales to 64px and desktop page ranges sit at 36px; same face and weight.
 - **Numeral Stat** (600, 30px, line-height 1): the three stat tiles on mobile Bugün.
 - **Numeral Inline** (600, 16-20px): durations ("20 dk"), percentages, day-of-month numbers in the week list, the book reference ("M1·3") above a chapter title.
 - **Numeral Unit** (500, 16-22px, Lichen Ink; 500 is the condensed default weight, so unit spans need no weight class): the denominator or unit after a figure ("/ 540 dk", "/ 38 hafta", "gün").
@@ -257,7 +257,7 @@ A cool, low-chroma forest palette with three muted "heart-rate zone" accents res
 - **Label** (600, 12px, Lichen Ink, sentence case): names a measurement, column or panel ("Bu hafta", "Sınava", "Haftalık hacim", table headers). Never uppercase, never tracked.
 
 ### Named Rules
-**The Two Widths Rule.** If it is a number the user reads as a quantity (minutes, days, weeks, pages, percentages, nets), it is Barlow Condensed with tabular figures. If it is a sentence, it is Barlow. Times and page ranges inside running text keep Barlow with `tnum`.
+**The Two Widths Rule.** If it is a number the user reads as a quantity (minutes, days, weeks, pages, percentages), it is Barlow Condensed with tabular figures. If it is a sentence, it is Barlow. Times and page ranges inside running text keep Barlow with `tnum`.
 
 **The Exact Notation Rule.** Book references are written in the user's notation, `M2·17, s. 210–225`: middle dot between book and chapter, "s." only for sayfa, en dash in ranges, decimal comma ("8,5", "1,5").
 
@@ -267,7 +267,7 @@ A cool, low-chroma forest palette with three muted "heart-rate zone" accents res
 
 Mobile (reference width 390px): a single column. A 20px-inset header line (date left, "Hafta 1 · Faz 1" meta right), then panels inset 12px from the screen edge with 12px gaps; panel padding 20px (14px in stat tiles). The bottom tab bar is fixed to the bottom, 68px tall. The first panel is always tonight's session and holds the primary action.
 
-Desktop (reference width 1280px): a 232px left rail plus a main area with 32px padding and 20px gaps. Bugün uses a two-column grid (main panel plus a 340px side column of small panels: Bu hafta, Yarın, Not) with a full-width phase panel below. İlerleme uses a 380px side column. Hafta stacks a volume panel (260px figure column plus chart) above a full-width table. Panel padding is 24-32px (larger for the main session panel).
+Desktop (reference width 1280px): a 232px left rail plus a main area with 32px padding and 20px gaps. Bugün uses a two-column grid (main panel plus a 340px side column of small panels: Bu hafta, Yarın, Not) with a full-width phase panel below. İlerleme stacks the plan strip and topic groups in one column; v1 has no score or deneme-results side panels. Hafta stacks a volume panel (260px figure column plus chart) above a full-width table. Panel padding is 24-32px (larger for the main session panel).
 
 Rhythm: 8px between small units, 12px between mobile panels and list items, 20px between desktop panels. Figures sit with `leading-none` and 4px above them for their label.
 
@@ -292,6 +292,8 @@ Decisive and singular: one dark pill per surface.
 - **Hover / Focus:** background eases to Pressed Forest over 200ms (`cubic-bezier(.16,1,.3,1)`); focus-visible is a 2px Forest Ink outline offset 3px (a teal ring would be only 2.5:1 against the ground).
 - **Secondary:** none exists yet. Do not invent one in a zone colour.
 
+After completion, replace the pill with a plain Tamamlandı status and a quiet Geri al form button. Completion and undo refresh the session, mobile summary, desktop weekly volume and phase blocks together.
+
 ### Cards / Containers (panels)
 - **Corner Style:** 14px.
 - **Background:** Card White on Trail Ground.
@@ -311,6 +313,8 @@ Decisive and singular: one dark pill per surface.
 
 ### Session profile (signature)
 Tonight's 90 minutes drawn as an interval workout on a 20:30-22:00 axis (ticks every 30 minutes, 12-13px tabular Lichen Ink). Three blocks share the width in proportion to their minutes (20 / 50 / 20) and stand at heights that read as intensity: konu low (about 43% of the chart height, Easy-Pace Teal), soru tall (about 92%, Main-Set Ochre), yanlış defteri mid (about 64%, Recovery Blue-Grey), with a 3-4px gap between them. On desktop each block carries its name (Barlow 15px semibold) and duration (Barlow Condensed 22px semibold) in Forest Ink, with dashed hairline gridlines at the half hours. On mobile the blocks are unlabelled and a three-row legend below pairs a 10px zone swatch, the part name with its pages, and the condensed duration.
+
+For uzun_blok and deneme, use one Phase Mist block with the full duration and start/end ticks; do not invent a 20/50/20 split. Multi-source sessions list every book/chapter/page reference in flat rows inside the session panel. The deneme session kind remains valid input, but v1 has no deneme score tracking.
 
 ### Volume bars (signature)
 Daily minutes for the week, Monday to Sunday, bottom-aligned with equal columns. State vocabulary, used identically everywhere:
@@ -344,7 +348,7 @@ Thirty-eight equal columns, 2-4px gaps: the current week shows its done fraction
 - **Don't** use purple-blue gradients, or any colour gradient on a surface (the moved-bar hatch is a stripe pattern, not a gradient).
 - **Don't** use glassmorphism, backdrop blur or drop shadows on product surfaces.
 - **Don't** use emoji as icons.
-- **Don't** add badges, streak rewards, celebrations or confetti; Seri and hacim are measurements only.
+- **Don't** add badges, streak rewards, celebrations or confetti; v1 uses a Seans tile instead of Seri; volume remains a measurement.
 - **Don't** nest panels inside panels; use dividers inside a panel.
 - **Don't** ship lorem ipsum or other filler text.
 - **Don't** colour anything with z1, z2 or z3 that is not the matching session part (today's ochre ring excepted).

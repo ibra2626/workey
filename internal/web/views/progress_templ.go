@@ -48,7 +48,7 @@ func Progress(p ProgressPage) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"flex items-baseline justify-between px-1\"><p class=\"text-title-lg font-semibold text-ink md:hidden\">İlerleme</p><h1 class=\"hidden text-headline font-bold text-ink md:block\">İlerleme</h1>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"flex items-baseline justify-between px-1\"><h1 class=\"text-title-lg font-semibold text-ink md:hidden\">İlerleme</h1><h1 class=\"hidden text-headline font-bold text-ink md:block\">İlerleme</h1>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

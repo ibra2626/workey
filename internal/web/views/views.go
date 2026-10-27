@@ -12,8 +12,7 @@ func asset(path string) string {
 	return path + "?v=" + assets.Version
 }
 
-// navItem is one primary navigation destination, shown in both the desktop
-// rail and the mobile bottom tab bar.
+// navItem describes a navigation destination.
 type navItem struct {
 	Href  string
 	Label string
@@ -26,6 +25,23 @@ var navItems = []navItem{
 	{Href: "/", Label: "Bugün", Icon: "i-today", Key: "bugun"},
 	{Href: "/hafta", Label: "Hafta", Icon: "i-week", Key: "hafta"},
 	{Href: "/ilerleme", Label: "İlerleme", Icon: "i-prog", Key: "ilerleme"},
+}
+
+var usageNavItems = []navItem{
+	{Href: "/kullanim/mcp", Label: "MCP Kullanımı", Icon: "i-guide", Key: "mcp"},
+	{Href: "/kullanim/api", Label: "API Kullanımı", Icon: "i-guide", Key: "api"},
+}
+
+func mobileNavItems() []navItem {
+	items := append([]navItem(nil), navItems...)
+	return append(items, navItem{Href: "/kullanim", Label: "Kullanım", Icon: "i-guide", Key: "kullanim"})
+}
+
+func mobileActive(active string) string {
+	if active == "mcp" || active == "api" {
+		return "kullanim"
+	}
+	return active
 }
 
 // hxHeaders attaches the CSRF token to htmx requests via the hx-headers

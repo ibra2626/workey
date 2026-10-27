@@ -55,11 +55,19 @@ func New(svc *plan.Service, examDate clock.Date, mcpToken string) (http.Handler,
 	return httpx.SecurityHeaders(httpx.BearerAuth(mcpToken, stream)), nil
 }
 
-// newMCPServer registers the six tools on a new MCP server. It returns an error
+// newMCPServer registers the tools on a new MCP server. It returns an error
 // (rather than panicking) if any input schema fails to build, so startup can
 // fail cleanly.
 func newMCPServer(h *handler) (*mcp.Server, error) {
-	srv := mcp.NewServer(&mcp.Implementation{Name: serverName, Version: serverVersion}, nil)
+	srv := mcp.NewServer(&mcp.Implementation{Name: serverName, Version: serverVersion}, &mcp.ServerOptions{
+		Instructions: "First call get_agent_guide for the current Istanbul date, rules and workflow. Read existing outline, plan and progress before writes. Preserve retained sessions: save_plan and save_outline replace full sets. Never invent book references. Re-read after writes and summarize in Turkish.",
+	})
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "get_agent_guide", Description: "Read this first. Return the server's current Istanbul date, exam date, supported books/session kinds, full-replacement rules and safe planning workflow. Does not change data.",
+		Annotations: toolHints(true, false),
+	}, func(context.Context, *mcp.CallToolRequest, struct{}) (*mcp.CallToolResult, plan.AgentGuide, error) {
+		return nil, h.svc.AgentGuide(h.examDate), nil
+	})
 
 	savePlanIn, err := savePlanSchema()
 	if err != nil {
@@ -80,12 +88,14 @@ func newMCPServer(h *handler) (*mcp.Server, error) {
 
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "get_plan",
+		Annotations: toolHints(true, false),
 		Description: "Return the planned sessions for a date range [from, to] (inclusive), Europe/Istanbul. Each session has its stored items (book/chapter/page references only), its derived state (planned, today, done, missed, moved), the resolved topic-group name and the canonical notation (e.g. 'M2·17, s. 210–225'). Use the returned 'id' with complete_session.",
 		InputSchema: getPlanIn,
 	}, h.getPlan)
 
 	mcp.AddTool(srv, &mcp.Tool{
-		Name: "save_plan",
+		Name:        "save_plan",
+		Annotations: toolHints(false, true),
 		Description: "Declaratively replace the open sessions for every date in [from, to] (Europe/Istanbul). For each date in range that is today or later, the open (uncompleted) sessions are made to match exactly the given set, keyed by date + start_time: a matching session is updated in place, a new one is created, and an open future session omitted from the request is deleted. " +
 			"Past days and completed sessions are frozen — they are never changed or deleted, and any incoming session that targets one is returned in 'skipped' rather than applied. " +
 			"The call is safe to repeat: sending the same request twice leaves the same state and reports the sessions as 'unchanged' (pass idempotency_key to also replay the exact first result). " +
@@ -95,27 +105,36 @@ func newMCPServer(h *handler) (*mcp.Server, error) {
 
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "complete_session",
+		Annotations: toolHints(false, true),
 		Description: "Mark a session done (done=true, the default) or undo its completion (done=false), addressed by the 'id' from get_plan. Allowed for today and past sessions only; a future session is rejected. Idempotent: setting the state it is already in changes nothing.",
 		InputSchema: completeIn,
 	}, h.completeSession)
 
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "get_outline",
+		Annotations: toolHints(true, false),
 		Description: "Return the plan outline: the phases (with their date spans) and the topic groups (with their keys and optional DGS question ranges), ordered. Topic-group keys here are the ones a session's topic_group refers to.",
 	}, h.getOutline)
 
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "save_outline",
+		Annotations: toolHints(false, true),
 		Description: "Declaratively replace the plan's phases and topic groups, each matched by key (create / update / delete). A phase or group present by key is created or updated; a key absent from the request is deleted. A topic group still referenced by sessions cannot be deleted. Idempotent, with the same idempotency_key replay semantics as save_plan.",
 		InputSchema: saveOutlineIn,
 	}, h.saveOutline)
 
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "get_progress",
+		Annotations: toolHints(true, false),
 		Description: "Return the progress summary (Europe/Istanbul): current plan week out of the fixed 38, sessions done vs planned, done vs planned minutes and hours, current phase, the exam countdown, per-topic-group completion and the 38-week strip.",
 	}, h.getProgress)
 
 	return srv, nil
+}
+
+func toolHints(readOnly, destructive bool) *mcp.ToolAnnotations {
+	closed := false
+	return &mcp.ToolAnnotations{ReadOnlyHint: readOnly, DestructiveHint: &destructive, IdempotentHint: true, OpenWorldHint: &closed}
 }
 
 // --- tool handlers (parse + call + map; no business rules) ---

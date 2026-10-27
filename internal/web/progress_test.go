@@ -12,9 +12,9 @@ func TestIlerlemeRendersProgress(t *testing.T) {
 	body := getAuthed(t, a, "/ilerleme")
 
 	for _, want := range []string{
-		"/ 38 hafta",  // plan length from the saved plan, not hard-coded
-		"1,5",         // done hours with a decimal comma (90 min)
-		" soru",       // DGS weight, never "s."
+		"/ 38 hafta", // plan length from the saved plan, not hard-coded
+		"1,5",        // done hours with a decimal comma (90 min)
+		" soru",      // DGS weight, never "s."
 		"Temel kavramlar",
 	} {
 		if !strings.Contains(body, want) {

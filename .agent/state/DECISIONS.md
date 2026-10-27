@@ -154,3 +154,11 @@ Record accepted decisions with date, context, decision, alternatives, and conseq
   - **New store helpers** (persistence only): `SessionByID`, `AllSessions`, `SetSessionCompletion`, `ListMakeupLinks` (+ `MakeupLink`), private `sessionItems`.
 - Alternatives: add `examDate`/plan-start to `New` or to `config` as new env vars (rejected — more wiring/churn for a value only Progress needs; 38 and the first phase already pin the window); match the mockup's %13 exactly (rejected — sample/illustrative, meaning undefined); store a `moved` flag or a `completed` boolean separately (rejected — derive from the makeup link and `completed_at`); Turkish `strings.ToLower` for weekday notes (rejected — locale-unaware, risks i/İ bugs).
 - Consequences: screens (WKY-09/10/11) consume these view models directly and format nothing date/notation-related themselves. REST/MCP (WKY-06/07) expose completion via `Complete`/`Undo` and the read models as JSON.
+
+
+## 2026-10-27 — WKY-13/14 verification and Today refresh
+
+Context: remaining local Windows acceptance tasks; Linux deployment explicitly held.
+Decision: verify MCP/web over real Streamable HTTP with the official SDK and disposable stores; record that a separate Claude Code model run is not covered. Use Product Design audit because /impeccable is unavailable. Swap TodayMain on completion/undo so mobile, desktop and phase summaries update with the session; list every multi-source book reference.
+Alternatives: panel-only swap (leaves stale figures); out-of-band individual fragments (more targets to maintain); altering existing dev databases (unnecessary).
+Consequences: local v1 technical checks are reproducible; no deployment, commit or push; autonomous model interpretation remains an explicit external acceptance limit. Existing v1 design decisions reconciled in DESIGN.md.

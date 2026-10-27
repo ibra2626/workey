@@ -11,6 +11,7 @@
   - `./bin/tailwindcss.exe -i web/styles/input.css -o web/static/app.css --minify` (rebuild CSS after a class or token change; `web/static/app.css` is embedded so it must exist before `go build`)
   - `go build ./...` (and `CGO_ENABLED=0 go build ./...` — the SQLite driver `modernc.org/sqlite` is pure Go, so the single binary must build with CGO off)
   - `go vet ./...`
+  - `go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...` (v1 gate; report findings explicitly; installed/verified in WKY-14)
   - `go test ./internal/config/... ./internal/clock/... ./internal/store/... ./internal/web/... ./cmd/...` (or the focused package)
   - `gofmt -l .` (must print nothing; generated `*_templ.go` are already gofmt-clean)
   - `scripts/build.sh` runs templ generate → Tailwind → `go build` in order.
