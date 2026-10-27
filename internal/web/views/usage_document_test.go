@@ -25,7 +25,7 @@ func TestUsageDocumentRenderersShareAllContent(t *testing.T) {
 		t.Run(key, func(t *testing.T) {
 			doc := NewUsageDocument(key, guide)
 			var rendered bytes.Buffer
-			if err := Usage(key, "csrf-shell-only", doc).Render(context.Background(), &rendered); err != nil {
+			if err := Usage(key, "csrf-shell-only", doc, false).Render(context.Background(), &rendered); err != nil {
 				t.Fatal(err)
 			}
 			htmlText := html.UnescapeString(rendered.String())
@@ -176,5 +176,16 @@ func TestUsageMCPClientsAndPrompts(t *testing.T) {
 	}
 	if len(ids) != 4 {
 		t.Errorf("got %d prompts", len(ids))
+	}
+}
+
+func TestRawUsageEscapesHTML(t *testing.T) {
+	doc := UsageDocument{Title: "Test", Blocks: []UsageBlock{{Kind: UsageCode, Text: "</textarea><script>alert('ç')</script>"}}}
+	var b bytes.Buffer
+	if err := Usage("mcp", "csrf", doc, true).Render(context.Background(), &b); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(b.String(), "<script>alert") || !strings.Contains(b.String(), "&lt;/textarea&gt;") {
+		t.Fatal("raw Markdown interpreted as HTML")
 	}
 }

@@ -4,7 +4,7 @@ templ usageCode(code string, language string) {
 	<pre tabindex="0" aria-label="Kod örneği" class="max-w-full overflow-x-auto rounded-nav border border-line bg-ground p-4 text-meta leading-relaxed"><code class={ "language-" + language }>{ code }</code></pre>
 }
 
-templ Usage(key string, csrf string, doc UsageDocument) {
+templ Usage(key string, csrf string, doc UsageDocument, markdown bool) {
 	@Layout(LayoutProps{Title: doc.Title + " · Workey", Active: key, CSRF: csrf}) {
 		<article class="mx-auto min-w-0 max-w-3xl space-y-8 text-body text-ink-2">
 			<header class="space-y-3">
@@ -14,8 +14,26 @@ templ Usage(key string, csrf string, doc UsageDocument) {
 					<a href="/kullanim/mcp" class="underline underline-offset-4" { ariaCurrent(key == "mcp")... }>MCP Kullanımı</a>
 					<a href="/kullanim/api" class="underline underline-offset-4" { ariaCurrent(key == "api")... }>API Kullanımı</a>
 				</nav>
+				if key == "mcp" || key == "api" {
+					<nav aria-label="Rehber görünümü" class="flex flex-wrap items-center gap-3">
+						<a href={ templ.SafeURL("/kullanim/" + key) } class="usage-control" { ariaCurrent(!markdown)... }>Rehber</a>
+						<a href={ templ.SafeURL("/kullanim/" + key + "?view=markdown") } class="usage-control" { ariaCurrent(markdown)... }>Markdown</a>
+						<button type="button" class="usage-control" data-copy-target="usage-markdown" data-copy-status="usage-copy-status" hidden>Markdown olarak kopyala</button>
+					</nav>
+					<p id="usage-copy-status" role="status" aria-live="polite" aria-atomic="true" class="text-meta text-ink-3"></p>
+				}
 			</header>
-			@usageBlocks(doc.Blocks)
+			if key == "mcp" || key == "api" {
+				<div id="usage-markdown-panel" data-copy-panel hidden?={ !markdown } class="space-y-3">
+					<label for="usage-markdown" class="text-title font-semibold text-ink">Ham Markdown rehberi</label>
+					<p id="usage-markdown-help" class="text-meta text-ink-3">Metni seçip Ctrl+C (macOS: ⌘C) ile kopyalayabilirsiniz.</p>
+					<textarea id="usage-markdown" readonly rows="24" spellcheck="false" aria-describedby="usage-markdown-help" class="usage-markdown">{ doc.Markdown() }</textarea>
+				</div>
+				<script defer src={ asset("/static/copy.js") }></script>
+			}
+			if !markdown || (key != "mcp" && key != "api") {
+				@usageBlocks(doc.Blocks)
+			}
 		</article>
 	}
 }

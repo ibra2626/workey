@@ -1,53 +1,51 @@
-# CURRENT — WKY-15 shared usage guide model complete
+# CURRENT — WKY-16 complete
 
 Updated 2026-10-27.
+Active task: none.
+Next task: `.agent/work/workey-v1/tasks/WKY-17.md`.
+WKY-12 Linux deployment remains held by the user's explicit instruction.
 
-Active task: none. WKY-01..11 were already complete. WKY-13/14 completed this
-session. WKY-15 completed 2026-10-27: shared HTML/Markdown usage guide model.
-Next task: `.agent/work/workey-v1/tasks/WKY-16.md` (Markdown view/copy controls).
-WKY-12 Linux deploy remains blocked by the user's explicit hold.
+## Objective and result
 
-## Results
+WKY-16 adds Rehber / Markdown links and full-Markdown copy controls to
+/kullanim/mcp and /kullanim/api. ?view=markdown opens a labelled readonly
+textarea inside the authenticated HTML shell. Unknown values use the guide.
+The same full UsageDocument.Markdown output is used in both views. Auth,
+no-store and OpenAPI download remain covered by tests.
 
-- WKY-15: `views.NewUsageDocument` builds one guide tree for HTML and Markdown.
-  Includes client metadata, prompt IDs, all closed API disclosures and shared
-  apidoc examples. Runtime dates/catalog/workflow/rules come from AgentGuide.
-  Focused renderer, fake-clock, syntax/code and contract example tests pass;
-  templ/CSS regenerated, focused vet and normal/CGO-off builds passed.
-  Details in WKY-15.md.
+web/static/copy.js is dependency-free and reusable through data-copy-target /
+data-copy-status IDs. Success is announced only after Clipboard writeText
+resolves. Unsupported/denied clipboard access reveals, focuses and selects
+the target with manual instructions. Without JS the copy button stays hidden;
+URL navigation and manual selection work. No saved view preference.
 
-- WKY-13: real Streamable HTTP integration test: MCP writes outline/plan, web
-  completes/undoes with CSRF, MCP reads shared progress; repeat requests add no
-  duplicate sessions/audit. 5 sessions/540 min; completion = 1/90 min/1,5 hours.
-  docs/mcp.md contains connection, semantics, prompts and audit evidence.
-- Initial MCP verification used the official Go SDK, not a Claude Code model.
-  Subsequent real Codex CLI acceptance passed using the agent guide and tools.
-- WKY-14: 27 screenshots at 390×844 and 1280×800, including all screens and key
-  states. docs/review/README.md contains findings and limits. Temporary images,
-  raw accessibility output and tmp-dev/tmp-mcp databases were cleaned before commit.
-- Fixed stale Today completion/undo totals by swapping TodayMain; list every
-  multi-source reference; mobile inset 12px; semantic headings; plain empty copy.
-  DESIGN.md aligned with existing v1 decisions. Generated templ/CSS rebuilt.
-- Existing real/local DB files untouched. All review data disposable and synthetic.
-- Added authenticated MCP/API usage pages, mobile Usage navigation, shared agent
-  guide, tool annotations, OpenAPI 3.1 contract and contract/example tests.
-  docs/usage-verification.md records real CLI acceptance and Desktop test limits.
+## Active paths
+
+- internal/web/usage.go and usage_test.go
+- internal/web/views/usage.templ, generated usage_templ.go,
+  usage_document_test.go
+- web/static/copy.js, web/styles/input.css, generated web/static/app.css
+- .agent/work/workey-v1/TASKS.md and tasks/WKY-16.md
 
 ## Verification
 
-Go 1.27.3: templ generate, Tailwind, go test ./..., go vet ./..., normal and
-CGO_ENABLED=0 builds, gofmt and diff whitespace checks. govulncheck v1.9.0:
-No vulnerabilities found. Existing progress_test.go formatted. Mobile text
->=12px, computed plain-text contrast >=4.60:1, no horizontal overflow. Login/nav
-keyboard focus checked; reduced-motion source checked; no screen-reader or
-motion-emulation certification.
+Passed: go tool templ generate; standalone Tailwind rebuild;
+go test ./internal/web/...; go vet ./internal/web/...; gofmt; git diff --check.
+Normal and CGO_ENABLED=0 go build ./... passed; a temporary binary was also built for browser tests.
+Headless Edge: both guides at 390x844 / 1280x844, keyboard navigation/copy and
+focus, actual clipboard write/readback, full text parity, no overflow,
+unsupported clipboard and denied access (NotAllowedError) fallback, whole-text
+selection and focus, JS-disabled view links/manual selection. Screenshots
+visually inspected at both widths. Clipboard API input matches Markdown;
+Windows clipboard readback uses CRLF. Tests use disposable dev DBs; existing
+real DB and .env untouched. Go tests cover real auth redirects and escaping.
+No full suite or vulnerability scan rerun for this focused UI change.
 
-## Remaining / handoff
+## Handoff
 
-Local Windows implementation and technical v1 checks complete with the client
-substitution above. WKY-16..19 are pending; WKY-15 is complete. WKY-12 must stay
-held until the user lifts it. Optional external acceptance: Claude Code model
-session using tools/list alone; separate Codex Desktop model acceptance also
-remains unverified. User authorized committing the completed changes after test
-artifact cleanup. No push/deploy. Temporary review servers are stopped after
-capture; reproduction is in docs/mcp.md.
+WKY-01..11,13..16 complete; WKY-17..19 pending. WKY-12 remains blocked.
+User requested commit and push after completion; no deployment requested. Existing uncommitted WKY-17..19
+plan files were preserved. WKY-17 can reuse copy.js with separate readonly text
+targets and live status nodes. WKY-19 owns final combined acceptance.
+
+Temporary browser-test servers stopped after verification.
