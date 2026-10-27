@@ -4,6 +4,21 @@ Menüde **MCP Kullanımı** (`/kullanim/mcp`), mobilde **Kullanım** sekmesi alt
 Claude Code, Codex CLI ve Codex Desktop bağlantı adımları bulunur. Sayfalar web
 oturumu ister; ortak kurallar doğrudan ajan rehberiyle aynı kaynaktan gelir.
 
+## Token nereden alınır?
+
+Workey tokenı bir siteden alınmaz; ilk kurulumda kendiniz rastgele bir değer
+oluşturup sunucunun `.env` dosyasındaki `WORKEY_API_TOKEN` alanına kaydedersiniz.
+Komutlar ve parola/oturum anahtarı dahil temel kurulum için
+[README'nin yerel kurulum adımlarını](../README.md#yerel-kurulum) izleyin.
+Uygulama içi rehberin **Workey'i hazırlayın** bölümü de token üretme komutunu gösterir.
+
+Mevcut bir kurulumda yeniden token üretmeyin; `.env` dosyasındaki değeri alın veya
+sunucuyu kuran kişiden isteyin. Sunucunun süreç ortamında `WORKEY_API_TOKEN`
+tanımlıysa `.env` yerine o değer geçerlidir. Token değiştiğinde sunucuyu yeniden
+başlatıp istemcide de aynı değeri kullanın. Aşağıdaki `Read-Host` token üretmez;
+var olan tokenı gizli girişle alıp istemcinin ortamına aktarır. Web parolası ve
+oturum anahtarı farklı değerlerdir.
+
 ## Rehber görünümü, istemci seçimi ve kopyalama
 
 Sayfa Codex Desktop seçili açılır. **İstemcinizi bağlayın** bölümünde **Codex CLI** veya **Claude Code** bağlantısını
@@ -49,7 +64,29 @@ netleşmeden yazma başlamaz. Mevcut plan okunur, korunacak açık kayıtlar her
 haftanın tam listesine dahil edilir ve her yazma tekrar okumayla doğrulanır.
 Kısmi sonuçlar ve hatalar asistan tarafından açıklanmalıdır.
 
-## Codex CLI ve Desktop
+## Codex Desktop
+
+1. **Ayarlar → MCP sunucuları → Sunucu ekle** yolunu açın. Workey zaten
+   ekliyse mevcut kaydı düzenleyin.
+2. **Ad:** `Workey`
+3. **Tür:** `Akış destekli HTTP` (Streamable HTTP)
+4. **URL:** `http://127.0.0.1:8080/mcp` (portu değiştirdiyseniz kendi portunuzu yazın).
+5. **Taşıyıcı token için ortam değişkeni:** boş bırakın; doluysa içeriğini silin.
+6. **Başlıklar** bölümüne şunları girin:
+   - **Anahtar:** `Authorization`
+   - **Değer:** `Bearer SENİN_TOKENIN`
+
+`SENİN_TOKENIN` yerine Workey projesindeki `.env` dosyasının `WORKEY_API_TOKEN=`
+satırındaki değeri yazın. **`Bearer` kelimesinden sonra bir boşluk bırakın.**
+Sunucu süreç ortamında token tanımlıysa o etkin değeri kullanın. Tokenı sohbete
+göndermeyin.
+
+**Kaydet** düğmesine basın, Codex Desktop'ı tamamen kapatıp yeniden açın ve yeni
+sohbet başlatın. Bu sırada **Workey sunucusu çalışır durumda kalmalı.** Yeni
+sohbette “Workey MCP bağlantısını kullanarak ajan rehberini oku ve bağlantıyı
+doğrula” istemini gönderin.
+
+## Codex CLI
 
 İstemciyi başlatacağınız PowerShell 7 terminalinde sunucuyla aynı tokenı girin:
 
@@ -68,11 +105,10 @@ url = "http://127.0.0.1:8080/mcp"
 bearer_token_env_var = "WORKEY_API_TOKEN"
 ```
 
-Workey'in `.env` okuması Codex'e ortam değişkeni aktarmaz. Codex Desktop'ı tamamen
-kapatıp token ortamını miras alacağı süreçten yeniden başlatın; açık uygulamaya
-sonradan terminalde tanımlanan değişken aktarılmaz. MCP ayarlarını kontrol edin
-ve yeni sohbette `get_agent_guide` çağrılmasını isteyin. Kalıcı kullanıcı
-yapılandırması bu geliştirme sırasında değiştirilmedi.
+Workey'in `.env` okuması Codex CLI'ye ortam değişkeni aktarmaz. Codex CLI'yi tokenı
+tanımladığınız aynı terminalden başlatın. `workey` kaydı zaten varsa tekrar
+eklemeyin. `/mcp` ile bağlantıyı kontrol edin ve `get_agent_guide` çağrılmasını
+isteyin. Desktop için yukarıdaki ayarlar ekranını kullanın.
 
 [OpenAI resmî MCP dokümantasyonu](https://learn.chatgpt.com/docs/extend/mcp).
 ChatGPT bağlantısı sonraki aşamadır; bu sürümde çalışır bağlantı olarak sunulmaz.

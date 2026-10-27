@@ -2,6 +2,13 @@
 
 ## Uygulama içi rehber ve makine sözleşmesi
 
+İlk kurulum, API tokenı üretimi, web parolası ve oturum anahtarı için
+[README'nin yerel kurulum adımlarını](../README.md#yerel-kurulum) izleyin.
+Tokenı kendiniz oluşturup `.env` dosyasının `WORKEY_API_TOKEN` alanına kaydedersiniz;
+Workey token dağıtan bir endpoint sunmaz. Mevcut kurulumda etkin sunucu tokenını
+kullanın: süreç ortamı `.env` ayarını geçersiz kılabilir. `Read-Host` yalnızca
+bu mevcut değeri girmenizi sağlar; yeni token oluşturmaz.
+
 Menüden **API Kullanımı** (`/kullanim/api`) sayfasına ulaşılır. Sayfa oturum
 doğrulaması ister; endpoint listesi, tam temsili yanıtlar, PowerShell/curl.exe
 komutları ve ortak ajan kurallarını gösterir. Mobilde **Kullanım** sekmesini açın.

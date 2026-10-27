@@ -62,3 +62,26 @@ Review screenshots are outside the repo in the chat visualization directory.
 Temporary test proxies and fixture servers stopped; task-owned proxy file removed.
 No personal .env/token/database/plan touched. User authorized committing and pushing WKY-20 and the design-document refresh on 2026-10-27. No PR or deployment requested.
 WKY-01..11,13..19 complete; WKY-12 held; WKY-20 zoom acceptance pending.
+
+## Follow-up — token setup and root README (2026-10-27)
+
+User requested explicit token acquisition instructions and basic project setup.
+Added README.md: prerequisites, clone/.env setup, separate random API token and
+session key generation, password hashing, run/health check, basic screens,
+MCP/API links, env precedence, SQLite backup, build and frontend tooling.
+Shared apiTokenSetup content now precedes client connection/first API read in
+both formatted and full Markdown guides. Clarified that tokens are operator
+created, Read-Host only inputs them, and existing installations reuse the active
+server token (process environment can override .env). .env.example and docs
+cross-link setup. No actual user environment/credentials/database changed.
+
+Passed focused web/views/apidoc tests. README PowerShell fences parsed; generation
+command executed twice with no files/settings written, distinct 32-byte Base64
+outputs confirmed without logging the values. README/guide generator text matches.
+IAB: 390px MCP and 1280px API token sections render without page overflow;
+code copy reports success and copies the 203-character generation command;
+manual Markdown Ctrl+A/Ctrl+C matched source. Full clipboard readback initially
+returned stale tool state; initializing the test clipboard then copying confirmed
+it changed to the code length. Preview fixtures stopped. No templ/CSS changes,
+no full install against personal .env, no commit/push for this follow-up.
+The earlier actual 200% zoom acceptance remains open.
