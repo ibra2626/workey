@@ -338,6 +338,46 @@ Decisive and singular: one dark pill per surface.
 
 After completion, replace the pill with a plain Tamamlandı status and a quiet Geri al form button. Completion and undo refresh the session, mobile summary, desktop weekly volume and phase blocks together.
 
+### Interaction feedback (27 October 2026)
+
+The primary completion action now reads **Seansı tamamla**; **Tamamlandı** is
+reserved for the completed state. This supersedes the action label in the
+original specifications above and below. The 54/56px forest pill and existing
+layout remain. A small outlined checkbox, pointer cursor, darker hover fill,
+visible keyboard focus and 120ms press response communicate interactivity.
+The check appears on hover/focus and is always visible on touch devices.
+
+Completion, undo and weekly row actions replace their label with a spinner and
+Turkish pending text while preserving button geometry. All actions in the
+affected content region are disabled until the request finishes; competing
+submissions are dropped. Requests time out after 20 seconds. Failed requests
+show an accessible message with recovery steps and restore controls. Keyboard
+focus follows the same session's action after the content is replaced.
+
+Shared navigation and login show an indeterminate 3px ink loading line after
+180ms; fast loads do not flash it. Navigation uses normal page rendering;
+snapshot view transitions and whole-content fades are removed because they
+competed with chart motion and made navigation feel stalled. The completed
+check draws once (280ms). Guide disclosure and copy-result feedback use 150ms fades.
+There are no celebrations, new colours or shadows.
+Reduced motion removes spatial movement, looping and page transitions while
+retaining loading text, a static loading line and the final completion state.
+The Today content grid uses one column below 1280px to keep the session action
+and side summaries inside intermediate viewports; the shell still switches at
+768px. Wide desktop retains the 340px side column.
+
+Chart fills grow upward from their own baseline over 650ms using composited
+scaleY transforms and `cubic-bezier(.22, .61, .36, 1)`. Horizontal topic tracks
+grow from the left with scaleX. Session labels occupy a separate stationary
+layer so text never scales. Animation layers are released at completion; there
+is no permanent will-change, clip-path animation, loop or layout movement.
+Rest-day stubs stay static. Reduced-motion users see the final chart immediately.
+
+Critical first-screen Barlow weights and Turkish subsets are preloaded before
+the stylesheet using identical font URLs and anonymous CORS. Font-display is
+optional: if a font misses the short initial rendering window, the existing
+system fallback remains stable for that visit instead of swapping mid-animation.
+
 ### Cards / Containers (panels)
 - **Corner Style:** 14px.
 - **Background:** Card White on Trail Ground.

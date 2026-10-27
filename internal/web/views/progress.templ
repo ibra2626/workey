@@ -60,7 +60,7 @@ templ Progress(p ProgressPage) {
 				<!-- 38-week strip. -->
 				<div class="mt-4 flex items-stretch gap-[2px] md:mt-5 md:gap-[4px]" style="height:44px" aria-label="38 haftalık plan">
 					for _, c := range progressStrip(p.Progress) {
-						<div class="relative h-full flex-1 overflow-hidden rounded-xs" { styleAttr("background:" + c.BaseFill)... }>
+						<div class="chart-rise relative h-full flex-1 overflow-hidden rounded-xs" { styleAttr("background:" + c.BaseFill)... }>
 							if c.InkPct > 0 {
 								<span class="absolute inset-x-0 bottom-0 bg-ink" { styleAttr("height:" + pct(c.InkPct))... }></span>
 							}
@@ -102,7 +102,7 @@ templ groupRow(gp plan.GroupProgress) {
 		<div class="mt-1 flex items-center gap-2">
 			<div class="h-[6px] flex-1 overflow-hidden rounded-bar bg-line">
 				if gp.Percent > 0 {
-					<span class="block h-full rounded-bar bg-ink" { styleAttr("width:" + pct(gp.Percent))... }></span>
+					<span class="chart-grow block h-full rounded-bar bg-ink" { styleAttr("width:" + pct(gp.Percent))... }></span>
 				}
 			</div>
 			<span class="w-[64px] text-right text-label tnum text-ink-3">{ dgsLabel(gp) }</span>
@@ -113,7 +113,7 @@ templ groupRow(gp plan.GroupProgress) {
 		<span class="text-body font-semibold text-ink">{ gp.Name }</span>
 		<div class="h-[8px] overflow-hidden rounded-bar bg-line">
 			if gp.Percent > 0 {
-				<span class="block h-full rounded-bar bg-ink" { styleAttr("width:" + pct(gp.Percent))... }></span>
+				<span class="chart-grow block h-full rounded-bar bg-ink" { styleAttr("width:" + pct(gp.Percent))... }></span>
 			}
 		</div>
 		<span class="text-right text-meta tnum text-ink-3">{ dgsLabel(gp) }</span>

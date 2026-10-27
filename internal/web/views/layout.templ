@@ -24,11 +24,14 @@ templ Layout(p LayoutProps) {
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<title>{ p.Title }</title>
+			@fontPreloads(p.Active == "bugun" || p.Active == "hafta" || p.Active == "ilerleme")
 			<link rel="stylesheet" href={ asset("/static/app.css") }/>
 			<script defer src={ asset("/static/htmx.min.js") }></script>
+			<script defer src={ asset("/static/ui.js") }></script>
 		</head>
 		<body class="min-h-screen" { hxHeaders(p.CSRF)... }>
 			@iconSprite()
+			@requestFeedback()
 			<div class="md:flex md:min-h-screen">
 				@rail(p)
 				<main class="min-w-0 flex-1 px-3 pt-6 pb-[88px] md:px-8 md:py-8">
@@ -38,6 +41,33 @@ templ Layout(p LayoutProps) {
 			@tabBar(p.Active)
 		</body>
 	</html>
+}
+
+// Match the unversioned URLs inside app.css exactly so preload and CSS share
+// one font request. Include Turkish subsets and only first-screen weights.
+templ fontPreloads(study bool) {
+	<link rel="preload" href="/static/fonts/barlow-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
+	<link rel="preload" href="/static/fonts/barlow-latin-ext-400-normal.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
+	<link rel="preload" href="/static/fonts/barlow-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
+	<link rel="preload" href="/static/fonts/barlow-latin-ext-600-normal.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
+	<link rel="preload" href="/static/fonts/barlow-condensed-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
+	if study {
+		<link rel="preload" href="/static/fonts/barlow-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
+		<link rel="preload" href="/static/fonts/barlow-condensed-latin-500-normal.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>
+	}
+}
+
+// Shared feedback for navigation and requests, outside swapped content.
+templ requestFeedback() {
+	<div class="request-progress" aria-hidden="true"><span></span></div>
+	<p id="request-status" class="sr-only" role="status" aria-live="polite"></p>
+	<p id="request-error" class="request-error" role="alert" hidden></p>
+}
+
+// Two overlapping labels keep the control's geometry stable while saving.
+templ actionLabel(label string, busy string) {
+	<span class="action-label">{ label }</span>
+	<span class="action-busy"><span class="request-spinner" aria-hidden="true"></span>{ busy }</span>
 }
 
 // iconSprite holds the stroked line icons (1.8 stroke, round caps) referenced

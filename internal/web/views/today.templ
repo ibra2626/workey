@@ -34,7 +34,7 @@ templ TodayMain(p TodayPage) {
 				</span>
 			</p>
 		</div>
-		<div class="mt-5 grid gap-3 md:grid-cols-[1fr_340px] md:gap-5">
+		<div class="mt-5 grid gap-3 md:gap-5 xl:grid-cols-[1fr_340px]">
 			@TodayPanel(p)
 			<!-- Mobile: stat tiles and the generated note. -->
 			<div class="md:hidden">
@@ -55,14 +55,14 @@ templ TodayMain(p TodayPage) {
 			</div>
 			<!-- Desktop: full-width current-phase panel. -->
 			if len(p.PhaseBlocks) > 0 {
-				<section class="hidden rounded-panel bg-card p-6 md:col-span-2 md:block">
+				<section class="hidden rounded-panel bg-card p-6 md:block xl:col-span-2">
 					<div class="flex items-baseline justify-between">
 						<p class="text-label font-semibold text-ink-3">{ p.PhaseLabel }</p>
 					</div>
 					<div class="mt-4 grid grid-cols-7 gap-3">
 						for _, b := range p.PhaseBlocks {
 							<div>
-								<div class="relative h-[44px] overflow-hidden rounded-block bg-z1-soft">
+								<div class="chart-rise relative h-[44px] overflow-hidden rounded-block bg-z1-soft">
 									if b.FillPct > 0 {
 										<span class="absolute inset-y-0 left-0 bg-ink" { styleAttr("width:" + pct(b.FillPct))... }></span>
 									}
@@ -128,10 +128,11 @@ templ todaySession(sv plan.SessionView, csrf string) {
 		<div class="flex h-[92px] items-end gap-1 md:h-[150px]">
 			for _, b := range sessionProfile(sv) {
 				<div
-					class="flex items-start overflow-hidden rounded-bar md:rounded-block"
-					{ styleAttr("flex:" + strconv.Itoa(b.Flex) + ";height:" + pct(b.HeightPct) + ";background:" + b.Fill)... }
+					class="relative flex items-start overflow-hidden rounded-bar md:rounded-block"
+					{ styleAttr("flex:" + strconv.Itoa(b.Flex) + ";height:" + pct(b.HeightPct))... }
 				>
-					<div class="hidden p-2.5 md:block">
+					<span class="chart-rise absolute inset-0" { styleAttr("background:" + b.Fill)... } aria-hidden="true"></span>
+					<div class="relative hidden p-2.5 md:block">
 						<p class="text-title font-semibold leading-none text-ink">{ b.Label }</p>
 						<p class="mt-1 cn text-numeral-profile font-semibold text-ink">{ b.Duration }</p>
 					</div>
@@ -177,25 +178,26 @@ templ todaySession(sv plan.SessionView, csrf string) {
 // hidden CSRF field for the no-JS path.
 templ completeControl(sv plan.SessionView, csrf string) {
 	if sv.State == plan.StateDone {
-		<div class="mt-6 flex items-center justify-between md:mt-8" role="status">
+		<div class="completion-status mt-6 flex items-center justify-between md:mt-8" role="status">
 			<p class="flex items-center gap-2 text-title-lg font-semibold text-ink">
-				@icon("i-check", "w-5 h-5")
+				<svg class="completion-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" pathLength="1"></path></svg>
 				Tamamlandı
 			</p>
 			<form method="post" { completeForm(sv.ID, "geri-al")... }>
 				<input type="hidden" name="_csrf" value={ csrf }/>
-				<button type="submit" class="rounded-nav text-body-small text-ink-3 underline-offset-2 transition-colors hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:2px]">Geri al</button>
+				<button id="today-action" type="submit" class="action-button secondary-action rounded-nav text-body-small text-ink-3 underline-offset-2 hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:2px]">@actionLabel("Geri al", "Geri alınıyor…")</button>
 			</form>
 		</div>
 	} else {
 		<form method="post" class="mt-6 md:mt-8" { completeForm(sv.ID, "tamamla")... }>
 			<input type="hidden" name="_csrf" value={ csrf }/>
 			<button
+				id="today-action"
 				type="submit"
-				class="flex h-[54px] w-full items-center justify-center gap-2 rounded-pill bg-ink text-title-lg font-semibold text-card transition-colors duration-200 hover:bg-ink-hover focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:3px] md:h-[56px] md:w-auto md:px-10"
+				class="action-button primary-action flex h-[54px] w-full items-center justify-center gap-2 rounded-pill bg-ink text-title-lg font-semibold text-card hover:bg-ink-hover focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:3px] md:h-[56px] md:w-auto md:px-10"
 			>
-				@icon("i-check", "w-5 h-5")
-				Tamamlandı
+				<span class="action-label flex items-center gap-2"><svg class="action-check" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"></rect><path d="m7.5 12 3 3 6-6"></path></svg>Seansı tamamla</span>
+				<span class="action-busy"><span class="request-spinner" aria-hidden="true"></span>Kaydediliyor…</span>
 			</button>
 		</form>
 	}
@@ -216,9 +218,9 @@ templ todayWeekMini(p TodayPage) {
 					if b.Rest {
 						<span class="w-full rounded-pill bg-line" style="height:3px"></span>
 					} else if b.IsToday {
-						<span class="w-full rounded-xs bg-z3-soft" { styleAttr("height:" + pct(b.HeightPct) + ";box-shadow:inset 0 0 0 2px var(--color-z3)")... }></span>
+						<span class="chart-rise w-full rounded-xs bg-z3-soft" { styleAttr("height:" + pct(b.HeightPct) + ";box-shadow:inset 0 0 0 2px var(--color-z3)")... }></span>
 					} else {
-						<span class={ "w-full rounded-xs", barClass(b) } { styleAttr("height:" + pct(b.HeightPct))... }></span>
+						<span class={ "chart-rise w-full rounded-xs", barClass(b) } { styleAttr("height:" + pct(b.HeightPct))... }></span>
 					}
 				}
 			</div>

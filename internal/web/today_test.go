@@ -92,7 +92,7 @@ func TestBugunRendersTonightsSession(t *testing.T) {
 		"s. 41–58",          // page range with en dash U+2013
 		"s. 41–44",          // konu split
 		"Antr. 1–3",         // antrenman range
-		"Tamamlandı",        // the primary action
+		"Seansı tamamla",    // action wording, distinct from the completed state
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("Bugün body missing %q", want)

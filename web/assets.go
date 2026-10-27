@@ -14,18 +14,28 @@ import (
 //go:embed static
 var staticFS embed.FS
 
-// Version is a short content hash of the built stylesheet. It is appended as a
-// cache-busting query (?v=) to asset URLs so a rebuilt CSS invalidates the
-// browser cache while unchanged assets stay cached for a year.
+// Version hashes all embedded assets so script-only changes also invalidate
+// the immutable browser cache. WalkDir visits paths in lexical order.
 var Version = computeVersion()
 
 func computeVersion() string {
-	b, err := staticFS.ReadFile("static/app.css")
+	h := sha256.New()
+	err := fs.WalkDir(staticFS, "static", func(path string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
+		}
+		b, err := staticFS.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		h.Write([]byte(path + "\x00"))
+		h.Write(b)
+		return nil
+	})
 	if err != nil {
 		return "dev"
 	}
-	sum := sha256.Sum256(b)
-	return hex.EncodeToString(sum[:])[:12]
+	return hex.EncodeToString(h.Sum(nil))[:12]
 }
 
 // StaticHandler serves the embedded assets. Register it under "GET /static/".

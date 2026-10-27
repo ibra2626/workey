@@ -510,10 +510,14 @@ func rowActionLabel(sv plan.SessionView) string {
 func weekForm(id int64, action string) templ.Attributes {
 	url := "/hafta/oturum/" + strconv.FormatInt(id, 10) + "/" + action
 	return templ.Attributes{
-		"action":    url,
-		"hx-post":   url,
-		"hx-target": "#hafta-main",
-		"hx-swap":   "outerHTML",
+		"action":          url,
+		"hx-post":         url,
+		"hx-target":       "#hafta-main",
+		"hx-swap":         "outerHTML",
+		"hx-disabled-elt": "#hafta-main button",
+		"hx-sync":         "#hafta-main:drop",
+		"data-session-id": strconv.FormatInt(id, 10),
+		"hx-request":      `{"timeout":20000}`,
 	}
 }
 
@@ -652,10 +656,14 @@ func tomorrowHint(sv *plan.SessionView) string {
 func completeForm(id int64, action string) templ.Attributes {
 	url := "/oturum/" + strconv.FormatInt(id, 10) + "/" + action
 	return templ.Attributes{
-		"action":    url,
-		"hx-post":   url,
-		"hx-target": "#bugun-main",
-		"hx-swap":   "outerHTML",
+		"action":          url,
+		"hx-post":         url,
+		"hx-target":       "#bugun-main",
+		"hx-swap":         "outerHTML",
+		"hx-disabled-elt": "#bugun-main button",
+		"hx-sync":         "#bugun-main:drop",
+		"data-session-id": strconv.FormatInt(id, 10),
+		"hx-request":      `{"timeout":20000}`,
 	}
 }
 

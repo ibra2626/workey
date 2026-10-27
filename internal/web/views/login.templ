@@ -12,9 +12,12 @@ templ Login(errMsg string) {
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<title>Workey · Giriş</title>
+			@fontPreloads(false)
 			<link rel="stylesheet" href={ asset("/static/app.css") }/>
+			<script defer src={ asset("/static/ui.js") }></script>
 		</head>
 		<body class="min-h-screen">
+			@requestFeedback()
 			<main class="flex min-h-screen items-center justify-center px-5 py-10">
 				<div class="w-full max-w-[400px] rounded-panel bg-card p-7 md:p-8">
 					<p class="cn text-wordmark font-semibold text-ink">Workey</p>
@@ -35,9 +38,9 @@ templ Login(errMsg string) {
 						}
 						<button
 							type="submit"
-							class="mt-5 flex h-[54px] w-full items-center justify-center rounded-pill bg-ink px-10 text-title font-semibold text-card transition-colors duration-200 hover:bg-ink-hover focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:3px]"
+							class="action-button primary-action mt-5 flex h-[54px] w-full items-center justify-center rounded-pill bg-ink px-10 text-title font-semibold text-card hover:bg-ink-hover focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:3px]"
 						>
-							Giriş yap
+							@actionLabel("Giriş yap", "Giriş yapılıyor…")
 						</button>
 					</form>
 				</div>

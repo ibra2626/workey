@@ -149,9 +149,9 @@ templ volumeBarEl(b volumeBar) {
 		if b.Rest {
 			<span class="w-full rounded-pill bg-line" style="height:3px"></span>
 		} else if b.IsToday {
-			<span class="w-full rounded-bar bg-z3-soft" { styleAttr("height:" + pct(b.HeightPct) + ";box-shadow:inset 0 0 0 2px var(--color-z3)")... }></span>
+			<span class="chart-rise w-full rounded-bar bg-z3-soft" { styleAttr("height:" + pct(b.HeightPct) + ";box-shadow:inset 0 0 0 2px var(--color-z3)")... }></span>
 		} else {
-			<span class={ "w-full rounded-bar", barClass(b) } { styleAttr("height:" + pct(b.HeightPct))... }></span>
+			<span class={ "chart-rise w-full rounded-bar", barClass(b) } { styleAttr("height:" + pct(b.HeightPct))... }></span>
 		}
 	</div>
 }
@@ -211,7 +211,7 @@ templ rowControl(sv plan.SessionView, csrf string) {
 	if rowActionable(sv) {
 		<form method="post" { weekForm(sv.ID, rowActionSlug(sv))... }>
 			<input type="hidden" name="_csrf" value={ csrf }/>
-			<button type="submit" class="shrink-0 rounded-nav px-2 py-1 text-label font-semibold text-ink-3 transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:2px]">{ rowActionLabel(sv) }</button>
+			<button type="submit" class="action-button secondary-action shrink-0 rounded-nav px-2 py-1 text-label font-semibold text-ink-3 hover:text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:2px]">@actionLabel(rowActionLabel(sv), "Kaydediliyor…")</button>
 		</form>
 	}
 }
