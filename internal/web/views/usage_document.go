@@ -14,6 +14,47 @@ import (
 type UsageDocument struct {
 	Title  string
 	Blocks []UsageBlock
+	Client string
+}
+
+// SelectClient normalizes the request value without storing a preference.
+func (d UsageDocument) SelectClient(client string) UsageDocument {
+	switch client {
+	case "codex-cli", "claude-code":
+		d.Client = client
+	default:
+		d.Client = "codex-desktop"
+	}
+	return d
+}
+
+func (d UsageDocument) ViewURL(key string, markdown bool) string {
+	url := "/kullanim/" + key
+	if key == "mcp" {
+		url += "?client=" + d.SelectClient(d.Client).Client
+		if markdown {
+			url += "&view=markdown"
+		}
+	} else if markdown {
+		url += "?view=markdown"
+	}
+	return url
+}
+
+func (d UsageDocument) GuideBlocks() []UsageBlock {
+	return clientBlocks(d.Blocks, d.SelectClient(d.Client).Client)
+}
+
+func clientBlocks(blocks []UsageBlock, client string) []UsageBlock {
+	var selected []UsageBlock
+	for _, b := range blocks {
+		if b.Client != "" && b.Client != client {
+			continue
+		}
+		b.Children = clientBlocks(b.Children, client)
+		selected = append(selected, b)
+	}
+	return selected
 }
 
 type UsageBlockKind string
@@ -59,18 +100,22 @@ func NewUsageDocument(key string, guide plan.AgentGuide) UsageDocument {
 	}}
 	switch key {
 	case "mcp":
+		doc.Blocks = []UsageBlock{paragraph("Asistanınız Workey’e bağlanır, çalışma planınızı kaydeder ve ilerlemenizi okur.")}
 		doc.Blocks = append(doc.Blocks, mcpSections()...)
 		tools := section("Araçlar")
+		tools.Kind = UsageDetails
 		for _, tool := range mcpToolDescriptions {
 			tools.Children = append(tools.Children, paragraph(tool.Name+" — "+tool.Description))
 		}
-		doc.Blocks = append(doc.Blocks, tools, section("Örnek istemler",
+		examples := section("Örnek istemler",
 			UsageBlock{Kind: UsagePrompt, ID: "week", Text: "Önce ajan rehberini ve mevcut planı oku. Verdiğim kitap/bölüm/sayfa referanslarıyla bu haftayı düzenle. Korunacak seansları koru, yazdıktan sonra tekrar okuyup sonucu bildir."},
 			UsageBlock{Kind: UsagePrompt, ID: "makeup", Text: "Yapılamayan seansı hafta sonuna telafi olarak ekle. Var olan hafta sonu seanslarını koru ve bağlantıyı doğrula."},
 			UsageBlock{Kind: UsagePrompt, ID: "complete", Text: "Bugünkü seansımı tamamla; ardından güncel ilerlemeyi oku."},
 			UsageBlock{Kind: UsagePrompt, ID: "undo", Text: "Son tamamlamayı geri al."},
 			link("OpenAI resmî MCP dokümantasyonu", "https://learn.chatgpt.com/docs/extend/mcp"),
-		))
+		)
+		examples.Kind = UsageDetails
+		doc.Blocks = append(doc.Blocks, tools, examples)
 	case "api":
 		contract := section("Sözleşme ve kimlik doğrulama",
 			paragraph("Taban yol /api/v1. Tüm endpoint’ler Authorization: Bearer token ister. Gövdeler JSON, üst sınır 1 MiB. Yanıtlar önbelleğe alınmaz."),
@@ -106,6 +151,13 @@ func NewUsageDocument(key string, guide plan.AgentGuide) UsageDocument {
 		rules.Children = append(rules.Children, paragraph(rule))
 	}
 	doc.Blocks = append(doc.Blocks, rules)
+	if key == "mcp" {
+		for i := range doc.Blocks {
+			if doc.Blocks[i].Text == "Ajanın izleyeceği işlem sırası" || doc.Blocks[i].Text == "Ortak işlem kuralları" {
+				doc.Blocks[i].Kind = UsageDetails
+			}
+		}
+	}
 	return doc
 }
 

@@ -24,34 +24,48 @@ var mcpToolDescriptions = []struct{ Name, Description string }{
 }
 
 func mcpSections() []UsageBlock {
-	return []UsageBlock{
-		usageSection("1. Workey sunucusunu başlatın", []string{
-			"Proje dizininde .env.example dosyasından .env hazırlayın ve gerekli değerleri doldurun. Mevcut .env dosyanız varsa üzerine yazmayın. Gerçek tokenları paylaşmayın veya Git'e eklemeyin.",
-			"Varsayılan bağlantı http://127.0.0.1:8080/mcp; WORKEY_ADDR değiştiyse örnek adresleri uyarlayın. Yerel HTTP için WORKEY_COOKIE_SECURE=false kullanın. Sunucu çalışır durumda kalmalı.",
-		}, "go run ./cmd/workey serve", "powershell", ""),
-		usageSection("2. İstemci ortamını hazırlayın", []string{
-			"Workey'in .env dosyasını okuması, ayrı başlatılan Claude veya Codex sürecine ortam değişkeni aktarmaz. Aynı WORKEY_API_TOKEN değerini istemciyi başlatacağınız PowerShell 7 terminalinde de tanımlayın.",
-		}, `$env:WORKEY_API_TOKEN = Read-Host 'Workey API tokenı' -MaskInput`, "powershell", ""),
-		usageSection("3. Claude Code", []string{"Proje dizininde çalıştırın. Bu komut tokenı yerel Claude yapılandırmasına yazar; dosyayı Git'e eklemeyin. Claude Desktop için istemcinin desteklediği HTTP MCP bağlantısını aynı adresle yapılandırın; aşağıdaki komut Claude Code içindir."},
-			`claude mcp add --scope local --transport http workey http://127.0.0.1:8080/mcp --header "Authorization: Bearer $env:WORKEY_API_TOKEN"
-claude mcp get workey`, "powershell", "claude-code"),
-		usageSection("4. Codex CLI", []string{"Tokenı ortamdan alan HTTP bağlantısını ekleyin. Codex'i aynı terminalden başlatın; /mcp ile bağlantıyı kontrol edin."},
-			`codex mcp add workey --url http://127.0.0.1:8080/mcp --bearer-token-env-var WORKEY_API_TOKEN
-codex mcp list
-codex`, "powershell", "codex-cli"),
-		usageSection("5. Codex Desktop", []string{
-			"Codex Desktop aynı kullanıcı yapılandırmasındaki MCP kaydını kullanır. CLI ile ekledikten sonra uygulamayı tamamen kapatıp token ortam değişkenini miras alacağı terminalden yeniden başlatın. Açık bir uygulamaya terminalde sonradan tanımlanan değişken aktarılmaz.",
-			"MCP ayarlarından workey sunucusunu kontrol edin ve yeni sohbette önce get_agent_guide çağrılmasını isteyin. Başlatıcı veya uygulama sürümüne göre ortam aktarımı farklılaşırsa o süreç için WORKEY_API_TOKEN tanımlayın; tokenı URL'ye veya config.toml içine yazmayın.",
-		}, "", "powershell", "codex-desktop"),
-		usageSection("Alternatif: config.toml", []string{"CLI komutu yerine kullanıcı dizininizdeki .codex/config.toml dosyasına aşağıdaki kaydı ekleyebilirsiniz. workey kaydı varsa ikinci kez eklemeyin. CLI ve Desktop aynı endpoint ve araçları kullanır."},
-			`[mcp_servers.workey]
+	const tokenInput = `$env:WORKEY_API_TOKEN = Read-Host 'Workey API tokenı' -MaskInput`
+	const codexAdd = `codex mcp add workey --url http://127.0.0.1:8080/mcp --bearer-token-env-var WORKEY_API_TOKEN
+codex mcp list`
+	tokenHelp := paragraph("Workey'in .env dosyasındaki WORKEY_API_TOKEN değerini alın; sunucu bir başkası tarafından kurulduysa bu değeri kuran kişiden güvenli yoldan isteyin. Aşağıdaki PowerShell 7 komutuna aynı tokenı girin. Workey'in .env okuması, ayrı başlatılan istemciye ortam değişkeni aktarmaz. Tokenı URL'ye veya config.toml içine yazmayın.")
+	desktop := section("Codex Desktop",
+		paragraph("Codex CLI kurulu olmalı. Codex Desktop'ı tamamen kapatın. PowerShell 7 terminalinde tokenı tanımlayıp bağlantıyı ekleyin; workey kaydı zaten varsa tekrar eklemeyin."),
+		tokenHelp, code(tokenInput+"\n"+codexAdd, "powershell"),
+		paragraph("Codex Desktop aynı kullanıcı yapılandırmasındaki MCP kaydını kullanır. Uygulamayı tokenı tanımladığınız terminalden kendi kurulumunuzun başlatıcısıyla açın; uygulama süreci WORKEY_API_TOKEN değişkenini miras almalı. Açık uygulamaya sonradan tanımlanan değişken aktarılmaz. Başlatıcıya göre ortam aktarımı farklılaşırsa uygulama sürecinin ortamında bu değişkeni tanımlayın ve tamamen yeniden başlatın."),
+		paragraph("MCP ayarlarında workey sunucusunu kontrol edin ve yeni sohbet açın."),
+	)
+	desktop.Client = "codex-desktop"
+	cli := section("Codex CLI", tokenHelp, code(tokenInput+"\n"+codexAdd+"\ncodex", "powershell"),
+		paragraph("workey kaydı zaten varsa tekrar eklemeyin. Codex'i tokenı tanımladığınız aynı terminalden başlatın; /mcp ile bağlantıyı kontrol edin."))
+	cli.Client = "codex-cli"
+	claude := section("Claude Code", tokenHelp,
+		paragraph("Proje dizininde aşağıdaki komutları aynı terminalde çalıştırın. Komut tokenı yerel Claude yapılandırmasına yazar; bu dosyayı Git'e eklemeyin. Claude Code'u aynı terminalden başlatın."),
+		code(tokenInput+`
+claude mcp add --scope local --transport http workey http://127.0.0.1:8080/mcp --header "Authorization: Bearer $env:WORKEY_API_TOKEN"
+claude mcp get workey
+claude`, "powershell"))
+	claude.Client = "claude-code"
+	alternative := usageSection("Alternatif: config.toml", []string{"CLI ile ekleme yerine kullanıcı dizininizdeki .codex/config.toml dosyasına aşağıdaki kaydı ekleyebilirsiniz. workey kaydı varsa ikinci kez eklemeyin. Token ortam aktarımı ve Desktop yeniden başlatma adımları yine gereklidir."},
+		`[mcp_servers.workey]
 url = "http://127.0.0.1:8080/mcp"
-bearer_token_env_var = "WORKEY_API_TOKEN"`, "toml", ""),
-		usageSection("Bağlantı sorunları ve kapsam", []string{
-			"Connection refused: Workey'in çalıştığını ve portu kontrol edin. 401: tokenın hem Workey hem istemci sürecinde aynı olduğunu kontrol edin. Web oturum çerezi MCP doğrulaması yerine geçmez.",
-			"Araçlar görünmüyorsa istemciyi yeniden başlatıp yeni sohbet açın. Metadata değiştiğinde bağlantıyı yenileyin. İlk çağrı get_agent_guide olmalı.",
-			"Bu sürüm Claude ve Codex Desktop/CLI içindir. ChatGPT bağlantısı sonraki aşamadır; HTTPS veya desteklenen tünel ve uygun kimlik doğrulama ayrıca hazırlanmalıdır.",
-		}, "", "powershell", ""),
+bearer_token_env_var = "WORKEY_API_TOKEN"`, "toml", "")
+	alternative.Kind = UsageDetails
+	troubleshooting := usageSection("Bağlantı sorunları ve kapsam", []string{
+		"Connection refused: Workey'in çalıştığını ve portu kontrol edin. 401: tokenın hem Workey hem istemci sürecinde aynı olduğunu kontrol edin. Web oturum çerezi MCP doğrulaması yerine geçmez.",
+		"Araçlar görünmüyorsa istemciyi tamamen yeniden başlatıp yeni sohbet açın. Metadata değiştiğinde bağlantıyı yenileyin. İlk çağrı get_agent_guide olmalı.",
+		"Bu rehber Codex Desktop, Codex CLI ve Claude Code içindir. Claude Desktop için istemcinin desteklediği HTTP MCP bağlantısını aynı adresle yapılandırmak gerekir; bu rehberde doğrulanmış ayrı kurulum adımı yoktur. ChatGPT bağlantısı sonraki aşamadır; HTTPS veya desteklenen tünel ve uygun kimlik doğrulama ayrıca hazırlanmalıdır.",
+	}, "", "", "")
+	troubleshooting.Kind = UsageDetails
+	return []UsageBlock{
+		usageSection("1. Workey'i hazırlayın", []string{
+			"Proje dizininde .env.example dosyasından .env hazırlayın ve gerekli değerleri doldurun. Mevcut .env dosyanız varsa üzerine yazmayın. Gerçek tokenları paylaşmayın veya Git'e eklemeyin.",
+			"Varsayılan bağlantı http://127.0.0.1:8080/mcp. WORKEY_ADDR değiştiyse aşağıdaki bağlantı komutlarında ve config.toml örneğinde 8080 portunu kendi portunuzla değiştirin. Yerel HTTP için WORKEY_COOKIE_SECURE=false kullanın. Sunucuyu başlatın ve çalışır durumda bırakın.",
+		}, "go run ./cmd/workey serve", "powershell", ""),
+		section("2. İstemcinizi bağlayın", desktop, cli, claude),
+		section("3. Bağlantıyı deneyin", paragraph("Yeni sohbette bu istemi gönderin. Asistanın get_agent_guide çağrısıyla sunucu tarihini ve kuralları okuyabildiğini doğrulayın."),
+			UsageBlock{Kind: UsagePrompt, ID: "connection", Text: "Workey MCP bağlantısını kullanarak ajan rehberini oku ve bağlantıyı doğrula"}),
+		section("4. Planınızı oluşturun", paragraph("Bağlantı hazır. Sınava kadar çalışma planı oluşturma istemi bir sonraki adımda eklenecek.")),
+		alternative, troubleshooting,
 	}
 }
 

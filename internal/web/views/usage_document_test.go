@@ -28,6 +28,13 @@ func TestUsageDocumentRenderersShareAllContent(t *testing.T) {
 			if err := Usage(key, "csrf-shell-only", doc, false).Render(context.Background(), &rendered); err != nil {
 				t.Fatal(err)
 			}
+			if key == "mcp" {
+				for _, client := range []string{"codex-cli", "claude-code"} {
+					if err := Usage(key, "csrf-shell-only", doc.SelectClient(client), false).Render(context.Background(), &rendered); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
 			htmlText := html.UnescapeString(rendered.String())
 			md := doc.Markdown()
 			walkBlocks(doc.Blocks, func(b UsageBlock) {
@@ -174,7 +181,7 @@ func TestUsageMCPClientsAndPrompts(t *testing.T) {
 			t.Errorf("missing client %s", client)
 		}
 	}
-	if len(ids) != 4 {
+	if len(ids) != 5 {
 		t.Errorf("got %d prompts", len(ids))
 	}
 }

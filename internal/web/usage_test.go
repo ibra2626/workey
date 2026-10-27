@@ -88,3 +88,55 @@ func TestUsageMarkdownViews(t *testing.T) {
 		}
 	}
 }
+
+func TestUsageMCPClientSelection(t *testing.T) {
+	a := newTestAuth(t)
+	cookie := login(t, a)
+	raw := regexp.MustCompile(`(?s)<textarea[^>]*id="usage-markdown"[^>]*>(.*?)</textarea>`)
+	wantMarkdown := views.NewUsageDocument("mcp", a.svc.AgentGuide(a.examDate)).Markdown()
+	for _, value := range []string{"", "invalid", "codex-desktop", "codex-cli", "claude-code", "%3Cscript%3E"} {
+		selected := "codex-desktop"
+		if value == "codex-cli" || value == "claude-code" {
+			selected = value
+		}
+		for _, view := range []string{"", "markdown", "unknown"} {
+			t.Run(value+"/"+view, func(t *testing.T) {
+				r := httptest.NewRequest("GET", "/kullanim/mcp?client="+value+"&view="+view, nil)
+				r.AddCookie(cookie)
+				res := do(t, a, r)
+				b, _ := io.ReadAll(res.Body)
+				res.Body.Close()
+				body := string(b)
+				match := raw.FindStringSubmatch(body)
+				if res.StatusCode != 200 || len(match) != 2 || html.UnescapeString(match[1]) != wantMarkdown {
+					t.Fatal("full Markdown changed with selection")
+				}
+				body = raw.ReplaceAllString(body, "")
+				for _, client := range []string{"codex-desktop", "codex-cli", "claude-code"} {
+					has := strings.Contains(body, `data-client="`+client+`"`)
+					if has != (view != "markdown" && client == selected) {
+						t.Errorf("wrong setup visibility for %s", client)
+					}
+				}
+				for _, link := range []string{"?client=" + selected + `"`, "?client=" + selected + `&amp;view=markdown"`} {
+					if !strings.Contains(body, link) {
+						t.Errorf("selection lost in view link: %s", link)
+					}
+				}
+				if view != "markdown" {
+					for _, want := range []string{"1. Workey", "2. İstemcinizi", "3. Bağlantıyı", "4. Planınızı", `data-copy-target="usage-prompt-connection"`, "Workey MCP bağlantısını kullanarak ajan rehberini oku ve bağlantıyı doğrula"} {
+						if !strings.Contains(body, want) {
+							t.Errorf("missing %q", want)
+						}
+					}
+					if regexp.MustCompile(`<details[^>]*\bopen\b`).MatchString(body) {
+						t.Fatal("technical details must start closed")
+					}
+				}
+				if len(res.Cookies()) != 0 {
+					t.Fatal("client selection must not set a preference cookie")
+				}
+			})
+		}
+	}
+}
