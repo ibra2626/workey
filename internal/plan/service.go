@@ -47,7 +47,10 @@ func (s *Service) nowUTC() string {
 // (uncompleted) sessions become exactly the given set, matched by
 // (date, start_time). An incoming session keeps the id of the one it matches,
 // a changed one is updated in place, and an open session absent from the
-// request is deleted. Sessions dated before today and completed sessions are
+// request is deleted unless it has a study record. Started sessions retain
+// their slot and content: equal content is unchanged, changes are skipped with
+// reason started, and omitted started sessions are kept.
+// Sessions dated before today and completed sessions are
 // frozen: they are never modified or deleted, and an incoming session that
 // targets one is returned in Skipped.
 //
@@ -107,6 +110,10 @@ func (s *Service) applyPlan(ctx context.Context, tx *sql.Tx, source Source, toda
 	for _, e := range existing {
 		existingBySlot[SlotRef{Date: e.Date, StartTime: e.StartTime}] = e
 	}
+	started, err := s.st.StartedSessionIDs(ctx, tx, req.From, req.To)
+	if err != nil {
+		return nil, err
+	}
 
 	// Classify each incoming session and resolve store-dependent references
 	// (topic group, makeup target) before any write, collecting typed errors.
@@ -160,6 +167,10 @@ func (s *Service) applyPlan(ctx context.Context, tx *sql.Tx, source Source, toda
 		if a.existing != nil {
 			if contentEqual(*a.existing, a.input.DurationMin, a.input.Kind, a.tgID, a.makeupID, items) {
 				result.Unchanged = append(result.Unchanged, refOf(*a.existing))
+				continue
+			}
+			if started[a.existing.ID] {
+				result.Skipped = append(result.Skipped, SkippedSession{Date: a.input.Date, StartTime: a.input.StartTime, Reason: SkipStarted})
 				continue
 			}
 			before, err := snapshotJSON(*a.existing)
@@ -221,9 +232,9 @@ func (s *Service) applyPlan(ctx context.Context, tx *sql.Tx, source Source, toda
 	}
 
 	// Delete the open future sessions no longer in the request. Frozen
-	// sessions (completed, or dated before today) are kept.
+	// sessions (completed, dated before today, or started) are kept.
 	for slot, ex := range existingBySlot {
-		if seen[slot] || ex.CompletedAt != nil || ex.Date < today {
+		if seen[slot] || ex.CompletedAt != nil || ex.Date < today || started[ex.ID] {
 			continue
 		}
 		before, err := snapshotJSON(ex)

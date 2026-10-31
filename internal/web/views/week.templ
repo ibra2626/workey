@@ -66,6 +66,7 @@ templ WeekMain(p WeekPage) {
 					</p>
 				</div>
 				<!-- Desktop figures: volume, sessions, moved — no streak figure. -->
+					<p class="mt-3 text-meta text-ink-3">{ progressMeasure }</p>
 				<dl class="mt-6 hidden grid-cols-2 gap-y-2 text-body tnum md:grid">
 					<dt class="text-ink-3">Seans</dt>
 					<dd class="font-semibold text-ink">{ strconv.Itoa(p.Week.SessionsDone) } / { strconv.Itoa(p.Week.SessionsPlanned) }</dd>
@@ -80,6 +81,7 @@ templ WeekMain(p WeekPage) {
 		</section>
 
 		<!-- Mobile: week list. -->
+		<p class="mt-3 px-1 text-meta text-ink-3">{ progressCounting }</p>
 		<ul class="mt-3 divide-y divide-line rounded-panel bg-card md:hidden">
 			for _, d := range p.Week.Days {
 				@weekListRow(d, p.CSRF)
@@ -170,6 +172,9 @@ templ weekListRow(d plan.DayRow, csrf string) {
 				<div class="min-w-0 flex-1">
 					<p class={ "text-body", templ.KV("font-semibold", rowActive(sv)) }>{ rowName(sv) }</p>
 					<p class={ "text-meta tnum", templ.KV("text-ink-2", sv.State == plan.StateToday), templ.KV("text-ink-3", sv.State != plan.StateToday) }>{ rowMeta(sv) }</p>
+					if sv.Study != nil {
+						<p class="text-meta tnum text-ink-2">{ weekStudyContext(sv) }</p>
+					}
 				</div>
 				@rowControl(sv, csrf)
 			</li>
@@ -188,7 +193,12 @@ templ weekTableRows(d plan.DayRow, csrf string) {
 		for _, sv := range d.Sessions {
 			<tr class={ templ.KV("bg-z3-soft", sv.State == plan.StateToday) }>
 				<td class={ "px-7 py-3", templ.KV("font-semibold", sv.State == plan.StateToday) }>{ d.WeekdayShort } { strconv.Itoa(d.DayNum) }</td>
-				<td class={ templ.KV("font-semibold", rowActive(sv)) }>{ rowName(sv) }</td>
+				<td class={ templ.KV("font-semibold", rowActive(sv)) }>
+					{ rowName(sv) }
+					if sv.Study != nil {
+						<p class="text-meta tnum text-ink-2">{ weekStudyContext(sv) }</p>
+					}
+				</td>
 				<td>{ pagesPlain(sv) }</td>
 				<td class={ templ.KV("text-ink-3", sv.State == plan.StateMoved) }>{ sureCell(sv) }</td>
 				<td class="py-3 pr-7">
@@ -211,6 +221,7 @@ templ rowControl(sv plan.SessionView, csrf string) {
 	if rowActionable(sv) {
 		<form method="post" { weekForm(sv.ID, rowActionSlug(sv))... }>
 			<input type="hidden" name="_csrf" value={ csrf }/>
+			<input type="hidden" name="expected_study_version" value={ strconv.FormatInt(sv.StudyVersion, 10) }/>
 			<button type="submit" class="action-button secondary-action shrink-0 rounded-nav px-2 py-1 text-label font-semibold text-ink-3 hover:text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:2px]">@actionLabel(rowActionLabel(sv), "Kaydediliyor…")</button>
 		</form>
 	}

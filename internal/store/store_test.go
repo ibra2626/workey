@@ -40,14 +40,14 @@ func TestMigrateIdempotent(t *testing.T) {
 		`SELECT COUNT(1) FROM schema_migrations`).Scan(&applied); err != nil {
 		t.Fatalf("count migrations: %v", err)
 	}
-	if applied != 1 {
-		t.Fatalf("schema_migrations rows = %d, want 1", applied)
+	if applied != 2 {
+		t.Fatalf("schema_migrations rows = %d, want 2", applied)
 	}
 
 	// Every v1 table exists.
 	for _, tbl := range []string{
 		"phases", "topic_groups", "sessions", "session_items",
-		"audit_log", "idempotency_keys",
+		"audit_log", "idempotency_keys", "session_study",
 	} {
 		var name string
 		err := s.DB().QueryRowContext(ctx,

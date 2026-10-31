@@ -78,3 +78,19 @@ func OperationResponseJSON(op Operation) string {
 	b, _ := json.MarshalIndent(OperationResponseExample(op), "", "  ")
 	return string(b)
 }
+
+// StudyResponseExample is a separate synthetic paused-work scenario. Keeping
+// the legacy examples unchanged demonstrates that study is optional.
+func StudyResponseExample() plan.SessionView {
+	s := ResponseExample("Session").(plan.SessionView)
+	s.Study = &plan.StudyView{Status: plan.StudyPaused, EntryMode: plan.EntryTenMinutes,
+		FirstStartedAt: "2026-10-26T17:30:00Z", LastStartedAt: "2026-10-26T17:30:00Z",
+		UpdatedAt: "2026-10-26T17:40:00Z", Version: 2,
+		Bookmark: &plan.BookmarkView{ItemOrdinal: 0, Stage: plan.StageSoru,
+			ResumePage: 5, Item: s.Items[0], Notation: s.Notation}}
+	return s
+}
+
+func StartedResultExample() plan.SavePlanResult {
+	return plan.SavePlanResult{Skipped: []plan.SkippedSession{{Date: "2026-10-26", StartTime: "20:30", Reason: plan.SkipStarted}}}
+}

@@ -116,8 +116,11 @@ GET /api/v1/plan?from=2026-10-26&to=2026-11-01
 
 ### `PUT /api/v1/plan`
 Declarative range replace for `[from, to]` (today-or-later open sessions become
-exactly the given set; past and completed sessions are frozen and returned in
-`skipped`). Optional `Idempotency-Key` header. Body is a `SavePlanRequest`.
+exactly the given unstarted set; past and completed sessions are frozen and returned in
+`skipped`). A session with any study record is also protected: identical input is
+`unchanged`, changed input is `skipped` with `reason=started`, and omission retains
+it. Past/completed reasons take priority. Optional `Idempotency-Key` header.
+Body is a `SavePlanRequest`.
 
 ```
 PUT /api/v1/plan
@@ -200,3 +203,120 @@ audit row). Returns the updated session view.
 ### `DELETE /api/v1/sessions/{id}/complete`
 Undo completion, under the same rules. Returns the updated session view
 (`completed: false`).
+
+<!-- study-contract:start -->
+## Çalışma durumu ve yer imini okuma
+
+SessionView\.study opsiyonel, salt okunur çalışma bağlamıdır: status=active/paused/closed, first\_started\_at/last\_started\_at/updated\_at (UTC), entry\_mode=normal/ten\_minutes ve version\. bookmark varsa item\_ordinal (sıfır tabanlı), stage (akşam: konu/soru/yanlis\_defteri; diğer: calisma), resume\_page, çözülmüş item ve notation içerir\. resume\_page devam edilecek kitap sayfasıdır; yarım sayfa aynı kalır, otomatik \+1 yapılmaz\. Yanlış defteri aşamasında da kitap sayfasıdır\. Yer imi yoksa uydurma; study yokluğu hiç çalışılmadığını kanıtlamaz\. SessionState planned/today/done/missed/moved değişmez; geçmiş kısmi emeği ayrıca study üzerinden oku\. GET /api/v1/today active\_study ve latest\_paused\_study ile tarih dışındaki devam bağlamını da sunar; aktif önceliklidir, yarım işe dönüş açık seçimdir, bugünün planı korunur\. get\_plan yalnız istenen aralığı döndürür; gerekirse geçmiş aralığı da oku\. Yeni çalışma yazma REST endpoint'i veya MCP aracı yoktur\. Kısmi sayfa ve ten\_minutes hedefi ilerlemeyi artırmaz; done\_min tamamlanan seansların planlı süresidir, ölçülmüş süre veya öğrenme yüzdesi değildir\. Telafi bağlantısı yer imini veya tamamlamayı otomatik taşımaz; eski ve telafi ayrı tamamlanırsa mevcut toplam ikisini de sayar\.
+
+26 Ekim 2026 tarihli temsili okuma → yazma → tekrar okuma örneği; gerçek kullanıcı planı değildir\. Önce ajan rehberini, outline, ilgili get\_plan / GET /api/v1/plan aralığını ve ilerlemeyi okuyun\. Aşağıda yarım kalmış örnek seansın okuma yanıtı var\.
+
+```json
+{
+  "study": {
+    "status": "paused",
+    "first_started_at": "2026-10-26T17:30:00Z",
+    "last_started_at": "2026-10-26T17:30:00Z",
+    "updated_at": "2026-10-26T17:40:00Z",
+    "entry_mode": "ten_minutes",
+    "version": 2,
+    "bookmark": {
+      "item_ordinal": 0,
+      "stage": "soru",
+      "resume_page": 5,
+      "item": {
+        "book": "M1",
+        "chapter_no": 1,
+        "chapter_title": "Temel kavramlar",
+        "page_from": 1,
+        "page_to": 10
+      },
+      "notation": "M1·1, s. 1–10"
+    }
+  },
+  "id": 1,
+  "date": "2026-10-26",
+  "start_time": "20:30",
+  "duration_min": 90,
+  "kind": "aksam",
+  "completed": false,
+  "state": "today",
+  "topic_group_key": "temel",
+  "topic_group_name": "Temel kavramlar",
+  "items": [
+    {
+      "book": "M1",
+      "chapter_no": 1,
+      "chapter_title": "Temel kavramlar",
+      "page_from": 1,
+      "page_to": 10
+    }
+  ],
+  "notation": "M1·1, s. 1–10"
+}
+```
+
+Plan yazarken study ve diğer okuma alanlarını göndermeyin\. Başlanmış seansın items, date, start\_time ve duration\_min değerlerini koruyun: aynı içerik unchanged, değiştirme denemesi skipped reason=started, istekten eksikse korunur\. past\_date ve completed nedenleri önceliklidir\. Örnekte duration\_min=100 yapmayı deneyen eski bir istemci aşağıdaki sonucu alır; seans 90 dakika ve yer imi aynı kalır\.
+
+```json
+{
+  "created": null,
+  "updated": null,
+  "deleted": null,
+  "unchanged": null,
+  "skipped": [
+    {
+      "date": "2026-10-26",
+      "start_time": "20:30",
+      "reason": "started"
+    }
+  ]
+}
+```
+
+Bu sonucu başarıyla uygulanmış değişiklik saymayın\. Yazdıktan sonra aynı aralığı ve ilerlemeyi tekrar okuyun; seansın süre, kaynak ve yer iminin korunduğunu doğrulayıp atlanan değişikliği kullanıcıya açıklayın\. Telafi gerekiyorsa kaynak geçmiş seansı değiştirmeden makeup\_of ile ayrı seans hazırlayın; yer imi otomatik taşınmaz\.
+
+Mevcut complete\_session ve REST tamamlama/geri alma çağrıları ek alan istemez: tamamla mevcut study durumunu atomik closed yapar; geri al yer imini koruyup paused yapar\. Eski seans için çalışma kaydı oluşturmaz\. Bu REST/MCP yazmaları study\.version denetlemez; eski sekme niyeti tespit edilemez\.
+
+<!-- study-contract:end -->
+
+<!-- planning-inputs:start -->
+## Plan için kaynaklarını hazırla
+
+Materyalleri Workey'e bağlı asistanına ver\. Workey dosya yüklemez, PDF saklamaz veya OCR yapmaz; asistanın görmediği özel bir kaynağı okuduğunu varsayma\.
+
+- Her kitabın adı, kitap kodu ve baskısı; okunaklı içindekiler ve bölüm sırası\.
+- Gerekli örnek sayfalar veya erişebildiğin PDF; basılı sayfa numarası ile PDF görüntüleyicisinin sayfa sırası arasındaki fark\.
+- Doğrulanabilen bölüm ve sayfa aralıkları; varsa konu, soru ve antrenman aralıkları\. Eksik referansı asistana sor; tahminle doldurtma\.
+- Mevcut seviye, bitirilen bölümler, hedef, uygun gün ve saatler, dinlenme ve diğer zaman kısıtları\.
+
+İlk haftadan sonra gerçek temponu ve yükün uygunluğunu asistana anlat\. Açık sekme süresi veya başlangıç hedefi çalışma süresi sayılmaz\.
+
+## İsteğe bağlı: ilk haftayla başla
+
+Sınava kadar plan oluşturma istemi kullanılabilir\. Alternatif olarak ilk haftayı ayrıntılı, uzak dönemi yalnız kaba kapsam olarak konuşabilirsin\. Uzak dönem için doğrulanmamış sayfa veya seans yazılmaz\. Kopyalama planı değiştirmez; asistan önce okur, yazdıktan sonra yeniden okuyarak doğrular\.
+
+```
+Workey bağlantısıyla önce get_agent_guide (REST: GET /api/v1/agent-guide), get_outline, ilgili get_plan ve get_progress eşdeğerlerini oku. Güncel today, timezone ve exam_date değerlerini esas al.
+Hedefim/seviyem: [doldur]. Uygun gün ve saatlerim: [doldur]. Doğrulanabilir kitap/baskı/içindekiler/sayfa kaynaklarım: [asistana ver].
+İlk haftayı ayrıntılı, uzak dönemi kaba kapsam olarak birlikte hazırlayalım. Eksik bölüm veya sayfa referansı uydurma; eksikleri sor ve yanıtımı bekle. Uzak dönem için doğrulanmamış seans yazma. İlk uygulama haftasından sonra gerçek tempomu ve yükü bana sor; açık kalma zamanından süre hesaplama.
+Yazılacak aralığı ve korunacak kayıtları benimle netleştir. Yazmadan hemen önce outline, ilgili plan ve study/yer imini yeniden oku. save_outline faz ve grupların, save_plan aralıktaki başlanmamış açık seansların TAM listesini değiştirir; eksik açık seanslar silinir. Korunacak kayıtları tüm kaynaklarıyla dahil et. Geçmiş, tamamlanmış ve başlanmış seansları koru; başlanmış seansın kaynak/tarih/saat/süresini değiştirme. Telafi bağlantılarını koru.
+Her yazma sonucunda created/updated/deleted/unchanged/skipped listelerini incele. skipped reason=started dahil atlanan değişikliği başarı sayma; hata veya belirsizlikte dur, körlemesine tekrar yazma. İlgili aralığı, outline ve ilerlemeyi yeniden okuyup doğrula; kalan kapsamı bildir. Planlama sırasında seans tamamlama çağrısı yapma.
+```
+
+## Ara sonrası planı yeniden değerlendir
+
+Bu istemi kopyalayıp Workey'e bağlı asistanına gönder\. Yer imi sunucudan okunur; kimlik veya token ekleme\. Kopyalama plan yazmaz ve eski işi otomatik bugüne taşımaz\. Asistan okuma → yazma → yeniden okuma sırasını izler\.
+
+```
+Workey bağlantısıyla ara sonrası planımı değerlendirelim.
+Gerçek tempom, uygun zamanım ve değişen koşullarım: [doldur]. Eksik kaynaklarım veya henüz çalışmadığım kapsam: [bildiğimi yazacağım; eksikleri bana sor].
+Önce get_agent_guide (REST: GET /api/v1/agent-guide) ile today, timezone ve exam_date değerlerini oku. Sınav geçmişse yazmadan hedefi benimle netleştir. get_outline, ilgili geçmiş/bugün/gelecek get_plan aralıkları ve get_progress eşdeğerlerini oku; büyük aralıkları haftalara böl.
+study durumunu, yer iminin kitap/bölüm/aşama/resume_page değerlerini ve makeup_of/moved_to ilişkilerini incele. Yer imi devam edeceğim sayfadır; otomatik +1 yapma veya telafiye kopyalama. Kısmi çalışmayı tamamlanmış ya da ölçülmüş dakika sayma. Eski işi otomatik bugüne yükleme; eksik kapsamı ve yetişmeyecek işi benimle netleştir. Kitap/bölüm/sayfa uydurma; kaynak eksikse sor ve yanıtımı bekle.
+Yazmadan hemen önce ilgili aralığı yeniden oku. Her study kaydı begun/başlanmış kabul edilir: kaynak, tarih, start_time, duration_min ve items korunur. save_plan aralıktaki başlanmamış açık seansların TAM listesini değiştirir; listede bulunmayanlar silinir. Korunacak açık seansları tüm items ile dahil et; silme/değiştirme kararını benimle netleştir. Geçmiş, tamamlanmış ve başlanmış seansları koru. Outline değişirse korunacak faz ve grupları da içeren tam listeyi gönder; kullanılan grupları silme.
+Telafi gerekiyorsa kaynak seansı değiştirmeden makeup_of ile ayrı seans öner ve bağlantıyı doğrula. Eski seans ve telafisini otomatik tamamlamayacaksın; ikisini ayrı tamamlamak mevcut seans tabanlı toplamda ikisini de sayar, benzersiz içerik ölçmez.
+Okuma alanları id/state/completed/notation/study yazma gövdesine girmez; topic_group_key yazmada topic_group olur. Her save_plan sonucunun created/updated/deleted/unchanged/skipped listelerini incele; skipped reason=started dahil atlananları başarı sayma. Hata, belirsiz yazma veya doğrulanamayan sonuçta dur; kalan haftaları yazma. Tekrar denemeden önce oku; aynı gövde için aynı idempotency_key kullan.
+Yazdıktan sonra aynı get_plan aralığını, outline ve get_progress eşdeğerlerini yeniden oku. Yer iminin, korunacak kayıtların ve telafi ilişkilerinin korunduğunu doğrula; değişen ve eksik kalan kapsamı Türkçe bildir. Bu planlama sırasında complete_session veya REST tamamlama/geri alma çağrısı yapma.
+```
+
+<!-- planning-inputs:end -->

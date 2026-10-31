@@ -965,7 +965,7 @@ func usageBlockList(blocks []UsageBlock, level int, doc UsageDocument, key strin
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if block.ID == "exam-plan" {
+				if block.ID == "exam-plan" || block.ID == "first-week" || block.ID == "replan" {
 					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "<details class=\"usage-disclosure\"><summary>İstemin tamamını göster</summary><div class=\"usage-stack\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err

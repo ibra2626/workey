@@ -236,7 +236,7 @@ Density is moderate and glanceable. On the phone at 20:30 the first panel answer
 - Three zone colours, each bound to one session part; everything else is ink, greys and line.
 - Condensed tabular numerals for every figure; humanist sans for every sentence.
 - State is carried by fill and pattern (ink, hatch, ochre outline, line grey, 3px rest stub), never by badges.
-- One primary action per surface: the dark ink pill "Tamamlandı".
+- One primary action per surface: the dark ink pill “Çalışmaya geç” before starting, “Bitirdim · Seansı tamamla” during active work, or “Kaldığım yerden devam et” for paused work.
 
 ## Colors
 
@@ -328,6 +328,30 @@ Flat. Product surfaces carry no shadows; depth is tonal only: white panels on th
 Soft but not bubbly. Panels have generously rounded corners (14px). Chart bars are small rounded rectangles whose radius scales with their size: 2-3px in the dense 38-week strip, 4-5px in weekly bars and phase blocks, 6px for the desktop session-profile blocks. Rest days are a 3px fully rounded stub on the baseline. Desktop rail items use 8px corners; the primary button is a full pill. Legend swatches are 10-12px squares with 2px corners. Icons are stroked line drawings (1.8 stroke, round caps and joins) at 22px in the tab bar, 20px in the rail and button, 16px in tables.
 
 ## Components
+
+### Study flow (29 October 2026)
+
+Bugün starts with the exact source, stage and first page. “İlk 10 dakikayla başla” is a secondary link below the primary start button; it sets an entry target without a countdown or a changed plan duration. Active work takes priority over today's plan and keeps a “Bugünün planını gör” link; today's plan and older paused work remain sibling panels. This priority also applies on rest days and after the exam so closing/completing active work remains reachable.
+
+“Burada bıraktım” is a native disclosure containing labelled source/stage selects, a numeric-keyboard text input for the resume page, valid ranges and a full-width save action. The page means the next page to open, including the same page if unfinished; no automatic increment. Source/stage boundaries direct the user to the next stage/source or completion. Closing without a page is separate and preserves previous bookmarks.
+
+422/409 responses preserve submitted values and the original version. Feedback is focusable and receives focus after htmx swaps; failed input uses an alert, successful input a status. Requests show busy labels and restore controls after failure. Ordinary POST/redirect and full-page error paths remain available without scripts. Visible focus, reduced-motion rules and the existing flat palette apply; partial work adds no new status colour or badge.
+
+Hafta shows “Kısmen çalışıldı” plus resolved source/stage/resume page or the explicit no-bookmark fallback, with makeup context alongside it. Bugün/Hafta/İlerleme explain that totals are completed sessions' planned minutes; partial work and entry targets do not increase totals. This is not a measure of unique learned content. Browser acceptance evidence and unfinished checks are in `docs/study-flow-acceptance.md`.
+
+### Study room (30 October 2026)
+
+Active work turns the first Bugün panel into the study room, drawn as tonight's session schedule (direction “B · Seans çizelgesi”, chosen by the user from three mock-ups after the dark room and the large live profile were rejected). It stays a Card White panel.
+
+Left column: a label “Açık çalışma · {start} açıldı”, the chapter title (28px mobile, 32px desktop bold), the exact first step, then an ordered list with one row per stage: a 5px zone-colour bar, the real clock range in condensed numerals (from the actual start, moved back to the start of a bookmarked stage on resume), the stage name and its pages, and a right-aligned state. Finished rows turn their bar Forest Ink, dim the name to Moss Ink and say “✓ Bitti”; the current row takes Today Sand, appends “· şu an” and shows the elapsed minute as a 30px condensed numeral over “dk / 90”; upcoming rows show “N dk sonra” with the bar at .5 opacity. After the planned time a single plain sentence under the list says how far past it is; there is no large warning headline. Two actions follow on one row: the ink pill “Bitirdim · Seansı tamamla” and the “Burada bıraktım” guide control, whose disclosure holds the bookmark form and the text action “Çalışmayı kapat · sayfa girmeden”.
+
+Right column (260px from 768px, divided by a hairline; stacked under the actions on phones with a 170px companion): the companion, then “Ortam sesi” with four guide-control chips in two columns (Kapalı, Kütüphane, Kafe, Yağmur), a volume range and the chime checkbox. The tab title reads “Soru · 36 dk kaldı · Workey”.
+
+Row states and the elapsed minute are computed in the browser from `last_started_at` (offset to the bookmarked stage) and never stored. A stage change updates the tab title, announces through a polite live region and, if enabled, rings a soft three-partial sine chime. The bookmark form preselects the live stage until the user touches it; stage is a set of pill radios, and a single-source session shows its source as text instead of a select.
+
+Ambient sound is synthesised with Web Audio (no files or third-party streams) and placed in a generated room reverb with stereo positions: **Kütüphane** (very low room tone; page riffles with paper crackle, one synced to the companion and others farther away; pencil writing; eraser rubs with a brush-off; whispered exchanges between the shelves; careful heel-toe footsteps passing from one side to the other; a book set down now and then), **Kafe** (low hubbub; four tables of distant formant-synthesised conversation with an occasional laugh; cups and saucers; spoon stirring; the bar's knock, grinder and milk steaming; a chair scrape) and **Yağmur** (a dark, soft wash through a window with sparse drops). Beds stay near silent and events are spaced tens of seconds apart (tuned down 30 October 2026 after “too much background sound”). Choice, volume and chime live in this browser's localStorage; audio starts only after a user gesture, passes a soft limiter and stops when the room closes. The companion is a flat SVG figure across the desk drawn in the Hairline greys with an ink desk and lamp shade and one warm light (`lamp` `#f2e4c4`), breathing slowly and turning a page every 16–42 seconds; reduced motion keeps it still. It never speaks, scores or reacts.
+
+Before starting, “Çalışmaya geç” (ink pill) and “İlk 10 dakikayla başla” (outlined pill) sit side by side with one sentence on what opens. Paused work shows the saved place between hairlines with a bookmark icon before the resume action.
 
 ### Buttons
 Decisive and singular: one dark pill per surface.

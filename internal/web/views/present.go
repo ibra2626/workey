@@ -25,22 +25,26 @@ const enDash = "–"
 // figures the header and stat tiles need (the service computes them on the Week
 // and Progress read models).
 type TodayPage struct {
-	Day            *plan.DayView
-	Week           *plan.WeekView // this week, for the desktop "Bu hafta" mini chart
-	HasPlan        bool
-	WeekNumber     int    // plan week 1..38, 0 outside the plan
-	PhaseName      string // full phase name, e.g. "Faz 1 · İşlem temeli"
-	DaysToExam     int
-	AfterExam      bool
-	HasExam        bool
-	ExamDate       string // "18 Temmuz 2027" for the desktop rail
-	WeekDoneMin    int
-	WeekPlannedMin int
-	SessionsDone   int
-	SessionsPlan   int
-	PhaseLabel     string       // "Faz 1 · İşlem temeli · Antrenmanlarla Matematik 1" style line
-	PhaseBlocks    []PhaseBlock // current phase week blocks (desktop)
-	CSRF           string
+	Day             *plan.DayView
+	Week            *plan.WeekView // this week, for the desktop "Bu hafta" mini chart
+	HasPlan         bool
+	WeekNumber      int    // plan week 1..38, 0 outside the plan
+	PhaseName       string // full phase name, e.g. "Faz 1 · İşlem temeli"
+	DaysToExam      int
+	AfterExam       bool
+	HasExam         bool
+	ExamDate        string // "18 Temmuz 2027" for the desktop rail
+	WeekDoneMin     int
+	WeekPlannedMin  int
+	SessionsDone    int
+	SessionsPlan    int
+	PhaseLabel      string       // "Faz 1 · İşlem temeli · Antrenmanlarla Matematik 1" style line
+	PhaseBlocks     []PhaseBlock // current phase week blocks (desktop)
+	CSRF            string
+	StudyFeedback   string
+	StudyInvalid    bool
+	StudyPeriodOpen bool
+	StudyInput      *StudyFormInput
 }
 
 // PhaseBlock is one week block of the current phase panel on desktop Bugün.
@@ -390,6 +394,12 @@ func barClass(b volumeBar) string {
 // statusWord renders a session's status for the Hafta table and list, e.g.
 // "Tamamlandı", "Cumartesiye taşındı", "Bugün 20:30", "Planlı".
 func statusWord(sv plan.SessionView) string {
+	if partialStudy(sv) {
+		if sv.MovedTo != nil {
+			return "Kısmen çalışıldı · " + sv.MovedTo.Date + " · " + weekdayDative(sv.MovedTo.Weekday) + " taşındı"
+		}
+		return "Kısmen çalışıldı"
+	}
 	switch sv.State {
 	case plan.StateDone:
 		return "Tamamlandı"
@@ -426,6 +436,9 @@ func rowName(sv plan.SessionView) string {
 // rowMeta renders the mobile week-row meta line: the page span and a status
 // detail, e.g. "s. 41–58 · bugün 20:30", "s. 23–40 · cumartesiye taşındı".
 func rowMeta(sv plan.SessionView) string {
+	if partialStudy(sv) {
+		return statusWord(sv)
+	}
 	pages := headPages(sv)
 	detail := ""
 	switch sv.State {
@@ -471,10 +484,12 @@ func sureCell(sv plan.SessionView) string {
 }
 
 // rowActionable reports whether a row offers a mark-done / undo control: today,
-// past-done and past-missed rows do; future, planned-future, moved and rest
-// rows do not (DECISIONS: only today and past can be marked).
+// past-done and past-missed rows do, as do moved rows with retained study
+// context. Future and rest rows do not offer completion.
 func rowActionable(sv plan.SessionView) bool {
 	switch sv.State {
+	case plan.StateMoved:
+		return sv.Study != nil
 	case plan.StateDone, plan.StateToday, plan.StateMissed:
 		return true
 	default:
@@ -660,7 +675,7 @@ func completeForm(id int64, action string) templ.Attributes {
 		"hx-post":         url,
 		"hx-target":       "#bugun-main",
 		"hx-swap":         "outerHTML",
-		"hx-disabled-elt": "#bugun-main button",
+		"hx-disabled-elt": "#bugun-main button, #bugun-main input, #bugun-main select",
 		"hx-sync":         "#bugun-main:drop",
 		"data-session-id": strconv.FormatInt(id, 10),
 		"hx-request":      `{"timeout":20000}`,

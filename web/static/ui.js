@@ -35,18 +35,28 @@
   document.addEventListener("htmx:beforeRequest", (event) => {
     const form = event.detail.elt;
     const button = form.querySelector("button");
-    focusID = button?.matches(":focus-visible") ? form.dataset.sessionId : null;
+    focusID = form.contains(document.activeElement) || button?.matches(":focus-visible") ? form.dataset.sessionId : null;
     form.setAttribute("aria-busy", "true");
     start("Değişiklik kaydediliyor…");
+  });
+
+  document.addEventListener("htmx:beforeSwap", (event) => {
+    const xhr = event.detail.xhr;
+    if (xhr.getResponseHeader("X-Workey-Study-Form") === "true" && [409, 422].includes(xhr.status)) {
+      event.detail.shouldSwap = true;
+      event.detail.isError = false;
+    }
   });
 
   document.addEventListener("htmx:afterRequest", (event) => {
     event.detail.elt.removeAttribute("aria-busy");
     finish();
-    if (event.detail.failed || event.detail.xhr.status === 0) {
+    const handled = event.detail.xhr.getResponseHeader("X-Workey-Study-Form") === "true";
+    if (!handled && (event.detail.failed || event.detail.xhr.status === 0)) {
       const code = event.detail.xhr.status;
       showError(code === 401 || code === 403
         ? "Oturum doğrulanamadı. Sayfayı yenileyip tekrar giriş yapın."
+        : code === 409 ? "Çalışma başka bir sekmede değişti. Sayfayı yenileyip güncel durumu kontrol edin."
         : "İşlem doğrulanamadı. Bağlantınızı kontrol edip sayfayı yenileyin ve seansın durumunu kontrol edin.");
       if (focusID) event.detail.elt.querySelector("button")?.focus({ preventScroll: true });
       focusID = null;
@@ -56,7 +66,9 @@
   document.addEventListener("htmx:afterSettle", (event) => {
     const content = event.target;
     content.classList.add("content-updated");
-    if (focusID && (document.activeElement === document.body || content.contains(document.activeElement))) {
+    const feedback = content.querySelector("#study-feedback");
+    if (feedback) feedback.focus({ preventScroll: false });
+    if (!feedback && focusID && (document.activeElement === document.body || content.contains(document.activeElement))) {
       for (const form of content.querySelectorAll("form[data-session-id]")) {
         if (form.dataset.sessionId === focusID && form.getClientRects().length) {
           form.querySelector("button")?.focus({ preventScroll: true });
@@ -65,7 +77,7 @@
       }
     }
     focusID = null;
-    if (status) status.textContent = content.querySelector(".completion-status")
+    if (status) status.textContent = feedback ? feedback.textContent : content.querySelector(".completion-status")
       ? "Seans tamamlandı. İlerleme güncellendi." : "Seans ve ilerleme güncellendi.";
   });
 

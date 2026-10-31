@@ -109,6 +109,22 @@ func nullableArrays(v any) {
 					p["minimum"] = 1
 				case "chapter_title":
 					p["minLength"] = 1
+				case "status":
+					p["enum"] = []string{plan.StudyActive, plan.StudyPaused, plan.StudyClosed}
+				case "entry_mode":
+					p["enum"] = []string{plan.EntryNormal, plan.EntryTenMinutes}
+				case "stage":
+					p["enum"] = []string{plan.StageKonu, plan.StageSoru, plan.StageYanlisDefteri, plan.StageCalisma}
+				case "reason":
+					p["enum"] = []string{plan.SkipPastDate, plan.SkipCompleted, plan.SkipStarted}
+				case "item_ordinal":
+					p["minimum"] = 0
+				case "version", "resume_page":
+					p["minimum"] = 1
+				case "first_started_at", "last_started_at", "updated_at":
+					p["format"] = "date-time"
+				case "study":
+					p["readOnly"] = true
 				case "state":
 					p["enum"] = []string{"planned", "today", "done", "missed", "moved"}
 				}

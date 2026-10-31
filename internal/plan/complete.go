@@ -20,22 +20,27 @@ const (
 // idempotent: completing an already-completed session changes nothing and
 // writes no audit row. Every real change is audited with its source and
 // before/after JSON.
-func (s *Service) Complete(ctx context.Context, source Source, sessionID int64) (*SessionView, error) {
-	return s.setCompletion(ctx, source, sessionID, true)
+// An optional expected study version protects web writes. Omitting it keeps
+// legacy REST/MCP behavior: those clients cannot detect stale study intent.
+func (s *Service) Complete(ctx context.Context, source Source, sessionID int64, expectedStudyVersion ...int64) (*SessionView, error) {
+	return s.setCompletion(ctx, source, sessionID, true, expectedStudyVersion)
 }
 
 // Undo clears a session's completion, under the same today-or-past rule and the
 // same idempotency and audit guarantees as Complete. Undoing a session that is
 // not completed changes nothing and writes no audit row.
-func (s *Service) Undo(ctx context.Context, source Source, sessionID int64) (*SessionView, error) {
-	return s.setCompletion(ctx, source, sessionID, false)
+func (s *Service) Undo(ctx context.Context, source Source, sessionID int64, expectedStudyVersion ...int64) (*SessionView, error) {
+	return s.setCompletion(ctx, source, sessionID, false, expectedStudyVersion)
 }
 
 // setCompletion is the shared body of Complete (done=true) and Undo
 // (done=false).
-func (s *Service) setCompletion(ctx context.Context, source Source, sessionID int64, done bool) (*SessionView, error) {
+func (s *Service) setCompletion(ctx context.Context, source Source, sessionID int64, done bool, expected []int64) (*SessionView, error) {
 	if !source.valid() {
 		return nil, fmt.Errorf("plan: invalid source %q", source)
+	}
+	if len(expected) > 1 || (len(expected) == 1 && expected[0] < 0) {
+		return nil, fieldError("expected_study_version", CodeInvalid, "geçersiz çalışma sürümü")
 	}
 	today := clock.Today(s.clk).String()
 	now := s.nowUTC()
@@ -52,6 +57,22 @@ func (s *Service) setCompletion(ctx context.Context, source Source, sessionID in
 		if ss.Date > today {
 			return fieldError("session_id", CodeFuture, "a future session cannot be marked")
 		}
+		study, err := s.st.StudyBySession(ctx, tx, sessionID)
+		if err != nil {
+			return err
+		}
+		alreadyDone := ss.CompletedAt != nil
+		same := done == alreadyDone
+		if study != nil {
+			wanted := StudyPaused
+			if done {
+				wanted = StudyClosed
+			}
+			same = same && study.Status == wanted
+		}
+		if len(expected) == 1 && !studyVersionMatches(study, expected[0], same) {
+			return ErrStudyConflict
+		}
 
 		tgName, tgKey, err := s.topicGroupNamesTx(ctx, tx)
 		if err != nil {
@@ -62,10 +83,10 @@ func (s *Service) setCompletion(ctx context.Context, source Source, sessionID in
 			return err
 		}
 
-		alreadyDone := ss.CompletedAt != nil
 		if done == alreadyDone {
 			// No-op: already in the requested state. No write, no audit row.
 			sv := buildSessionView(*ss, today, movedBy, tgName, tgKey)
+			attachStudy(&sv, study, ss.Items)
 			view = &sv
 			return nil
 		}
@@ -89,6 +110,21 @@ func (s *Service) setCompletion(ctx context.Context, source Source, sessionID in
 		if err := s.st.SetSessionCompletion(ctx, tx, ss.ID, ss.CompletedAt, ss.CompletedSource, now); err != nil {
 			return err
 		}
+		if study != nil {
+			beforeStudy := *study
+			study.Status = StudyPaused
+			if done {
+				study.Status = StudyClosed
+			}
+			study.UpdatedAt = now
+			study.Version++
+			if err := s.st.UpdateStudy(ctx, tx, study); err != nil {
+				return err
+			}
+			if err := s.auditStudy(ctx, tx, source, action, &beforeStudy, study); err != nil {
+				return err
+			}
+		}
 
 		after, err := snapshotJSON(*ss)
 		if err != nil {
@@ -99,6 +135,7 @@ func (s *Service) setCompletion(ctx context.Context, source Source, sessionID in
 		}
 
 		sv := buildSessionView(*ss, today, movedBy, tgName, tgKey)
+		attachStudy(&sv, study, ss.Items)
 		view = &sv
 		return nil
 	})
