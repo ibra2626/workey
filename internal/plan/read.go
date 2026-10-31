@@ -34,6 +34,8 @@ type MovedInfo struct {
 // SessionView is a session prepared for a screen: its stored fields, its derived
 // state, the resolved topic-group name and the canonical item notation.
 type SessionView struct {
+	Study          *StudyView   `json:"study,omitempty" jsonschema:"Optional read-only study context. Absence is not proof of no work. Partial work does not count as completion."`
+	StudyVersion   int64        `json:"-"` // internal web form concurrency token
 	ID             int64        `json:"id"`
 	Date           string       `json:"date"`
 	StartTime      string       `json:"start_time"`
@@ -51,13 +53,15 @@ type SessionView struct {
 // DayView is the Bugün model for one date: the day's sessions, tomorrow's first
 // session and the week's generated note lines.
 type DayView struct {
-	Date     string        `json:"date"`
-	Weekday  string        `json:"weekday"` // "Çarşamba"
-	Heading  string        `json:"heading"` // "Çarşamba, 28 Ekim"
-	IsRest   bool          `json:"is_rest"` // no sessions this day
-	Sessions []SessionView `json:"sessions"`
-	Tomorrow *SessionView  `json:"tomorrow,omitempty"`
-	Notes    []string      `json:"notes"`
+	ActiveStudy       *SessionView  `json:"active_study,omitempty" jsonschema:"Currently active work, even outside this date; takes priority without changing its schedule."`
+	LatestPausedStudy *SessionView  `json:"latest_paused_study,omitempty" jsonschema:"Most recently paused work, even outside this date. Resuming is an explicit choice; today remains visible. May have moved_to."`
+	Date              string        `json:"date"`
+	Weekday           string        `json:"weekday"` // "Çarşamba"
+	Heading           string        `json:"heading"` // "Çarşamba, 28 Ekim"
+	IsRest            bool          `json:"is_rest"` // no sessions this day
+	Sessions          []SessionView `json:"sessions"`
+	Tomorrow          *SessionView  `json:"tomorrow,omitempty"`
+	Notes             []string      `json:"notes"`
 }
 
 // DayRow is one day inside a WeekView, rest days included.
@@ -132,14 +136,27 @@ type ProgressView struct {
 // Day returns the Bugün model for date. State is always derived against the
 // clock's "today", so Day can be read for any date.
 func (s *Service) Day(ctx context.Context, date clock.Date) (*DayView, error) {
-	today := clock.Today(s.clk).String()
-	db := s.st.DB()
-
-	tgName, tgKey, err := s.topicGroupNames(ctx, db)
+	var view *DayView
+	err := s.st.WithTx(ctx, func(tx *sql.Tx) error {
+		var err error
+		view, err = s.dayTx(ctx, date, tx)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
-	movedBy, err := s.movedByMissed(ctx, db)
+	return view, nil
+}
+
+// Read each form's session state and study version from the same snapshot.
+func (s *Service) dayTx(ctx context.Context, date clock.Date, db *sql.Tx) (*DayView, error) {
+	today := clock.Today(s.clk).String()
+
+	tgName, tgKey, err := s.topicGroupNamesTx(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	movedBy, err := s.movedByMissedTx(ctx, db)
 	if err != nil {
 		return nil, err
 	}
@@ -154,8 +171,14 @@ func (s *Service) Day(ctx context.Context, date clock.Date) (*DayView, error) {
 		Heading: FormatDayHeading(date.String()),
 		IsRest:  len(daySessions) == 0,
 	}
+	studies, err := s.st.StudiesByDateRange(ctx, db, date.String(), addDays(date, 1).String())
+	if err != nil {
+		return nil, err
+	}
 	for _, ss := range daySessions {
-		view.Sessions = append(view.Sessions, buildSessionView(ss, today, movedBy, tgName, tgKey))
+		sv := buildSessionView(ss, today, movedBy, tgName, tgKey)
+		attachStudy(&sv, studies[ss.ID], ss.Items)
+		view.Sessions = append(view.Sessions, sv)
 	}
 
 	tomorrow := addDays(date, 1)
@@ -165,6 +188,7 @@ func (s *Service) Day(ctx context.Context, date clock.Date) (*DayView, error) {
 	}
 	if len(tomSessions) > 0 {
 		sv := buildSessionView(tomSessions[0], today, movedBy, tgName, tgKey)
+		attachStudy(&sv, studies[tomSessions[0].ID], tomSessions[0].Items)
 		view.Tomorrow = &sv
 	}
 
@@ -174,19 +198,45 @@ func (s *Service) Day(ctx context.Context, date clock.Date) (*DayView, error) {
 		return nil, err
 	}
 	view.Notes = noteLines(weekSessions, movedBy)
+	studyContext, err := s.readStudyContextTx(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	resolve := func(entry *StudyContextEntry) *SessionView {
+		if entry == nil {
+			return nil
+		}
+		sv := buildSessionView(entry.Session, today, movedBy, tgName, tgKey)
+		attachStudy(&sv, &entry.Study, entry.Session.Items)
+		return &sv
+	}
+	view.ActiveStudy = resolve(studyContext.Active)
+	view.LatestPausedStudy = resolve(studyContext.LatestPaused)
 	return view, nil
 }
 
 // Week returns the Hafta model for the Monday–Sunday week containing date.
 func (s *Service) Week(ctx context.Context, date clock.Date) (*WeekView, error) {
-	today := clock.Today(s.clk).String()
-	db := s.st.DB()
-
-	tgName, tgKey, err := s.topicGroupNames(ctx, db)
+	var view *WeekView
+	err := s.st.WithTx(ctx, func(tx *sql.Tx) error {
+		var err error
+		view, err = s.weekTx(ctx, date, tx)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
-	movedBy, err := s.movedByMissed(ctx, db)
+	return view, nil
+}
+
+func (s *Service) weekTx(ctx context.Context, date clock.Date, db *sql.Tx) (*WeekView, error) {
+	today := clock.Today(s.clk).String()
+
+	tgName, tgKey, err := s.topicGroupNamesTx(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	movedBy, err := s.movedByMissedTx(ctx, db)
 	if err != nil {
 		return nil, err
 	}
@@ -194,6 +244,10 @@ func (s *Service) Week(ctx context.Context, date clock.Date) (*WeekView, error) 
 	start := clock.WeekStart(date)
 	end := addDays(start, 6)
 	sessions, err := s.st.SessionsByDateRange(ctx, db, start.String(), end.String())
+	if err != nil {
+		return nil, err
+	}
+	studies, err := s.st.StudiesByDateRange(ctx, db, start.String(), end.String())
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +272,9 @@ func (s *Service) Week(ctx context.Context, date clock.Date) (*WeekView, error) 
 			IsRest:       len(byDate[ds]) == 0,
 		}
 		for _, ss := range byDate[ds] {
-			row.Sessions = append(row.Sessions, buildSessionView(ss, today, movedBy, tgName, tgKey))
+			sv := buildSessionView(ss, today, movedBy, tgName, tgKey)
+			attachStudy(&sv, studies[ss.ID], ss.Items)
+			row.Sessions = append(row.Sessions, sv)
 		}
 		view.Days = append(view.Days, row)
 	}
@@ -364,23 +420,35 @@ func (s *Service) Progress(ctx context.Context, examDate clock.Date) (*ProgressV
 // derived state, resolved topic-group names and item notation, ordered by date
 // then start time. It backs GET /api/v1/plan.
 func (s *Service) Range(ctx context.Context, from, to clock.Date) ([]SessionView, error) {
-	today := clock.Today(s.clk).String()
-	db := s.st.DB()
-	tgName, tgKey, err := s.topicGroupNames(ctx, db)
+	var views []SessionView
+	err := s.st.WithTx(ctx, func(tx *sql.Tx) error {
+		today := clock.Today(s.clk).String()
+		tgName, tgKey, err := s.topicGroupNamesTx(ctx, tx)
+		if err != nil {
+			return err
+		}
+		movedBy, err := s.movedByMissedTx(ctx, tx)
+		if err != nil {
+			return err
+		}
+		sessions, err := s.st.SessionsByDateRange(ctx, tx, from.String(), to.String())
+		if err != nil {
+			return err
+		}
+		studies, err := s.st.StudiesByDateRange(ctx, tx, from.String(), to.String())
+		if err != nil {
+			return err
+		}
+		views = make([]SessionView, 0, len(sessions))
+		for _, ss := range sessions {
+			sv := buildSessionView(ss, today, movedBy, tgName, tgKey)
+			attachStudy(&sv, studies[ss.ID], ss.Items)
+			views = append(views, sv)
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
-	}
-	movedBy, err := s.movedByMissed(ctx, db)
-	if err != nil {
-		return nil, err
-	}
-	sessions, err := s.st.SessionsByDateRange(ctx, db, from.String(), to.String())
-	if err != nil {
-		return nil, err
-	}
-	views := make([]SessionView, 0, len(sessions))
-	for _, ss := range sessions {
-		views = append(views, buildSessionView(ss, today, movedBy, tgName, tgKey))
 	}
 	return views, nil
 }

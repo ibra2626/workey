@@ -1,99 +1,111 @@
-# CURRENT — WKY-20 implemented; zoom acceptance pending
+# CURRENT — Study room on Bugün done; SF-06 next
 
-Updated 2026-10-27.
-Active task: .agent/work/workey-v1/tasks/WKY-20.md
-Next: verify actual 200% browser zoom; then close WKY-20. WKY-12 Linux deployment remains held by the user's explicit instruction.
+Updated 2026-10-30.
+Active task: .agent/work/study-flow/tasks/SF-05.md
+Next: SF-06 integration/visual acceptance (now including the study room) and
+product docs. WKY-20 actual 200% zoom acceptance pending; WKY-12 deployment held.
 
-## Objective and result
+## Study room B · Seans çizelgesi — 2026-10-30 (latest)
 
-API/MCP usage pages now use Workey's existing palette, Barlow typography,
-sibling white panels and spacing. Shared content/Markdown source retained.
-Stable section fragments and responsive contents navigation added. Client
-selector moved into MCP connection setup; switching preserves #connect.
-Long exam prompt is in a closed preview with an external copy button and visible
-replacement warning. API first read precedes reference; read/write/re-read flow
-and replacement warning grouped. Code blocks have language labels, copy controls
-and local scrolling. Copy fallback reveals closed ancestors, selects textarea or
-code Range, focuses it and reports failure honestly. All prompt labels now use
-İstemi kopyala. No backend/auth/API/MCP contract change.
+User picked mock-up B. studyRoom (study.templ) now: label/title/first step, one
+row per stage (roomRows in study.go: real clock ranges from last_started_at minus
+bookmark offset, pages), states Bitti / şu an + minute / N dk sonra set by
+room.js, plain over-time sentence, Bitirdim + Burada bıraktım; side column with
+companion and sound chips. Removed profile/needle/axis, roomStage/roomTicks/
+roomTenPct, header sound menu. Checks: templ, Tailwind, build (CGO off too),
+vet, gofmt, go test ./internal/web/... (91) passed; IAB 1440/375 states, 179-min
+over-time and no console errors. Mock-ups: scratchpad oda-alternatifleri.html.
+Follow-up: header no longer shows the phase name (only "Hafta N / 38"); topic line
+"Konu: <topic group> · <book>, N. bölüm" (studyTopic) under the room/paused title
+and "Konu: ..." on the plan panel; desktop phase panel label is now
+"Bu dönemin haftaları · H1–H7". web tests passed; IAB checked.
 
-## Active paths
+## Plan screen — 2026-10-31 (calendar)
 
-- internal/web/views/usage.templ and generated usage_templ.go
-- internal/web/views/usage_document.go, usage_content.go, usage_document_test.go
-- web/styles/input.css, web/static/app.css, web/static/copy.js
-- docs/api.md, docs/mcp.md, docs/usage-verification.md (detailed WKY-20 evidence)
-- .agent/work/workey-v1/TASKS.md and tasks/WKY-20.md
+GET /plan ("Plan" in rail + mobile tab bar, 5 tabs, icon i-plan). Per user, the
+plan is a wide month calendar: plan.Service.Overview (internal/plan/overview.go,
+phases with start/end, weeks, sessions, today) → views/planpage.go planMonths
+(Mon-first grids) → planpage.templ: phase summary, month strip (?ay=YYYY-MM,
+prev/next, default today's month; planCalendar), legend, ONE month panel,
+session chips by state; hover/focus opens a wide detail (day, phase, kind/time,
+chapter, notation, Konu, konu/soru/yanlış split, state) that grows out of the
+cell via clip-path (CSS only, flat ink border, no shadow); phones: tap opens a
+sheet above the tab bar. CSS .plan-*/.cal-* in input.css. Tests:
+internal/web/plan_test.go; usage_test expects grid-cols-5. Checks: templ,
+Tailwind, build, vet, gofmt, go test ./internal/web/... ./internal/plan/...
+passed; IAB 375/900/1440 no overflow, focus opens/closes detail, no console
+errors. Not checked: real mouse hover visually (pane screenshots timed out).
 
-## Verification
+## Study room simplification + sounds — 2026-10-30
 
-Go 1.27.3: templ and Tailwind generation; focused web/views/apidoc tests;
-normal and CGO_ENABLED=0 builds; vet; gofmt (empty); diff whitespace check pass.
-Regression covers stable valid fragments/unique IDs, exact code targets, client
-selector placement, closed prompt preview and shared prompt/Markdown content.
-Existing auth/no-store/OpenAPI parity tests pass. Layout detector: no findings.
+Room now has one header sound menu (Kapalı/Kütüphane/Kafe/Yağmur, volume, chime)
+and two actions (Bitirdim pill, Burada bıraktım outlined pill; close-without-page
+inside the disclosure). Fullscreen and in-room plan link removed. room.js sound
+engine rewritten: convolver room, panning, formant murmur/whispers, footsteps,
+eraser, pencil, paper riffles, café cups/stir/grinder/steam/chairs. Checks:
+node --check, templ, Tailwind, go build, gofmt, go test ./internal/web/...
+passed; IAB 1440/375 layout, menu, Escape; café/library ran ~30s each at volume
+0 without console errors. Then, per user, beds/reverb/chatter cut (café 2 tables),
+events spaced out, rain darker and sparser. Audible quality NOT verified.
 
-Rendered initial/final states compared with Today/Week/Progress using disposable
-sample fixtures. IAB matrix: 320x844, 390x844, 1280x800; three MCP clients x two
-views plus API views. No page overflow (305/375/1265px document widths). Mobile
-end content clears fixed menu. Headings h1/h2/h3; 28px h1, 15px body; visible
-interactive guide targets >=44px; measured text contrast minimum 4.60:1.
-Keyboard navigation/client/view/disclosures and visible focus verified.
-30 clipboard targets matched source exactly after CRLF normalization (two full
-Markdowns, six prompts, 22 code snippets). Long prompt copied closed, 3945 chars.
-Injected Clipboard denial/absence: focus, full selection, opened prompt/Markdown,
-error status and reenabled controls correct. CSP script-src none: copy controls
-hidden; navigation/client/view/disclosures and real Ctrl+A/Ctrl+C work.
+## Study room — 2026-10-30 (first version, superseded by B)
 
-## Remaining acceptance and limits
+Room state (stage + elapsed minutes) is computed in web/static/room.js from
+last_started_at + bookmarked-stage offset; nothing new is stored. Ambient sound
+is Web Audio (prefs in localStorage); room.js loads on Bugün only. PRODUCT.md,
+DESIGN.md (Study room) and DECISIONS.md updated. Not verified: audible output on
+real speakers, Safari/iOS audio unlock, screen reader, full suite, govulncheck.
 
-Actual 200% browser zoom is NOT verified: IAB Ctrl+plus left innerWidth/DPR
-unchanged. Equivalent 640x400 reflow for 1280x800 passed on both guides without
-horizontal overflow, but is explicitly not claimed as actual zoom. WKY-20 stays
-in progress for this reason; application implementation is complete.
-No screen reader, other browser engines, full test suite or vulnerability rescan
-in this task. WKY-19 and earlier model-client acceptance limits remain recorded
-in docs/usage-verification.md. Impeccable document refresh completed on 2026-10-27;
-DESIGN.md and its v2 sidecar now capture current navigation, guide controls, inputs, actual breakpoints/easing and 10 self-contained component snippets. Token/narrative checks and desktop/mobile shadow-DOM previews passed. This separately requested documentation refresh does not close the pending actual-zoom acceptance.
+## SF-05 result — 2026-10-29
 
-## Handoff
+Week shows partial study, resolved source/stage/resume page, no-bookmark fallback
+and makeup relation; versioned finish/undo remain. Today/Week/Progress explain
+planned minutes of completed sessions, partial exclusion and separate original +
+makeup counting (no unique-content claim). Shared API/MCP source checklist and
+optional first-week/replan prompts use closed previews; exam prompt retained.
+Docs planning-inputs sections generated from shared content with parity tests.
+Go 1.27.3 focused web/views/plan/apidoc tests, templ/Tailwind, normal/CGO-off
+builds, vet, changed Go gofmt and diff whitespace passed. SQLite totals and real
+HTTP finish/undo bookmark regressions added. Pre-existing views/views.go format
+output untouched. No live browser/clipboard/zoom, full suite/race or govulncheck;
+SF-06 owns integrated acceptance. Same checkout/codex/study-flow-experiment;
+personal env/data and prior edits retained, no commit/push/merge/deploy.
+Receipt failed normally and elevated: specified SUBU Python/Atlas absent.
+Evidence: .agent/work/study-flow/tasks/SF-05.md.
+## SF-04 result — 2026-10-29
 
-Review screenshots are outside the repo in the chat visualization directory.
-Temporary test proxies and fixture servers stopped; task-owned proxy file removed.
-No personal .env/token/database/plan touched. User authorized committing and pushing WKY-20 and the design-document refresh on 2026-10-27. No PR or deployment requested.
-WKY-01..11,13..19 complete; WKY-12 held; WKY-20 zoom acceptance pending.
+Today now has authenticated/CSRF/versioned start and pause forms, normal/10-minute
+entry, a deterministic first page, active-first workspace, explicit old paused
+resume and today's plan access. Bookmark form prefills saved values, shows every
+source/stage range and next-stage/source/finish guidance; raw invalid input and
+its old version survive errors. No automatic page increment. Completion is one
+action without starting; existing versioned Complete/Undo retained. Rest/exam
+empty states cannot hide active close/complete. StudyPeriodOpen uses the same
+service bounds as StartStudy; partial work never changes completion totals.
+Htmx 422/409 feedback/focus and busy controls work; network failure preserves
+fields and restores controls. No-JS start/bookmark redirect; close explanation
+and errors render full pages. No timer/localStorage/interval added.
+Go 1.27.3 focused web/views/plan tests, templ + Tailwind 4.3.3, normal/CGO-off
+builds, vet, changed Go gofmt, JS syntax and diff whitespace passed. Actual SQLite
+close/reopen, independent auth sessions and all kinds covered. IAB: long Turkish
+multi-source first step/actions visible at 390x844; 320px open form and 1280px
+layout without overflow; keyboard focus, two-tab stale close, real dropped POST
+network failure and CSP script-src none lifecycle checked. Temporary fixture
+servers/source removed. Personal env/data untouched; SF-01..03 edits preserved.
+Same checkout/codex/study-flow-experiment; no commit/push/merge/deploy.
+No full suite/race/vulnerability rescan/screen reader/actual reduced-motion
+setting test; SF-06 integration acceptance stays separate. Evidence: SF-04.md.
+Beyin receipt failed in normal/elevated runs: specified SUBU Python/Atlas absent.
 
-## Follow-up — token setup and root README (2026-10-27)
+## Retained SF-01..03 results — 2026-10-29
 
-User requested explicit token acquisition instructions and basic project setup.
-Added README.md: prerequisites, clone/.env setup, separate random API token and
-session key generation, password hashing, run/health check, basic screens,
-MCP/API links, env precedence, SQLite backup, build and frontend tooling.
-Shared apiTokenSetup content now precedes client connection/first API read in
-both formatted and full Markdown guides. Clarified that tokens are operator
-created, Read-Host only inputs them, and existing installations reuse the active
-server token (process environment can override .env). .env.example and docs
-cross-link setup. No actual user environment/credentials/database changed.
-
-Passed focused web/views/apidoc tests. README PowerShell fences parsed; generation
-command executed twice with no files/settings written, distinct 32-byte Base64
-outputs confirmed without logging the values. README/guide generator text matches.
-IAB: 390px MCP and 1280px API token sections render without page overflow;
-code copy reports success and copies the 203-character generation command;
-manual Markdown Ctrl+A/Ctrl+C matched source. Full clipboard readback initially
-returned stale tool state; initializing the test clipboard then copying confirmed
-it changed to the code length. Preview fixtures stopped. No templ/CSS changes,
-no full install against personal .env, no commit/push for this follow-up.
-The earlier actual 200% zoom acceptance remains open.
-
-## Follow-up — supplied logo (2026-10-27)
-
-Integrated user-provided web/workey.png into the desktop rail and login screen
-through shared brandLogo markup. The original is preserved; an identical copy
-in web/static is embedded and cache-versioned with the application. An SVG
-viewport hides outer whitespace without changing image pixels or proportions;
-the accessible image name is Workey. Mobile study-page geometry is unchanged.
-Passed templ/Tailwind generation, focused web tests, normal and CGO-disabled
-builds, focused vet, gofmt and diff whitespace checks. Visually verified login
-at 390x844 and desktop rail at 1280x800 using a disposable render-only server;
-server stopped and temporary source removed. No commit/push or deployment.
+SF-01: 0002 session_study migration, store queries and atomic started-session
+SavePlan protection; normal/CGO-off builds and focused plan/store checks passed.
+SF-02: transactional StartStudy/PauseStudy/ReadStudyContext, single active,
+versions/idempotency/bookmark validation and lifecycle; versioned web completion,
+legacy unversioned API/MCP completion retained. Focused checks/builds passed.
+SF-03: optional SessionView.study and Day active/latest paused context; batched
+snapshot reads, atomic Complete/Undo output; OpenAPI/MCP/shared synthetic usage
+contract docs and parity tests. Focused plan/store/API/apidoc/MCP/web/views,
+vet/builds passed (MCP localhost elevated). Detailed evidence in tasks/SF-01.md,
+SF-02.md and SF-03.md. Receipt failed there too: runtime/Atlas absent.

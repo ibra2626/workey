@@ -104,17 +104,18 @@ type SessionRef struct {
 }
 
 // SkippedSession reports an incoming session that was not applied because it
-// targets a frozen slot (a past date or a completed session).
+// targets a frozen slot (past, completed, or changed after starting).
 type SkippedSession struct {
 	Date      string `json:"date"`
 	StartTime string `json:"start_time"`
-	Reason    string `json:"reason"` // machine code: past_date | completed
+	Reason    string `json:"reason" jsonschema:"past_date or completed take priority; started means a changed started session was preserved. Omitted started sessions are retained; identical ones are unchanged."` // machine code: past_date | completed | started
 }
 
 // Skip reason codes.
 const (
 	SkipPastDate  = "past_date"
 	SkipCompleted = "completed"
+	SkipStarted   = "started"
 )
 
 // SavePlanResult reports what a SavePlan call changed, grouped by disposition.

@@ -6,6 +6,55 @@ import (
 	"github.com/ibra2626/workey/internal/plan"
 )
 
+// outputSchema keeps additive study fields discoverable from tools/list. The
+// SDK infers the Go shape; enrich enum/bounds and preserve nil-slice wire values.
+func outputSchema[T any]() (*jsonschema.Schema, error) {
+	s, err := jsonschema.For[T](nil)
+	if err != nil {
+		return nil, err
+	}
+	var visit func(*jsonschema.Schema)
+	visit = func(s *jsonschema.Schema) {
+		if s == nil {
+			return
+		}
+		if s.Type == "array" {
+			s.Type = ""
+			s.Types = []string{"array", "null"}
+		}
+		for name, p := range s.Properties {
+			switch name {
+			case "status":
+				p.Enum = []any{plan.StudyActive, plan.StudyPaused, plan.StudyClosed}
+			case "entry_mode":
+				p.Enum = []any{plan.EntryNormal, plan.EntryTenMinutes}
+			case "stage":
+				p.Enum = []any{plan.StageKonu, plan.StageSoru, plan.StageYanlisDefteri, plan.StageCalisma}
+			case "reason":
+				p.Enum = []any{plan.SkipPastDate, plan.SkipCompleted, plan.SkipStarted}
+			case "item_ordinal":
+				p.Minimum = jsonschema.Ptr(0.0)
+			case "version", "resume_page":
+				p.Minimum = jsonschema.Ptr(1.0)
+			case "study":
+				p.ReadOnly = true
+			case "first_started_at", "last_started_at", "updated_at":
+				p.Format = "date-time"
+			}
+			visit(p)
+		}
+		visit(s.Items)
+		for _, d := range s.Defs {
+			visit(d)
+		}
+		for _, d := range s.AnyOf {
+			visit(d)
+		}
+	}
+	visit(s)
+	return s, nil
+}
+
 // Shared schema fragments. The patterns and enums mirror the plan service's
 // validation so an AI client can build a valid call from tools/list alone; the
 // service re-checks everything, so these are a convenience, not the guarantee.
@@ -64,7 +113,7 @@ func savePlanSchema() (*jsonschema.Schema, error) {
 	}
 	setProp(s, "idempotency_key", "Optional caller-chosen key. Repeating a request with the same key replays the first result; reusing a key with a different body is rejected.")
 
-	sessions := setProp(s, "sessions", "The complete set of open sessions for every date in [from, to]. Each date in range that is today or later is made to match exactly this set (by date + start_time): omitted open future sessions are deleted. Example: 2026-10-26.")
+	sessions := setProp(s, "sessions", "The complete set of open sessions for every date in [from, to]. Each date in range that is today or later is made to match exactly this set (by date + start_time): omitted unstarted open future sessions are deleted. Any study record protects the session: identical=unchanged, changed=skipped reason=started, omitted=retained. Past/completed reasons take priority. Example: 2026-10-26.")
 	enrichSessionSchema(itemsOf(sessions))
 
 	return s, nil

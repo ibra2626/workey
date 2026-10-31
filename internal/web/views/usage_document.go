@@ -192,6 +192,10 @@ func NewUsageDocument(key string, guide plan.AgentGuide) UsageDocument {
 			paragraph("Web sayfaları oturum çereziyle, MCP ve API ise Bearer token ile korunur. Web oturumu API tokenı yerine geçmez."),
 		))
 	}
+	if key == "mcp" || key == "api" {
+		doc.Blocks = append(doc.Blocks, planningInputSections()...)
+		doc.Blocks = append(doc.Blocks, studyContractSection())
+	}
 	doc.Blocks = append(doc.Blocks, namedSection("workflow", "Ajanın izleyeceği işlem sırası",
 		paragraph("Sunucu tarihi: "+guide.Today+" · "+guide.Timezone+" · Sınav: "+guide.ExamDate),
 		UsageBlock{Kind: UsageList, Ordered: true, Items: guide.Workflow},

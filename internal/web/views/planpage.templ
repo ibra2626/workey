@@ -1,0 +1,185 @@
+package views
+
+import (
+	"strconv"
+	"strings"
+
+	"github.com/ibra2626/workey/internal/plan"
+)
+
+// PlanScreen is the Plan screen: the whole saved plan as wide month
+// calendars. Hovering or focusing a day opens its detail panel, which grows
+// out of the cell; on phones a tap opens it as a sheet above the tab bar.
+templ PlanScreen(p PlanPage) {
+	@Layout(LayoutProps{Title: "Workey · Plan", Active: "plan", CSRF: p.CSRF, DaysToExam: p.DaysToExam, HasExam: p.HasExam}) {
+		<div id="plan-main">
+			<div class="flex items-baseline justify-between gap-4 px-1">
+				<h1 class="text-title-lg font-semibold text-ink md:text-headline md:font-bold">Plan</h1>
+				if p.WeekNumber > 0 {
+					<p class="text-meta text-ink-3 tnum md:text-body-small">Hafta { strconv.Itoa(p.WeekNumber) } / 38</p>
+				}
+			</div>
+			if !p.Overview.HasPlan {
+				<section class="mt-5 rounded-panel bg-card p-5 md:p-8">
+					<h2 class="text-title-lg font-semibold">Plan henüz yazılmadı.</h2>
+					<p class="mt-2 text-body text-ink-2">Asistan planı yazınca bütün aylar burada takvim olarak görünecek.</p>
+				</section>
+			} else {
+				<div class="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 px-1 text-body-small text-ink-2 tnum">
+					<span>{ strconv.Itoa(p.Overview.SessionsDone) } / { strconv.Itoa(p.Overview.SessionsPlanned) } seans tamamlandı</span>
+					<span>{ plan.FormatHoursTR(p.Overview.PlannedMin) } saat planlı</span>
+				</div>
+				<section class="mt-5 rounded-panel bg-card p-5 md:p-7" aria-label="Dönemler">
+					<ol class="plan-phases">
+						for _, ph := range p.Overview.Phases {
+							<li class={ "plan-phase-item", templ.KV("is-current", ph.IsCurrent) }>
+								<p class="text-label font-semibold text-ink-3 tnum">
+									{ planPhaseLine(ph) }
+									if ph.IsCurrent {
+										<span class="text-ink-2"> · şu an</span>
+									}
+								</p>
+								<p class="mt-0.5 font-semibold text-ink">{ planPhaseTitle(ph) }</p>
+								if len(ph.TopicGroups) > 0 {
+									<p class="mt-0.5 text-body-small text-ink-2">{ strings.Join(ph.TopicGroups, ", ") }</p>
+								}
+							</li>
+						}
+					</ol>
+				</section>
+				{{ months, sel := planCalendar(p) }}
+				if len(months) > 0 {
+					<nav class="cal-strip" aria-label="Aylar">
+						for i, m := range months {
+							<a
+								href={ templ.SafeURL(planMonthHref(m.ID)) }
+								class={ "cal-strip-item", templ.KV("is-now", m.IsCurrent) }
+								{ ariaCurrent(i == sel)... }
+							>
+								<span class="cal-strip-name">{ calStripLabel(months, i) }</span>
+								<span class="cal-strip-count tnum">{ strconv.Itoa(m.Done) }/{ strconv.Itoa(m.Sessions) }</span>
+								<span class="cal-strip-track" aria-hidden="true"><i { styleAttr(calStripFill(m))... }></i></span>
+							</a>
+						}
+					</nav>
+					<div class="plan-legend" aria-hidden="true">
+						<span><i class="cal-key" data-state="planned"></i>Planlı</span>
+						<span><i class="cal-key" data-state="done"></i>Tamamlandı</span>
+						<span><i class="cal-key" data-state="partial"></i>Kısmen</span>
+						<span><i class="cal-key" data-state="missed"></i>Yapılamadı / taşındı</span>
+					</div>
+					<div class="mt-3">
+						@calMonthPanel(months, sel)
+					</div>
+				}
+			}
+		</div>
+	}
+}
+
+templ calMonthPanel(months []calMonth, sel int) {
+	{{ m := months[sel] }}
+	<section class="cal-month rounded-panel bg-card" aria-labelledby={ "ay-" + m.ID }>
+		<header class="cal-head">
+			<div class="cal-nav">
+				if sel > 0 {
+					<a class="cal-nav-btn" href={ templ.SafeURL(planMonthHref(months[sel-1].ID)) } aria-label={ "Önceki ay: " + months[sel-1].Title }>‹</a>
+				} else {
+					<span class="cal-nav-btn" aria-hidden="true">‹</span>
+				}
+				if sel < len(months)-1 {
+					<a class="cal-nav-btn" href={ templ.SafeURL(planMonthHref(months[sel+1].ID)) } aria-label={ "Sonraki ay: " + months[sel+1].Title }>›</a>
+				} else {
+					<span class="cal-nav-btn" aria-hidden="true">›</span>
+				}
+			</div>
+			<div class="min-w-0 flex-1">
+				<h2 id={ "ay-" + m.ID } class="text-title-lg font-semibold text-ink md:text-headline md:font-bold">{ m.Title }</h2>
+				if len(m.Phases) > 0 {
+					<p class="text-body-small text-ink-2">{ strings.Join(m.Phases, " → ") }</p>
+				}
+			</div>
+			<p class="shrink-0 text-body-small text-ink-3 tnum">
+				<span class="cn text-numeral-inline font-semibold text-ink">{ strconv.Itoa(m.Done) }</span> / { strconv.Itoa(m.Sessions) } seans
+				if !m.IsCurrent {
+					<a class="study-link ml-3" href="/plan">Bu aya dön</a>
+				}
+			</p>
+		</header>
+		<div class="cal-grid" role="list">
+			for _, w := range calWeekdays {
+				<span class="cal-wd" aria-hidden="true">{ w }</span>
+			}
+			for _, d := range m.Days {
+				@calCell(d)
+			}
+		</div>
+	</section>
+}
+
+templ calCell(d calDay) {
+	if d.Blank {
+		<div class={ calDayClass(d) } aria-hidden="true"></div>
+	} else if len(d.Sessions) == 0 {
+		<div class={ calDayClass(d) } role="listitem" aria-label={ calDayLabel(d) }>
+			<span class="cal-num cn">{ strconv.Itoa(d.Day) }</span>
+		</div>
+	} else {
+		<div class={ calDayClass(d) } role="listitem" tabindex="0" aria-label={ calDayLabel(d) } aria-describedby={ "gun-" + d.Date } data-cal-day>
+			<span class="cal-num cn">{ strconv.Itoa(d.Day) }</span>
+			<ul class="cal-chips" aria-hidden="true">
+				for _, sv := range d.Sessions {
+					<li class="cal-chip" data-state={ calChipState(sv) }>
+						<span class="cal-chip-time tnum">{ sv.StartTime }</span>
+						<span class="cal-chip-title">{ calChipTitle(sv) }</span>
+					</li>
+				}
+			</ul>
+			@calDetail(d)
+		</div>
+	}
+}
+
+// calDetail is the wide day panel. It stays in the DOM as the cell's
+// description and is revealed by hover, focus or a tap.
+templ calDetail(d calDay) {
+	<div class="cal-pop" id={ "gun-" + d.Date } role="tooltip">
+		<div class="cal-pop-inner">
+			<p class="text-label font-semibold text-ink-3">
+				{ plan.FormatDayHeading(d.Date) }
+				if d.Phase != "" {
+					· { d.Phase }
+				}
+			</p>
+			for _, sv := range d.Sessions {
+				<div class="cal-pop-session" data-state={ calChipState(sv) }>
+					<p class="text-body-small text-ink-2 tnum">{ planKindLabel(sv) } · { sv.StartTime } · { dk(sv.DurationMin) }</p>
+					<p class="mt-0.5 text-title-lg font-semibold leading-snug text-ink">{ planRowTitle(sv) }</p>
+					<p class="text-body-small text-ink-2 tnum">{ sv.Notation }</p>
+					if sv.TopicGroupName != "" {
+						<p class="text-body-small text-ink-2">Konu: { sv.TopicGroupName }</p>
+					}
+					<dl class="cal-pop-parts tnum">
+						for _, b := range sessionProfile(sv) {
+							<div>
+								<dt><i { styleAttr("background:" + b.Fill)... }></i>{ b.Label }</dt>
+								<dd>
+									{ b.Duration }
+									if b.Pages != "" {
+										· { b.Pages }
+									}
+								</dd>
+							</div>
+						}
+					</dl>
+					<p class="cal-pop-state">
+						if sv.State == plan.StateDone {
+							@icon("i-check", "w-4 h-4")
+						}
+						{ statusWord(sv) }
+					</p>
+				</div>
+			}
+		</div>
+	</div>
+}

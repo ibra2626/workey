@@ -86,28 +86,44 @@ func newMCPServer(h *handler) (*mcp.Server, error) {
 		return nil, fmt.Errorf("mcpserver: complete_session schema: %w", err)
 	}
 
+	planOut, err := outputSchema[planResult]()
+	if err != nil {
+		return nil, err
+	}
+	sessionOut, err := outputSchema[plan.SessionView]()
+	if err != nil {
+		return nil, err
+	}
+	resultOut, err := outputSchema[plan.SavePlanResult]()
+	if err != nil {
+		return nil, err
+	}
+
 	mcp.AddTool(srv, &mcp.Tool{
-		Name:        "get_plan",
-		Annotations: toolHints(true, false),
-		Description: "Return the planned sessions for a date range [from, to] (inclusive), Europe/Istanbul. Each session has its stored items (book/chapter/page references only), its derived state (planned, today, done, missed, moved), the resolved topic-group name and the canonical notation (e.g. 'M2·17, s. 210–225'). Use the returned 'id' with complete_session.",
-		InputSchema: getPlanIn,
+		Name:         "get_plan",
+		OutputSchema: planOut,
+		Annotations:  toolHints(true, false),
+		Description:  "Return the planned sessions for a date range [from, to] (inclusive), Europe/Istanbul. Each session has its stored items (book/chapter/page references only), its derived state (planned, today, done, missed, moved), the resolved topic-group name and the canonical notation (e.g. 'M2·17, s. 210–225'). Optional read-only study includes status, UTC lifecycle timestamps, entry_mode, version and a resolved bookmark (zero-based item_ordinal, stage, resume_page, item, notation). Missing study does not prove no work. Partial work does not change state or progress. Use the returned 'id' with complete_session.",
+		InputSchema:  getPlanIn,
 	}, h.getPlan)
 
 	mcp.AddTool(srv, &mcp.Tool{
-		Name:        "save_plan",
-		Annotations: toolHints(false, true),
-		Description: "Declaratively replace the open sessions for every date in [from, to] (Europe/Istanbul). For each date in range that is today or later, the open (uncompleted) sessions are made to match exactly the given set, keyed by date + start_time: a matching session is updated in place, a new one is created, and an open future session omitted from the request is deleted. " +
-			"Past days and completed sessions are frozen — they are never changed or deleted, and any incoming session that targets one is returned in 'skipped' rather than applied. " +
+		Name:         "save_plan",
+		OutputSchema: resultOut,
+		Annotations:  toolHints(false, true),
+		Description: "Declaratively replace the open sessions for every date in [from, to] (Europe/Istanbul). For each date in range that is today or later, the open (uncompleted) sessions are made to match exactly the given set, keyed by date + start_time: a matching session is updated in place, a new one is created, and an unstarted open future session omitted from the request is deleted. " +
+			"Started sessions (any study record) are retained when omitted; identical requests are unchanged, changed requests return skipped reason=started. Past/completed reasons take priority. Past days and completed sessions are frozen — they are never changed or deleted, and any incoming session that targets one is returned in 'skipped' rather than applied. " +
 			"The call is safe to repeat: sending the same request twice leaves the same state and reports the sessions as 'unchanged' (pass idempotency_key to also replay the exact first result). " +
 			"Link a makeup session to the missed one with 'makeup_of' (the missed session's date + start_time). Only book/chapter/page references are stored, never topic text or question content.",
 		InputSchema: savePlanIn,
 	}, h.savePlan)
 
 	mcp.AddTool(srv, &mcp.Tool{
-		Name:        "complete_session",
-		Annotations: toolHints(false, true),
-		Description: "Mark a session done (done=true, the default) or undo its completion (done=false), addressed by the 'id' from get_plan. Allowed for today and past sessions only; a future session is rejected. Idempotent: setting the state it is already in changes nothing.",
-		InputSchema: completeIn,
+		Name:         "complete_session",
+		OutputSchema: sessionOut,
+		Annotations:  toolHints(false, true),
+		Description:  "Mark a session done (done=true, the default) or undo its completion (done=false), addressed by the 'id' from get_plan. Allowed for today and past sessions only; a future session is rejected. Completion atomically closes existing study; undo pauses it and preserves its bookmark. No study is created for legacy sessions. Existing REST/MCP calls do not check study.version, so cannot detect stale study intent. Idempotent: setting the state it is already in changes nothing.",
+		InputSchema:  completeIn,
 	}, h.completeSession)
 
 	mcp.AddTool(srv, &mcp.Tool{
@@ -126,7 +142,7 @@ func newMCPServer(h *handler) (*mcp.Server, error) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "get_progress",
 		Annotations: toolHints(true, false),
-		Description: "Return the progress summary (Europe/Istanbul): current plan week out of the fixed 38, sessions done vs planned, done vs planned minutes and hours, current phase, the exam countdown, per-topic-group completion and the 38-week strip.",
+		Description: "Return the progress summary (Europe/Istanbul): current plan week out of the fixed 38, sessions done vs planned, done vs planned minutes and hours, current phase, the exam countdown, per-topic-group completion and the 38-week strip. Done minutes are the planned duration of completed sessions, never measured time. Partial pages and ten_minutes goals add no progress; separately completed original and makeup sessions both count.",
 	}, h.getProgress)
 
 	return srv, nil

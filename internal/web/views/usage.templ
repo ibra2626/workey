@@ -115,7 +115,7 @@ templ usageBlockList(blocks []UsageBlock, level int, doc UsageDocument, key stri
 				<div class="usage-stack" data-prompt={ block.ID }>
 					@usageCopyButton("usage-prompt-" + block.ID, "usage-prompt-status-" + block.ID, "İstemi kopyala")
 					<p id={ "usage-prompt-status-" + block.ID } role="status" aria-live="polite" aria-atomic="true" class="usage-status"></p>
-					if block.ID == "exam-plan" {
+					if block.ID == "exam-plan" || block.ID == "first-week" || block.ID == "replan" {
 						<details class="usage-disclosure">
 							<summary>İstemin tamamını göster</summary>
 							<div class="usage-stack">@usagePromptText(block)</div>

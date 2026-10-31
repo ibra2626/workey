@@ -11,6 +11,7 @@ package web
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -47,6 +48,9 @@ func (a *Auth) Handler() http.Handler {
 	mux.Handle("GET /{$}", a.requireAuth(http.HandlerFunc(a.screenToday)))
 	mux.Handle("GET /hafta", a.requireAuth(http.HandlerFunc(a.screenWeek)))
 	mux.Handle("GET /ilerleme", a.requireAuth(http.HandlerFunc(a.screenProgress)))
+	mux.Handle("GET /plan", a.requireAuth(http.HandlerFunc(a.screenPlan)))
+	mux.Handle("POST /oturum/{id}/baslat", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.startStudy))))
+	mux.Handle("POST /oturum/{id}/birak", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.pauseStudy))))
 	mux.Handle("POST /oturum/{id}/tamamla", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.completeSession))))
 	mux.Handle("POST /oturum/{id}/geri-al", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.undoSession))))
 	mux.Handle("POST /hafta/oturum/{id}/tamamla", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.weekComplete))))
@@ -120,6 +124,30 @@ func renderLogin(w http.ResponseWriter, r *http.Request, errMsg string) {
 	_ = views.Login(errMsg).Render(r.Context(), w)
 }
 
+// screenPlan renders the Plan screen: the whole saved plan by phase and week.
+func (a *Auth) screenPlan(w http.ResponseWriter, r *http.Request) {
+	ov, err := a.svc.Overview(r.Context())
+	if err != nil {
+		http.Error(w, "sunucu hatası", http.StatusInternalServerError)
+		return
+	}
+	prog, err := a.svc.Progress(r.Context(), a.examDate)
+	if err != nil {
+		http.Error(w, "sunucu hatası", http.StatusInternalServerError)
+		return
+	}
+	p := views.PlanPage{
+		Overview:   ov,
+		Month:      r.URL.Query().Get("ay"),
+		WeekNumber: prog.WeekNumber,
+		DaysToExam: prog.DaysToExam,
+		HasExam:    a.examDate != (clock.Date{}),
+		CSRF:       csrfTokenFromRequest(r),
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = views.PlanScreen(p).Render(r.Context(), w)
+}
+
 // screenProgress renders the İlerleme screen.
 func (a *Auth) screenProgress(w http.ResponseWriter, r *http.Request) {
 	prog, err := a.svc.Progress(r.Context(), a.examDate)
@@ -165,12 +193,21 @@ func (a *Auth) setSessionDone(w http.ResponseWriter, r *http.Request, done bool)
 		http.Error(w, "geçersiz oturum", http.StatusBadRequest)
 		return
 	}
+	version, err := completionStudyVersion(r)
+	if err != nil {
+		http.Error(w, "geçersiz çalışma sürümü", http.StatusBadRequest)
+		return
+	}
 	if done {
-		_, err = a.svc.Complete(r.Context(), plan.SourceWeb, id)
+		_, err = a.svc.Complete(r.Context(), plan.SourceWeb, id, version)
 	} else {
-		_, err = a.svc.Undo(r.Context(), plan.SourceWeb, id)
+		_, err = a.svc.Undo(r.Context(), plan.SourceWeb, id, version)
 	}
 	if err != nil {
+		if errors.Is(err, plan.ErrStudyConflict) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		// A future-session or not-found completion is a client error; any other
 		// failure is a server error. Both render without leaking internals.
 		http.Error(w, "işlem tamamlanamadı", http.StatusUnprocessableEntity)
@@ -222,7 +259,31 @@ func (a *Auth) buildTodayPage(ctx context.Context, csrf string) (views.TodayPage
 		CSRF:           csrf,
 	}
 	p.PhaseLabel, p.PhaseBlocks = phaseBlocks(prog)
+	p.StudyPeriodOpen, err = a.svc.StudyPeriodOpen(ctx, a.examDate)
+	if err != nil {
+		return views.TodayPage{}, err
+	}
 	return p, nil
+}
+
+// Old forms predate study records and therefore observed version zero. They
+// still work on untouched sessions, but cannot overwrite a started session.
+func completionStudyVersion(r *http.Request) (int64, error) {
+	if err := r.ParseForm(); err != nil {
+		return 0, err
+	}
+	values := r.PostForm["expected_study_version"]
+	if len(values) == 0 {
+		return 0, nil
+	}
+	if len(values) != 1 {
+		return 0, errors.New("duplicate study version")
+	}
+	v, err := strconv.ParseInt(values[0], 10, 64)
+	if err != nil || v < 0 {
+		return 0, errors.New("invalid study version")
+	}
+	return v, nil
 }
 
 // screenWeek renders the Hafta screen for the week containing ?tarih= (default
@@ -250,13 +311,22 @@ func (a *Auth) weekSetDone(w http.ResponseWriter, r *http.Request, done bool) {
 		http.Error(w, "geçersiz oturum", http.StatusBadRequest)
 		return
 	}
+	version, err := completionStudyVersion(r)
+	if err != nil {
+		http.Error(w, "geçersiz çalışma sürümü", http.StatusBadRequest)
+		return
+	}
 	var sv *plan.SessionView
 	if done {
-		sv, err = a.svc.Complete(r.Context(), plan.SourceWeb, id)
+		sv, err = a.svc.Complete(r.Context(), plan.SourceWeb, id, version)
 	} else {
-		sv, err = a.svc.Undo(r.Context(), plan.SourceWeb, id)
+		sv, err = a.svc.Undo(r.Context(), plan.SourceWeb, id, version)
 	}
 	if err != nil {
+		if errors.Is(err, plan.ErrStudyConflict) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		// A future-session or not-found completion is a client error.
 		http.Error(w, "işlem tamamlanamadı", http.StatusUnprocessableEntity)
 		return
@@ -327,6 +397,7 @@ func shiftDays(date clock.Date, n int) clock.Date {
 // fraction (filled for the current week), with the current week sub-labelled by
 // its minutes.
 func phaseBlocks(prog *plan.ProgressView) (label string, blocks []views.PhaseBlock) {
+	var firstWeek, lastWeek int
 	if prog.CurrentPhase == "" {
 		return "", nil
 	}
@@ -343,7 +414,14 @@ func phaseBlocks(prog *plan.ProgressView) (label string, blocks []views.PhaseBlo
 			b.Label += " · bu hafta"
 			b.Sub = strconv.Itoa(c.DoneMin) + " / " + strconv.Itoa(c.PlannedMin) + " dk"
 		}
+		if len(blocks) == 0 {
+			firstWeek = c.WeekNumber
+		}
+		lastWeek = c.WeekNumber
 		blocks = append(blocks, b)
 	}
-	return prog.CurrentPhase, blocks
+	if len(blocks) == 0 {
+		return "", nil
+	}
+	return "Bu dönemin haftaları · H" + strconv.Itoa(firstWeek) + "–H" + strconv.Itoa(lastWeek), blocks
 }

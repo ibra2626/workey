@@ -1,0 +1,226 @@
+package views
+
+import (
+	"github.com/ibra2626/workey/internal/plan"
+	"strconv"
+)
+
+templ studyFields(sv plan.SessionView, csrf string) {
+	<input type="hidden" name="_csrf" value={ csrf }/>
+	<input type="hidden" name="expected_study_version" value={ strconv.FormatInt(sv.StudyVersion, 10) }/>
+}
+
+templ studyStart(sv plan.SessionView, p TodayPage) {
+	if studyCanStart(p, sv) {
+		<form method="post" class="study-start" { completeForm(sv.ID, "baslat")... }>
+			@studyFields(sv, p.CSRF)
+			<div class="study-start-row">
+				<button type="submit" name="entry_mode" value="normal" class="action-button study-primary">@actionLabel(studyStartLabel(sv), "Açılıyor…")</button>
+				<button type="submit" name="entry_mode" value="ten_minutes" class="action-button study-secondary">@actionLabel("İlk 10 dakikayla başla", "Açılıyor…")</button>
+			</div>
+			<p class="mt-3 text-body-small text-ink-2">Çalışma odası açılır: hangi aşamada olduğun, isteğe bağlı ortam sesi ve masanın karşısında sessizce çalışan biri. 10 dakikalık başlangıç sadece ilk adımı küçültür; plan süresi değişmez.</p>
+		</form>
+	} else if sv.MovedTo != nil {
+		<p class="mt-3 text-body text-ink-2">Telafi: { sv.MovedTo.Date }. <a class="underline" href={ templ.SafeURL("/hafta?tarih=" + sv.MovedTo.Date) }>Hafta ekranında gör</a></p>
+	} else if p.Day.ActiveStudy != nil && p.Day.ActiveStudy.ID != sv.ID {
+		<p class="mt-3 text-body text-ink-2">Devam etmek için önce <a class="underline" href="#bugun-panel">açık çalışmayı kapat</a>.</p>
+	} else {
+		<p class="mt-3 text-body text-ink-2">Bu dönemde yeni çalışma başlatılamıyor; tamamlama erişilebilir.</p>
+	}
+}
+
+// studyRoom is the active-study surface, drawn as tonight's session schedule:
+// one row per stage with its clock times, the current row on Today Sand.
+// Row states and the elapsed minute are computed in the browser from the
+// start time and are never stored; only the user's own bookmark is.
+templ studyRoom(sv plan.SessionView, p TodayPage) {
+	<div class="room-grid">
+		<div class="min-w-0">
+			<p class="room-label tnum">Açık çalışma · { studyStartTime(sv.Study.LastStartedAt) } açıldı</p>
+			<h1 class="room-title">{ studyTitle(sv) }</h1>
+			<p class="room-topic">{ studyTopic(sv) }</p>
+			<p class="room-muted">{ studyFirstStep(sv) }</p>
+			<ol class="room-steps">
+				for _, row := range roomRows(sv) {
+					<li class="room-step" data-room-seg>
+						<span class="room-step-bar" { styleAttr("background:" + row.Fill)... }></span>
+						<span class="room-step-time cn">
+							if row.From != "" {
+								{ row.From }–{ row.To }
+							} else {
+								{ strconv.Itoa(row.Min) } dk
+							}
+						</span>
+						<div class="min-w-0">
+							<p class="room-step-name">{ row.Label }<span data-room-now hidden> · şu an</span></p>
+							<p class="room-step-pages">{ row.Pages }</p>
+						</div>
+						<p class="room-step-state" data-room-state></p>
+					</li>
+				}
+			</ol>
+			<p class="room-hint" data-room-hint hidden></p>
+			if sv.Study.EntryMode == plan.EntryTenMinutes {
+				<p class="room-note">Başlangıç hedefi: 10 dakika. Plan süresi değişmedi; bu hedef seansı kendiliğinden tamamlamaz.</p>
+			}
+			<p class="sr-only" role="status" aria-live="polite" data-room-announce></p>
+			<div class="room-actions">
+				<form method="post" { completeForm(sv.ID, "tamamla")... }>
+					@studyFields(sv, p.CSRF)
+					<button type="submit" class="action-button study-primary room-primary">@actionLabel("Bitirdim · Seansı tamamla", "Kaydediliyor…")</button>
+				</form>
+				<details class="room-bookmark" open?={ p.StudyInput != nil && p.StudyInput.SessionID == sv.ID }>
+					<summary class="room-tool room-pause">
+						@icon("i-bookmark", "w-4 h-4")
+						Burada bıraktım
+					</summary>
+					<div class="room-pause-body">
+						@bookmarkForm(sv, p)
+						<form method="post" class="mt-2" { completeForm(sv.ID, "birak")... }>
+							@studyFields(sv, p.CSRF)
+							<input type="hidden" name="pause_mode" value="close"/>
+							<button type="submit" class="action-button study-link">@actionLabel("Çalışmayı kapat · sayfa girmeden", "Kapatılıyor…")</button>
+						</form>
+					</div>
+				</details>
+			</div>
+		</div>
+		<aside class="room-aside" aria-label="Çalışma ortamı">
+			@roomCompanion()
+			@roomSound()
+		</aside>
+	</div>
+}
+
+// roomSound sits under the companion. It stays hidden without JavaScript:
+// every sound is synthesised in the browser, so there are no files, streams
+// or third-party requests.
+templ roomSound() {
+	<div class="room-sound" data-room-sound hidden>
+		<p class="room-label" id="room-sound-label">Ortam sesi</p>
+		<div class="room-chips" role="group" aria-labelledby="room-sound-label">
+			<button type="button" class="room-chip" data-sound="off" aria-pressed="true">Kapalı</button>
+			<button type="button" class="room-chip" data-sound="library" aria-pressed="false"><span class="room-eq" aria-hidden="true"><i></i><i></i><i></i></span>Kütüphane</button>
+			<button type="button" class="room-chip" data-sound="cafe" aria-pressed="false"><span class="room-eq" aria-hidden="true"><i></i><i></i><i></i></span>Kafe</button>
+			<button type="button" class="room-chip" data-sound="rain" aria-pressed="false"><span class="room-eq" aria-hidden="true"><i></i><i></i><i></i></span>Yağmur</button>
+		</div>
+		<label class="room-volume">
+			<span>Ses</span>
+			<input type="range" min="0" max="100" step="1" value="45" data-room-volume/>
+		</label>
+		<label class="room-check">
+			<input type="checkbox" checked data-room-chime/>
+			<span>Aşama geçişinde zil</span>
+		</label>
+	</div>
+}
+
+// roomCompanion is the quiet body-doubling figure across the desk. It reads,
+// breathes and now and then turns a page; it never speaks, scores or reacts.
+templ roomCompanion() {
+	<figure class="room-companion" data-room-companion>
+		<svg viewBox="0 0 220 160" role="img" aria-label="Masanın karşısında kitabına eğilmiş, sessizce çalışan biri">
+			<polygon class="rc-light" points="148,52 172,46 214,132 98,132"></polygon>
+			<ellipse class="rc-pool" cx="140" cy="133" rx="70" ry="7"></ellipse>
+			<g class="rc-body">
+				<path class="rc-torso" d="M50 132 C50 100 66 86 92 86 C118 86 134 100 134 132 Z"></path>
+				<g class="rc-head">
+					<circle class="rc-face" cx="94" cy="64" r="17"></circle>
+					<path class="rc-hair" d="M77 62 C77 48 88 42 98 43 C108 44 113 52 112 60 C104 54 92 53 77 62 Z"></path>
+				</g>
+				<path class="rc-arm" d="M62 124 C70 116 82 118 92 126"></path>
+				<path class="rc-arm" d="M126 124 C118 116 106 118 96 126"></path>
+			</g>
+			<path class="rc-page" d="M94 127 L118 122 L120 130 L94 132 Z"></path>
+			<path class="rc-page" d="M94 127 L70 122 L68 130 L94 132 Z"></path>
+			<path class="rc-page rc-turn" d="M94 127 L116 123 L118 130 L94 132 Z"></path>
+			<rect class="rc-desk" x="0" y="132" width="220" height="4" rx="2"></rect>
+			<rect class="rc-mug" x="30" y="117" width="12" height="15" rx="2"></rect>
+			<path class="rc-handle" d="M42 121 C47 121 47 128 42 128"></path>
+			<path class="rc-lamp-arm" d="M176 132 L182 92 L160 56"></path>
+			<rect class="rc-lamp-base" x="166" y="129" width="22" height="4" rx="2"></rect>
+			<path class="rc-shade" d="M144 54 L168 40 L176 52 L152 62 Z"></path>
+		</svg>
+	</figure>
+}
+
+// studyWorkspace is paused work: the saved place first, then the way back in.
+templ studyWorkspace(sv plan.SessionView, p TodayPage) {
+	<p class="mt-2 text-meta text-ink-3 tnum">{ sv.Date } · { sv.StartTime }</p>
+	<p class="mt-2 text-title font-semibold text-ink">{ sv.Notation } · { studyTitle(sv) }</p>
+	<div class="study-mark">
+		@icon("i-bookmark", "w-5 h-5 shrink-0 text-ink")
+		<div class="min-w-0">
+			<p class="text-label font-semibold text-ink-3">Kaldığın yer</p>
+			<p class="text-title-lg font-semibold text-ink">{ studyFirstStep(sv) }</p>
+		</div>
+	</div>
+	<p class="mt-3 text-body-small text-ink-2">Kısmen çalışıldı. Devam etmek senin seçimin; takvim değişmez.</p>
+	@studyStart(sv, p)
+	@studyFinish(sv, p.CSRF)
+	if p.StudyInput != nil && p.StudyInput.SessionID == sv.ID {
+		@bookmarkForm(sv, p)
+	}
+}
+
+templ studyFinish(sv plan.SessionView, csrf string) {
+	if sv.State == plan.StateDone {
+		@completeControl(sv, csrf)
+	} else {
+		<form method="post" class="mt-1" { completeForm(sv.ID, "tamamla")... }>
+			@studyFields(sv, csrf)
+			<button type="submit" class="action-button study-link">@actionLabel("Bitirdim · Seansı tamamla", "Kaydediliyor…")</button>
+		</form>
+	}
+}
+
+templ bookmarkForm(sv plan.SessionView, p TodayPage) {
+	{{ input := studyInput(sv, p.StudyInput) }}
+	<form method="post" class="study-form mt-3" data-room-autostage?={ roomAutoStage(sv, p.StudyInput) } { completeForm(sv.ID, "birak")... }>
+		<input type="hidden" name="_csrf" value={ p.CSRF }/>
+		<input type="hidden" name="expected_study_version" value={ input.Version }/>
+		<input type="hidden" name="pause_mode" value="bookmark"/>
+		if singleStudySource(sv, input) {
+			<input type="hidden" name="item_ordinal" value="0"/>
+			<p class="study-form-source"><span>Kaynak</span>{ plan.FormatItem(sv.Items[0]) } · { sv.Items[0].ChapterTitle }</p>
+		} else {
+			<label>
+				Kaynak
+				<select name="item_ordinal" required>
+					if input.Ordinal != "" && !validStudyOrdinal(sv, input.Ordinal) {
+						<option value={ input.Ordinal } selected>{ "Geçersiz kaynak: " + input.Ordinal }</option>
+					}
+					<option value="" selected?={ input.Ordinal == "" }>Kaynak seç</option>
+					for i, item := range sv.Items {
+						<option value={ strconv.Itoa(i) } selected?={ input.Ordinal == strconv.Itoa(i) }>{ plan.FormatItem(item) } · { item.ChapterTitle }</option>
+					}
+				</select>
+			</label>
+		}
+		<fieldset class="study-stages">
+			<legend>Aşama</legend>
+			<div class="study-stage-opts">
+				if !validStudyStage(sv, input.Stage) {
+					<label class="study-stage"><input type="radio" name="stage" value={ input.Stage } checked required/><span>{ "Geçersiz aşama: " + input.Stage }</span></label>
+				}
+				for _, stage := range studyStages(sv) {
+					<label class="study-stage"><input type="radio" name="stage" value={ stage } checked?={ input.Stage == stage } required/><span>{ stageName(stage) }</span></label>
+				}
+			</div>
+		</fieldset>
+		<label>
+			Devam edeceğin sayfa
+			<input name="resume_page" inputmode="numeric" type="text" required value={ input.Page } aria-describedby={ "bookmark-help-" + strconv.FormatInt(sv.ID, 10) }/>
+		</label>
+		<div id={ "bookmark-help-" + strconv.FormatInt(sv.ID, 10) } class="study-help text-body-small text-ink-2">
+			<p>Yarım kalan sayfaysa aynı sayfayı, bittiyse sonrakini yaz; uygulama otomatik artırmaz. Yanlış defterinde de kitaptaki sayfayı kullan.</p>
+			<ul class="mt-2 divide-y divide-line" aria-label="Geçerli sayfa aralıkları">
+				for _, item := range sv.Items {
+					<li class="py-2 tnum">{ sourceRanges(item, sv.Kind) }</li>
+				}
+			</ul>
+			<p>Aşama veya kaynak bittiyse sonrakini seç. Seansın tamamı bittiyse Bitirdim’i kullan.</p>
+		</div>
+		<button type="submit" class="action-button study-primary">@actionLabel("Kaldığım yeri kaydet ve kapat", "Kaydediliyor…")</button>
+	</form>
+}

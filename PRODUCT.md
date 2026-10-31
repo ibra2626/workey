@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-Go + templ + htmx, Tailwind CSS (standalone CLI). No JavaScript framework. Server-rendered HTML; interactivity through htmx only.
+Go + templ + htmx, Tailwind CSS (standalone CLI), SQLite. No JavaScript framework. Server-rendered HTML and ordinary form fallbacks; htmx updates and small local scripts provide feedback, focus, copy and motion enhancements.
 
 ## Users
 
@@ -31,20 +31,26 @@ The plan is authored outside the app: an AI assistant builds it and writes it in
 - Evening structure: 20 min topic → 50 min questions → 20 min mistake notebook (yanlış defteri).
 - Sources: Antrenmanlarla Matematik 1–3 and Antrenmanlarla Geometri 1–2.
 - Plan items reference a book, a chapter and a page range, written like `M2·17, s. 210–225` (Matematik 2, chapter 17, pages 210–225).
-- Studying happens on paper with the physical books; the app is consulted before and after, not during, the session.
+- Studying happens on paper with the physical books. Since 2026-10-30 the app may also stay open during the session as a study room (stage, elapsed time, ambient sound, a quiet companion); it never requires it.
 
 ## Capabilities and Constraints
 
 - Shows the daily/weekly assignment (day, book, chapter, page range) and tracks completion.
+- Bugün offers an exact first step, normal or 10-minute entry, and one active study session. The 10-minute target changes neither planned duration nor completion. Active work opens a study room that shows the current stage and elapsed minutes computed in the browser from the start time; this is display only, never stored, sent or counted toward progress.
+- Active work and the optional source/stage/resume-page bookmark live in SQLite and survive refresh, another device and process restart. Resuming old work is an explicit choice; Istanbul midnight changes today's plan without moving or closing the old session.
+- “Burada bıraktım” records the page to resume, without incrementing it. “Çalışmayı kapat” needs no page and preserves an existing bookmark. “Bitirdim” works without starting; completion closes study atomically, and undo preserves the bookmark as paused work.
+- Started sessions cannot be replaced or removed by save_plan. Web forms detect stale study versions; legacy REST/MCP completion remains compatible without a version and cannot detect stale intent. Study context is read-only in REST/MCP.
+- Progress counts completed sessions' planned minutes. Partial work is shown separately as “Kısmen çalışıldı”; no unique-content or actual-time claim is made. Original and makeup sessions count separately if both are explicitly completed.
+- API/MCP guides share a source-material checklist and optional first-week/replanning prompts. Materials are supplied to the connected assistant; Workey provides no PDF upload, storage or OCR.
 - Exposes an MCP/API interface so an AI assistant can create and update the plan. The app itself creates no plan content.
 - Single user; no multi-user, social, or sharing features.
 - UI language is Turkish. Turkish characters (ş, ğ, ı, İ, ç, ö, ü) must render correctly, and case conversion must respect Turkish rules (i ↔ İ, ı ↔ I).
 - Must work well on both desktop and phone screens.
-- v1 decisions (2026-10-26, see `.agent/state/DECISIONS.md`): no question counts, deneme results or streak; missed sessions stay visible as "yapılamadı" and the AI may link a makeup session; no target score.
+- v1 decisions (2026-10-26, see `.agent/state/DECISIONS.md`): no question counts, deneme results or streak; missed sessions without a study record show "yapılamadı", partial work is identified separately, and the AI may link a makeup session; no target score.
 
 ## Brand Commitments
 
-Name: Workey. No logo or palette yet.
+Name: Workey. The supplied logo is embedded from `web/static/workey.png`; the locked forest-ink palette, Barlow typography and visual rules are in `DESIGN.md`.
 
 Personality, in the user's words: sakin, net, kararlı (calm, clear, decisive). It should feel calm, focused, and reassuring: "a long road, but I am moving forward." It must never feel like a tracker that makes the user feel guilty. Missed or late items are stated plainly, not as reproach.
 
@@ -58,7 +64,7 @@ Explicitly rejected by the user (binding):
 
 ## Evidence on Hand
 
-No content, data, or assets exist yet; the repository is empty. The 38-week plan will arrive through the AI/MCP interface. Do not fabricate plan items, progress figures, or scores in product copy; sample data must be clearly labeled as such.
+The repository contains the Go application, embedded web assets, SQLite migrations, REST/MCP interfaces and synthetic test fixtures. The real plan is authored through the AI/MCP interface; these fixtures do not establish the user's actual plan or progress. Do not fabricate plan items, progress figures, or scores in product copy; sample data must be clearly labeled as such. Study-flow acceptance and remaining browser checks are recorded in `docs/study-flow-acceptance.md`.
 
 ## Product Principles
 

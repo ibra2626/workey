@@ -182,7 +182,7 @@ func TestUsageMCPClientsAndPrompts(t *testing.T) {
 			t.Errorf("missing client %s", client)
 		}
 	}
-	if len(ids) != 6 {
+	if len(ids) != 8 {
 		t.Errorf("got %d prompts", len(ids))
 	}
 }
@@ -231,8 +231,8 @@ func TestExamPlanPrompt(t *testing.T) {
 		"Hedefim ve mevcut seviyem: [", "Uygun gün ve saatlerim: [", "Seans sürelerim: [", "Dinlenme günlerim: [", "Kitap/bölüm/sayfa referanslarım: [",
 		"dört akşam × 90 dakika", "bir hafta sonu × 180 dakika", "today, timezone ve exam_date", "get_outline → ilgili get_plan → get_progress",
 		"Doldurulmamış alanlarla yazmaya başlama", "referansı uydurma", "yanıtımı bekle", "save_outline", "korunacak mevcut faz ve grupları da içeren TAM liste",
-		"Pazartesi–Pazar", "çakışmayan", "İlk aralığın başlangıcı today, son aralığın bitişi exam_date", "HER haftayı yazmadan hemen önce", "listeden çıkarılan açık seanslar silinir",
-		"Geçmiş ve tamamlanmış kayıtları koru", "topic_group_key", "makeup_of", "created/updated/deleted/unchanged/skipped", "skipped kayıtlarını başarı diye sunma",
+		"Pazartesi–Pazar", "çakışmayan", "İlk aralığın başlangıcı today, son aralığın bitişi exam_date", "HER haftayı yazmadan hemen önce", "listeden çıkarılan başlanmamış açık seanslar silinir",
+		"Geçmiş, tamamlanmış ve başlanmış kayıtları koru", "study ve yer imini incele", "skipped reason=started", "eksikse korunur", "notation ve study okuma alanlarını gönderme", "topic_group_key", "makeup_of", "created/updated/deleted/unchanged/skipped", "skipped kayıtlarını başarı diye sunma",
 		"Her yazmadan sonra ilgili get_plan ve get_progress", "doğrulama hatasında DUR", "Sonraki haftaları yazma", "Tamamlanan ve kalan aralıkları", "Türkçe özetle", "complete_session çağırma",
 	} {
 		if !strings.Contains(prompt, want) {

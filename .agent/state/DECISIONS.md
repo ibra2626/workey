@@ -162,3 +162,14 @@ Context: remaining local Windows acceptance tasks; Linux deployment explicitly h
 Decision: verify MCP/web over real Streamable HTTP with the official SDK and disposable stores; record that a separate Claude Code model run is not covered. Use Product Design audit because /impeccable is unavailable. Swap TodayMain on completion/undo so mobile, desktop and phase summaries update with the session; list every multi-source book reference.
 Alternatives: panel-only swap (leaves stale figures); out-of-band individual fragments (more targets to maintain); altering existing dev databases (unnecessary).
 Consequences: local v1 technical checks are reproducible; no deployment, commit or push; autonomous model interpretation remains an explicit external acceptance limit. Existing v1 design decisions reconciled in DESIGN.md.
+
+
+## 2026-10-30 — Study room on Bugün
+
+Context: the user found the study-flow controls unclear and the Today page lifeless; they want a reason to stay in the app during the session (study atmosphere, ambient sound, a study companion) and a more current interface.
+Decision (user-chosen options): active work becomes a Forest Ink "Çalışma odası" panel showing the current stage and elapsed minutes computed in the browser (display only, never stored or counted), a soft chime on stage changes, Web Audio-synthesised ambient sound (library, rain, brown noise) and a silent SVG companion. Exits are explained as two labelled choices; bookmark stage uses pill radios.
+Alternatives: elapsed time only or no timer (rejected by the user); third-party radio/lofi stream (rejected: network, availability, licensing); textual companion notes (not chosen).
+Consequences: PRODUCT.md no longer says the app is not used during the session; the 2026-10-26 no-timer decision is narrowed to "no measured time is collected". Sound preferences live in per-browser localStorage. room.js is loaded on Bugün only.
+
+Revision (same day): the user rejected the dark Forest Ink room as off-theme. The room now stays a Card White panel; the live session profile (needle, finished blocks turned ink) carries the atmosphere, and controls reuse the guide-control and ink-pill vocabulary. Room-only dark tokens were removed; `lamp` remains for the companion.
+Revision 2 (same day): from three mock-ups (A Odak, B Seans çizelgesi, C Masa) the user chose B. The room is a stage-by-stage schedule with real clock times, the current row on Today Sand, companion and sound chips in a side column; the large live profile, header sound menu and big stage headline were removed.
