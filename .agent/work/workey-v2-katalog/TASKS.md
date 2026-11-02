@@ -1,0 +1,24 @@
+# workey-v2-katalog — tasks
+
+Shared rules for every task: `README.md` in this folder (new concept model,
+amended invariants, layout). Direction decision: `.agent/state/DECISIONS.md`
+`2026-11-02 — v2 kaynak kataloğu`.
+
+Plan content (İbrahim's own DGS catalog, if re-entered later) is not part of this
+feature; these tasks deliver the generalized machinery. Work one task per session.
+
+| ID | Task | Status | Depends on |
+| --- | --- | --- | --- |
+| WKY-21 | [Katalog şeması ve store katmanı (sources/sections/units/unit_progress)](tasks/WKY-21.md) | planned | — |
+| WKY-22 | [Plan domain modelini kataloğa bağla (Item → kaynak/bölüm/birim, notasyon)](tasks/WKY-22.md) | planned | WKY-21 |
+| WKY-23 | [Birim ilerlemesi ve D/Y/B servis yolu (tamamlamadan bağımsız)](tasks/WKY-23.md) | planned | WKY-22 |
+| WKY-24 | [MCP: save_source/get_sources, bookEnum kaldırma, ajan rehberi](tasks/WKY-24.md) | planned | WKY-22, WKY-23 |
+| WKY-25 | [REST API: katalog uçları ve plan item sözleşmesi](tasks/WKY-25.md) | planned | WKY-22, WKY-23 |
+| WKY-26 | [Web: Kaynaklar düzeltme sayfası ve D/Y/B raporu](tasks/WKY-26.md) | planned | WKY-22, WKY-23 |
+| WKY-27 | [Web: Bugün/Hafta/İlerleme birim görünümü ve işaretleme](tasks/WKY-27.md) | planned | WKY-23, WKY-26 |
+| WKY-28 | [Uçtan uca doğrulama ve v2 kapısı](tasks/WKY-28.md) | planned | WKY-24, WKY-25, WKY-27 |
+
+## Suggested session order
+WKY-21 → 22 → 23 are the backbone (store → domain → unit progress) and must go in
+order. WKY-24 (MCP) and WKY-25 (REST) are independent of each other once 22/23
+land. WKY-26 then WKY-27 build the web flows. WKY-28 closes the gate end to end.

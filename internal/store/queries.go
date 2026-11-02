@@ -15,7 +15,7 @@ type Session struct {
 	Date            string // 'YYYY-MM-DD'
 	StartTime       string // 'HH:MM'
 	DurationMin     int
-	Kind            string // 'aksam' | 'uzun_blok' | 'deneme'
+	Kind            string // open label (e.g. 'aksam' | 'uzun_blok' | 'deneme'); store imposes no CHECK
 	TopicGroupID    *int64
 	MakeupOf        *int64
 	CompletedAt     *string // ISO-8601 UTC, or nil
@@ -25,22 +25,20 @@ type Session struct {
 	Items           []SessionItem
 }
 
-// SessionItem is one book reference inside a session.
+// SessionItem is one ordered reference inside a session: a source, an optional
+// section, and a unit range and/or a location range. It holds references only,
+// never topic text or question content. The plan layer validates the ranges
+// against the catalog and renders the notation.
 type SessionItem struct {
-	ID            int64
-	SessionID     int64
-	Ordinal       int
-	Book          string // 'M1' | 'M2' | 'M3' | 'G1' | 'G2'
-	ChapterNo     int
-	ChapterTitle  string
-	PageFrom      int
-	PageTo        int
-	KonuFrom      *int
-	KonuTo        *int
-	SoruFrom      *int
-	SoruTo        *int
-	AntrenmanFrom *int
-	AntrenmanTo   *int
+	ID        int64
+	SessionID int64
+	Ordinal   int
+	SourceID  int64
+	SectionID *int64
+	UnitFrom  *int
+	UnitTo    *int
+	LocFrom   *int
+	LocTo     *int
 }
 
 // AuditEntry is one row of the change log.
@@ -144,9 +142,8 @@ func (s *Store) SessionByDateAndTime(ctx context.Context, q dbtx, date, startTim
 	}
 
 	itemRows, err := q.QueryContext(ctx, `
-		SELECT id, session_id, ordinal, book, chapter_no, chapter_title,
-		       page_from, page_to, konu_from, konu_to, soru_from, soru_to,
-		       antrenman_from, antrenman_to
+		SELECT id, session_id, ordinal, source_id, section_id,
+		       unit_from, unit_to, loc_from, loc_to
 		FROM session_items WHERE session_id = ? ORDER BY ordinal`, ss.ID)
 	if err != nil {
 		return nil, fmt.Errorf("store: query items of %d: %w", ss.ID, err)
@@ -155,9 +152,8 @@ func (s *Store) SessionByDateAndTime(ctx context.Context, q dbtx, date, startTim
 	for itemRows.Next() {
 		var it SessionItem
 		if err := itemRows.Scan(
-			&it.ID, &it.SessionID, &it.Ordinal, &it.Book, &it.ChapterNo, &it.ChapterTitle,
-			&it.PageFrom, &it.PageTo, &it.KonuFrom, &it.KonuTo, &it.SoruFrom, &it.SoruTo,
-			&it.AntrenmanFrom, &it.AntrenmanTo,
+			&it.ID, &it.SessionID, &it.Ordinal, &it.SourceID, &it.SectionID,
+			&it.UnitFrom, &it.UnitTo, &it.LocFrom, &it.LocTo,
 		); err != nil {
 			return nil, fmt.Errorf("store: scan item of %d: %w", ss.ID, err)
 		}
@@ -173,13 +169,11 @@ func (s *Store) SessionByDateAndTime(ctx context.Context, q dbtx, date, startTim
 func (s *Store) InsertSessionItem(ctx context.Context, q dbtx, it *SessionItem) error {
 	res, err := q.ExecContext(ctx, `
 		INSERT INTO session_items
-			(session_id, ordinal, book, chapter_no, chapter_title,
-			 page_from, page_to, konu_from, konu_to, soru_from, soru_to,
-			 antrenman_from, antrenman_to)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		it.SessionID, it.Ordinal, it.Book, it.ChapterNo, it.ChapterTitle,
-		it.PageFrom, it.PageTo, it.KonuFrom, it.KonuTo, it.SoruFrom, it.SoruTo,
-		it.AntrenmanFrom, it.AntrenmanTo,
+			(session_id, ordinal, source_id, section_id,
+			 unit_from, unit_to, loc_from, loc_to)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		it.SessionID, it.Ordinal, it.SourceID, it.SectionID,
+		it.UnitFrom, it.UnitTo, it.LocFrom, it.LocTo,
 	)
 	if err != nil {
 		return fmt.Errorf("store: insert session item: %w", err)
@@ -229,9 +223,8 @@ func (s *Store) SessionsByDateRange(ctx context.Context, q dbtx, from, to string
 	}
 
 	itemRows, err := q.QueryContext(ctx, `
-		SELECT i.id, i.session_id, i.ordinal, i.book, i.chapter_no, i.chapter_title,
-		       i.page_from, i.page_to, i.konu_from, i.konu_to, i.soru_from, i.soru_to,
-		       i.antrenman_from, i.antrenman_to
+		SELECT i.id, i.session_id, i.ordinal, i.source_id, i.section_id,
+		       i.unit_from, i.unit_to, i.loc_from, i.loc_to
 		FROM session_items i
 		JOIN sessions s ON s.id = i.session_id
 		WHERE s.date >= ? AND s.date <= ?
@@ -244,9 +237,8 @@ func (s *Store) SessionsByDateRange(ctx context.Context, q dbtx, from, to string
 	for itemRows.Next() {
 		var it SessionItem
 		if err := itemRows.Scan(
-			&it.ID, &it.SessionID, &it.Ordinal, &it.Book, &it.ChapterNo, &it.ChapterTitle,
-			&it.PageFrom, &it.PageTo, &it.KonuFrom, &it.KonuTo, &it.SoruFrom, &it.SoruTo,
-			&it.AntrenmanFrom, &it.AntrenmanTo,
+			&it.ID, &it.SessionID, &it.Ordinal, &it.SourceID, &it.SectionID,
+			&it.UnitFrom, &it.UnitTo, &it.LocFrom, &it.LocTo,
 		); err != nil {
 			return nil, fmt.Errorf("store: scan session item: %w", err)
 		}
@@ -290,9 +282,8 @@ func (s *Store) SessionByID(ctx context.Context, q dbtx, id int64) (*Session, er
 // sessionItems returns the items of one session ordered by ordinal.
 func (s *Store) sessionItems(ctx context.Context, q dbtx, sessionID int64) ([]SessionItem, error) {
 	rows, err := q.QueryContext(ctx, `
-		SELECT id, session_id, ordinal, book, chapter_no, chapter_title,
-		       page_from, page_to, konu_from, konu_to, soru_from, soru_to,
-		       antrenman_from, antrenman_to
+		SELECT id, session_id, ordinal, source_id, section_id,
+		       unit_from, unit_to, loc_from, loc_to
 		FROM session_items WHERE session_id = ? ORDER BY ordinal`, sessionID)
 	if err != nil {
 		return nil, fmt.Errorf("store: query items of %d: %w", sessionID, err)
@@ -302,9 +293,8 @@ func (s *Store) sessionItems(ctx context.Context, q dbtx, sessionID int64) ([]Se
 	for rows.Next() {
 		var it SessionItem
 		if err := rows.Scan(
-			&it.ID, &it.SessionID, &it.Ordinal, &it.Book, &it.ChapterNo, &it.ChapterTitle,
-			&it.PageFrom, &it.PageTo, &it.KonuFrom, &it.KonuTo, &it.SoruFrom, &it.SoruTo,
-			&it.AntrenmanFrom, &it.AntrenmanTo,
+			&it.ID, &it.SessionID, &it.Ordinal, &it.SourceID, &it.SectionID,
+			&it.UnitFrom, &it.UnitTo, &it.LocFrom, &it.LocTo,
 		); err != nil {
 			return nil, fmt.Errorf("store: scan item of %d: %w", sessionID, err)
 		}
@@ -352,9 +342,8 @@ func (s *Store) AllSessions(ctx context.Context, q dbtx) ([]Session, error) {
 	}
 
 	itemRows, err := q.QueryContext(ctx, `
-		SELECT id, session_id, ordinal, book, chapter_no, chapter_title,
-		       page_from, page_to, konu_from, konu_to, soru_from, soru_to,
-		       antrenman_from, antrenman_to
+		SELECT id, session_id, ordinal, source_id, section_id,
+		       unit_from, unit_to, loc_from, loc_to
 		FROM session_items
 		ORDER BY session_id, ordinal`)
 	if err != nil {
@@ -364,9 +353,8 @@ func (s *Store) AllSessions(ctx context.Context, q dbtx) ([]Session, error) {
 	for itemRows.Next() {
 		var it SessionItem
 		if err := itemRows.Scan(
-			&it.ID, &it.SessionID, &it.Ordinal, &it.Book, &it.ChapterNo, &it.ChapterTitle,
-			&it.PageFrom, &it.PageTo, &it.KonuFrom, &it.KonuTo, &it.SoruFrom, &it.SoruTo,
-			&it.AntrenmanFrom, &it.AntrenmanTo,
+			&it.ID, &it.SessionID, &it.Ordinal, &it.SourceID, &it.SectionID,
+			&it.UnitFrom, &it.UnitTo, &it.LocFrom, &it.LocTo,
 		); err != nil {
 			return nil, fmt.Errorf("store: scan session item: %w", err)
 		}
