@@ -31,6 +31,21 @@ type MovedInfo struct {
 	Weekday string `json:"weekday"` // capitalised Turkish weekday, e.g. "Cumartesi"
 }
 
+// ItemView is a session item resolved against the catalog for a screen or read
+// response: the raw reference ranges plus the resolved source key/name, section
+// ordinal/name and the units the unit range covers (label + number).
+type ItemView struct {
+	SourceKey      string    `json:"source_key"`
+	SourceName     string    `json:"source_name,omitempty"`
+	SectionOrdinal *int      `json:"section_ordinal,omitempty"`
+	SectionName    string    `json:"section_name,omitempty"`
+	UnitFrom       *int      `json:"unit_from,omitempty"`
+	UnitTo         *int      `json:"unit_to,omitempty"`
+	Units          []RefUnit `json:"units,omitempty"`
+	LocFrom        *int      `json:"loc_from,omitempty"`
+	LocTo          *int      `json:"loc_to,omitempty"`
+}
+
 // SessionView is a session prepared for a screen: its stored fields, its derived
 // state, the resolved topic-group name and the canonical item notation.
 type SessionView struct {
@@ -45,7 +60,7 @@ type SessionView struct {
 	State          SessionState `json:"state"`
 	TopicGroupKey  string       `json:"topic_group_key,omitempty"`
 	TopicGroupName string       `json:"topic_group_name,omitempty"`
-	Items          []Item       `json:"items"`
+	Items          []ItemView   `json:"items"`
 	Notation       string       `json:"notation"`
 	MovedTo        *MovedInfo   `json:"moved_to,omitempty"`
 }
@@ -91,12 +106,12 @@ type WeekView struct {
 	Notes           []string `json:"notes"`
 }
 
-// GroupProgress is one topic group's completion and DGS question weight.
+// GroupProgress is one topic group's completion and question weight.
 type GroupProgress struct {
 	Key          string  `json:"key"`
 	Name         string  `json:"name"`
-	DGSMin       *int    `json:"dgs_min,omitempty"`
-	DGSMax       *int    `json:"dgs_max,omitempty"`
+	QuestionMin  *int    `json:"question_min,omitempty"`
+	QuestionMax  *int    `json:"question_max,omitempty"`
 	PlannedMin   int     `json:"planned_min"`
 	DoneMin      int     `json:"done_min"`
 	DoneFraction float64 `json:"done_fraction"` // 0..1
@@ -160,6 +175,10 @@ func (s *Service) dayTx(ctx context.Context, date clock.Date, db *sql.Tx) (*DayV
 	if err != nil {
 		return nil, err
 	}
+	cat, err := s.loadCatalog(ctx, db)
+	if err != nil {
+		return nil, err
+	}
 
 	daySessions, err := s.st.SessionsByDateRange(ctx, db, date.String(), date.String())
 	if err != nil {
@@ -176,8 +195,8 @@ func (s *Service) dayTx(ctx context.Context, date clock.Date, db *sql.Tx) (*DayV
 		return nil, err
 	}
 	for _, ss := range daySessions {
-		sv := buildSessionView(ss, today, movedBy, tgName, tgKey)
-		attachStudy(&sv, studies[ss.ID], ss.Items)
+		sv := buildSessionView(ss, today, cat, movedBy, tgName, tgKey)
+		attachStudy(&sv, cat, studies[ss.ID], ss.Items)
 		view.Sessions = append(view.Sessions, sv)
 	}
 
@@ -187,8 +206,8 @@ func (s *Service) dayTx(ctx context.Context, date clock.Date, db *sql.Tx) (*DayV
 		return nil, err
 	}
 	if len(tomSessions) > 0 {
-		sv := buildSessionView(tomSessions[0], today, movedBy, tgName, tgKey)
-		attachStudy(&sv, studies[tomSessions[0].ID], tomSessions[0].Items)
+		sv := buildSessionView(tomSessions[0], today, cat, movedBy, tgName, tgKey)
+		attachStudy(&sv, cat, studies[tomSessions[0].ID], tomSessions[0].Items)
 		view.Tomorrow = &sv
 	}
 
@@ -197,7 +216,7 @@ func (s *Service) dayTx(ctx context.Context, date clock.Date, db *sql.Tx) (*DayV
 	if err != nil {
 		return nil, err
 	}
-	view.Notes = noteLines(weekSessions, movedBy)
+	view.Notes = noteLines(weekSessions, cat, movedBy)
 	studyContext, err := s.readStudyContextTx(ctx, db)
 	if err != nil {
 		return nil, err
@@ -206,8 +225,8 @@ func (s *Service) dayTx(ctx context.Context, date clock.Date, db *sql.Tx) (*DayV
 		if entry == nil {
 			return nil
 		}
-		sv := buildSessionView(entry.Session, today, movedBy, tgName, tgKey)
-		attachStudy(&sv, &entry.Study, entry.Session.Items)
+		sv := buildSessionView(entry.Session, today, cat, movedBy, tgName, tgKey)
+		attachStudy(&sv, cat, &entry.Study, entry.Session.Items)
 		return &sv
 	}
 	view.ActiveStudy = resolve(studyContext.Active)
@@ -237,6 +256,10 @@ func (s *Service) weekTx(ctx context.Context, date clock.Date, db *sql.Tx) (*Wee
 		return nil, err
 	}
 	movedBy, err := s.movedByMissedTx(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	cat, err := s.loadCatalog(ctx, db)
 	if err != nil {
 		return nil, err
 	}
@@ -272,8 +295,8 @@ func (s *Service) weekTx(ctx context.Context, date clock.Date, db *sql.Tx) (*Wee
 			IsRest:       len(byDate[ds]) == 0,
 		}
 		for _, ss := range byDate[ds] {
-			sv := buildSessionView(ss, today, movedBy, tgName, tgKey)
-			attachStudy(&sv, studies[ss.ID], ss.Items)
+			sv := buildSessionView(ss, today, cat, movedBy, tgName, tgKey)
+			attachStudy(&sv, cat, studies[ss.ID], ss.Items)
 			row.Sessions = append(row.Sessions, sv)
 		}
 		view.Days = append(view.Days, row)
@@ -290,7 +313,7 @@ func (s *Service) weekTx(ctx context.Context, date clock.Date, db *sql.Tx) (*Wee
 			view.MovedCount++
 		}
 	}
-	view.Notes = noteLines(sessions, movedBy)
+	view.Notes = noteLines(sessions, cat, movedBy)
 
 	phases, err := s.st.ListPhases(ctx, db)
 	if err != nil {
@@ -349,12 +372,12 @@ func (s *Service) Progress(ctx context.Context, examDate clock.Date) (*ProgressV
 
 	for _, g := range groups {
 		gp := GroupProgress{
-			Key:        g.Key,
-			Name:       g.Name,
-			DGSMin:     g.DGSQuestionMin,
-			DGSMax:     g.DGSQuestionMax,
-			PlannedMin: planByGroup[g.ID],
-			DoneMin:    doneByGroup[g.ID],
+			Key:         g.Key,
+			Name:        g.Name,
+			QuestionMin: g.QuestionMin,
+			QuestionMax: g.QuestionMax,
+			PlannedMin:  planByGroup[g.ID],
+			DoneMin:     doneByGroup[g.ID],
 		}
 		gp.DoneFraction = fraction(gp.DoneMin, gp.PlannedMin)
 		gp.Percent = int(math.Round(gp.DoneFraction * 100))
@@ -431,6 +454,10 @@ func (s *Service) Range(ctx context.Context, from, to clock.Date) ([]SessionView
 		if err != nil {
 			return err
 		}
+		cat, err := s.loadCatalog(ctx, tx)
+		if err != nil {
+			return err
+		}
 		sessions, err := s.st.SessionsByDateRange(ctx, tx, from.String(), to.String())
 		if err != nil {
 			return err
@@ -441,8 +468,8 @@ func (s *Service) Range(ctx context.Context, from, to clock.Date) ([]SessionView
 		}
 		views = make([]SessionView, 0, len(sessions))
 		for _, ss := range sessions {
-			sv := buildSessionView(ss, today, movedBy, tgName, tgKey)
-			attachStudy(&sv, studies[ss.ID], ss.Items)
+			sv := buildSessionView(ss, today, cat, movedBy, tgName, tgKey)
+			attachStudy(&sv, cat, studies[ss.ID], ss.Items)
 			views = append(views, sv)
 		}
 		return nil
@@ -475,11 +502,11 @@ type PhaseInfo struct {
 
 // TopicGroupInfo is one topic group in an OutlineView.
 type TopicGroupInfo struct {
-	Key            string `json:"key"`
-	Name           string `json:"name"`
-	Ordinal        int    `json:"ordinal"`
-	DGSQuestionMin *int   `json:"dgs_question_min,omitempty"`
-	DGSQuestionMax *int   `json:"dgs_question_max,omitempty"`
+	Key         string `json:"key"`
+	Name        string `json:"name"`
+	Ordinal     int    `json:"ordinal"`
+	QuestionMin *int   `json:"question_min,omitempty"`
+	QuestionMax *int   `json:"question_max,omitempty"`
 }
 
 // OutlineView is the saved phases and topic groups, for GET /api/v1/outline.
@@ -509,7 +536,7 @@ func (s *Service) Outline(ctx context.Context) (*OutlineView, error) {
 	for _, g := range groups {
 		out.TopicGroups = append(out.TopicGroups, TopicGroupInfo{
 			Key: g.Key, Name: g.Name, Ordinal: g.Ordinal,
-			DGSQuestionMin: g.DGSQuestionMin, DGSQuestionMax: g.DGSQuestionMax,
+			QuestionMin: g.QuestionMin, QuestionMax: g.QuestionMax,
 		})
 	}
 	return out, nil
@@ -517,8 +544,9 @@ func (s *Service) Outline(ctx context.Context) (*OutlineView, error) {
 
 // --- shared read helpers ---
 
-// buildSessionView prepares one stored session for a screen.
-func buildSessionView(ss store.Session, today string, movedBy map[int64]store.MakeupLink, tgName, tgKey map[int64]string) SessionView {
+// buildSessionView prepares one stored session for a screen, resolving its item
+// references against the catalog snapshot.
+func buildSessionView(ss store.Session, today string, cat *catalog, movedBy map[int64]store.MakeupLink, tgName, tgKey map[int64]string) SessionView {
 	sv := SessionView{
 		ID:          ss.ID,
 		Date:        ss.Date,
@@ -526,9 +554,9 @@ func buildSessionView(ss store.Session, today string, movedBy map[int64]store.Ma
 		DurationMin: ss.DurationMin,
 		Kind:        ss.Kind,
 		Completed:   ss.CompletedAt != nil,
-		Items:       toDomainItems(ss.Items),
+		Items:       cat.itemViews(ss.Items),
 	}
-	sv.Notation = FormatItems(sv.Items)
+	sv.Notation = FormatRefs(cat.resolveAll(ss.Items))
 	if ss.TopicGroupID != nil {
 		sv.TopicGroupName = tgName[*ss.TopicGroupID]
 		sv.TopicGroupKey = tgKey[*ss.TopicGroupID]
@@ -561,7 +589,7 @@ func sessionState(ss store.Session, today string, moved bool) SessionState {
 // noteLines generates the plain, blameless note lines for the moved (missed but
 // rescheduled) sessions in the given set, e.g.
 // "Salı yapılamadı; M1·2 cumartesi bloğuna eklendi."
-func noteLines(sessions []store.Session, movedBy map[int64]store.MakeupLink) []string {
+func noteLines(sessions []store.Session, cat *catalog, movedBy map[int64]store.MakeupLink) []string {
 	var notes []string
 	for _, ss := range sessions {
 		if ss.CompletedAt != nil {
@@ -571,7 +599,7 @@ func noteLines(sessions []store.Session, movedBy map[int64]store.MakeupLink) []s
 		if !moved || len(ss.Items) == 0 {
 			continue
 		}
-		ref := Ref(toDomainItems(ss.Items)[0])
+		ref := cat.resolve(ss.Items[0]).head()
 		notes = append(notes, WeekdayTR(ss.Date)+" yapılamadı; "+ref+" "+weekdayLowerTR(link.Date)+" bloğuna eklendi.")
 	}
 	return notes
@@ -604,27 +632,6 @@ func (s *Service) movedByMissed(ctx context.Context, q *sql.DB) (map[int64]store
 		byMissed[l.MakeupOf] = l
 	}
 	return byMissed, nil
-}
-
-// toDomainItems converts stored items to domain items for notation and views.
-func toDomainItems(items []store.SessionItem) []Item {
-	out := make([]Item, 0, len(items))
-	for _, it := range items {
-		out = append(out, Item{
-			Book:          it.Book,
-			ChapterNo:     it.ChapterNo,
-			ChapterTitle:  it.ChapterTitle,
-			PageFrom:      it.PageFrom,
-			PageTo:        it.PageTo,
-			KonuFrom:      it.KonuFrom,
-			KonuTo:        it.KonuTo,
-			SoruFrom:      it.SoruFrom,
-			SoruTo:        it.SoruTo,
-			AntrenmanFrom: it.AntrenmanFrom,
-			AntrenmanTo:   it.AntrenmanTo,
-		})
-	}
-	return out
 }
 
 // fraction returns done/planned bounded to [0, 1], and 0 when planned is 0.

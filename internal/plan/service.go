@@ -114,14 +114,20 @@ func (s *Service) applyPlan(ctx context.Context, tx *sql.Tx, source Source, toda
 	if err != nil {
 		return nil, err
 	}
+	cat, err := s.loadCatalog(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
 
 	// Classify each incoming session and resolve store-dependent references
-	// (topic group, makeup target) before any write, collecting typed errors.
+	// (topic group, makeup target, catalog item references) before any write,
+	// collecting typed errors.
 	type applyItem struct {
 		input    SessionInput
 		existing *store.Session // non-nil when an open session already holds the slot
 		tgID     *int64
 		makeupID *int64
+		items    []store.SessionItem // catalog references resolved to ids
 	}
 	var toApply []applyItem
 	var verr errBuilder
@@ -148,8 +154,12 @@ func (s *Service) applyPlan(ctx context.Context, tx *sql.Tx, source Source, toda
 		if err != nil {
 			return nil, err
 		}
+		items := make([]store.SessionItem, 0, len(si.Items))
+		for j, it := range si.Items {
+			items = append(items, cat.resolveWrite(&verr, fmt.Sprintf("%s.items[%d]", p, j), it))
+		}
 
-		item := applyItem{input: si, tgID: tgID, makeupID: makeupID}
+		item := applyItem{input: si, tgID: tgID, makeupID: makeupID, items: items}
 		if ok {
 			exCopy := ex
 			item.existing = &exCopy
@@ -163,7 +173,7 @@ func (s *Service) applyPlan(ctx context.Context, tx *sql.Tx, source Source, toda
 	}
 
 	for _, a := range toApply {
-		items := toStoreItems(a.input.Items)
+		items := a.items
 		if a.existing != nil {
 			if contentEqual(*a.existing, a.input.DurationMin, a.input.Kind, a.tgID, a.makeupID, items) {
 				result.Unchanged = append(result.Unchanged, refOf(*a.existing))
@@ -381,29 +391,6 @@ func (s *Service) remember(ctx context.Context, tx *sql.Tx, key, hash string, re
 
 // --- helpers on plain values (no store/clock) ---
 
-// toStoreItems converts request items to store items (ids and ordinals set on
-// insert).
-func toStoreItems(items []Item) []store.SessionItem {
-	out := make([]store.SessionItem, 0, len(items))
-	for i, it := range items {
-		out = append(out, store.SessionItem{
-			Ordinal:       i,
-			Book:          it.Book,
-			ChapterNo:     it.ChapterNo,
-			ChapterTitle:  it.ChapterTitle,
-			PageFrom:      it.PageFrom,
-			PageTo:        it.PageTo,
-			KonuFrom:      it.KonuFrom,
-			KonuTo:        it.KonuTo,
-			SoruFrom:      it.SoruFrom,
-			SoruTo:        it.SoruTo,
-			AntrenmanFrom: it.AntrenmanFrom,
-			AntrenmanTo:   it.AntrenmanTo,
-		})
-	}
-	return out
-}
-
 // withSessionID returns a copy of items bound to sessionID with sequential
 // ordinals, for building an accurate after-snapshot.
 func withSessionID(items []store.SessionItem, sessionID int64) []store.SessionItem {
@@ -443,17 +430,12 @@ func contentEqual(ex store.Session, dur int, kind string, tg, makeup *int64, ite
 
 // itemContentEqual compares two items ignoring ids and session ids.
 func itemContentEqual(a, b store.SessionItem) bool {
-	return a.Book == b.Book &&
-		a.ChapterNo == b.ChapterNo &&
-		a.ChapterTitle == b.ChapterTitle &&
-		a.PageFrom == b.PageFrom &&
-		a.PageTo == b.PageTo &&
-		intPtrEqual(a.KonuFrom, b.KonuFrom) &&
-		intPtrEqual(a.KonuTo, b.KonuTo) &&
-		intPtrEqual(a.SoruFrom, b.SoruFrom) &&
-		intPtrEqual(a.SoruTo, b.SoruTo) &&
-		intPtrEqual(a.AntrenmanFrom, b.AntrenmanFrom) &&
-		intPtrEqual(a.AntrenmanTo, b.AntrenmanTo)
+	return a.SourceID == b.SourceID &&
+		int64PtrEqual(a.SectionID, b.SectionID) &&
+		intPtrEqual(a.UnitFrom, b.UnitFrom) &&
+		intPtrEqual(a.UnitTo, b.UnitTo) &&
+		intPtrEqual(a.LocFrom, b.LocFrom) &&
+		intPtrEqual(a.LocTo, b.LocTo)
 }
 
 func intPtrEqual(a, b *int) bool {
@@ -473,17 +455,12 @@ func int64PtrEqual(a, b *int64) bool {
 // snapshotJSON renders a session's content as the JSON kept in audit before/after.
 func snapshotJSON(s store.Session) (string, error) {
 	type snapItem struct {
-		Book          string `json:"book"`
-		ChapterNo     int    `json:"chapter_no"`
-		ChapterTitle  string `json:"chapter_title"`
-		PageFrom      int    `json:"page_from"`
-		PageTo        int    `json:"page_to"`
-		KonuFrom      *int   `json:"konu_from,omitempty"`
-		KonuTo        *int   `json:"konu_to,omitempty"`
-		SoruFrom      *int   `json:"soru_from,omitempty"`
-		SoruTo        *int   `json:"soru_to,omitempty"`
-		AntrenmanFrom *int   `json:"antrenman_from,omitempty"`
-		AntrenmanTo   *int   `json:"antrenman_to,omitempty"`
+		SourceID  int64  `json:"source_id"`
+		SectionID *int64 `json:"section_id,omitempty"`
+		UnitFrom  *int   `json:"unit_from,omitempty"`
+		UnitTo    *int   `json:"unit_to,omitempty"`
+		LocFrom   *int   `json:"loc_from,omitempty"`
+		LocTo     *int   `json:"loc_to,omitempty"`
 	}
 	type snap struct {
 		ID           int64      `json:"id"`
@@ -508,11 +485,9 @@ func snapshotJSON(s store.Session) (string, error) {
 	}
 	for _, it := range s.Items {
 		sn.Items = append(sn.Items, snapItem{
-			Book: it.Book, ChapterNo: it.ChapterNo, ChapterTitle: it.ChapterTitle,
-			PageFrom: it.PageFrom, PageTo: it.PageTo,
-			KonuFrom: it.KonuFrom, KonuTo: it.KonuTo,
-			SoruFrom: it.SoruFrom, SoruTo: it.SoruTo,
-			AntrenmanFrom: it.AntrenmanFrom, AntrenmanTo: it.AntrenmanTo,
+			SourceID: it.SourceID, SectionID: it.SectionID,
+			UnitFrom: it.UnitFrom, UnitTo: it.UnitTo,
+			LocFrom: it.LocFrom, LocTo: it.LocTo,
 		})
 	}
 	buf, err := json.Marshal(sn)

@@ -327,26 +327,23 @@ func validateBookmark(ss store.Session, b Bookmark) error {
 	if item == nil {
 		return fieldError("bookmark.item_ordinal", CodeNotFound, "geçerli bir kaynak seçin")
 	}
-	from, to := item.PageFrom, item.PageTo
 	if ss.Kind == KindAksam {
 		switch b.Stage {
-		case StageKonu:
-			if item.KonuFrom != nil && item.KonuTo != nil {
-				from, to = *item.KonuFrom, *item.KonuTo
-			}
-		case StageSoru:
-			if item.SoruFrom != nil && item.SoruTo != nil {
-				from, to = *item.SoruFrom, *item.SoruTo
-			}
-		case StageYanlisDefteri:
+		case StageKonu, StageSoru, StageYanlisDefteri:
 		default:
 			return fieldError("bookmark.stage", CodeInvalid, "konu, soru veya yanlış defteri aşamasını seçin")
 		}
 	} else if b.Stage != StageCalisma {
 		return fieldError("bookmark.stage", CodeInvalid, "çalışma aşamasını seçin")
 	}
-	if b.ResumePage < from || b.ResumePage > to {
-		return fieldError("bookmark.resume_page", CodeOutOfRange, "devam edeceğin sayfa seçilen kaynak ve aşama aralığında olmalı")
+	// ResumePage is a location value in the source's location unit. When the item
+	// carries a location range, the resume position must fall inside it; an item
+	// with only a unit range imposes no location bound. (The v1 konu/soru
+	// sub-ranges are gone with the catalog model; WKY-27 redefines stage detail.)
+	if item.LocFrom != nil && item.LocTo != nil {
+		if b.ResumePage < *item.LocFrom || b.ResumePage > *item.LocTo {
+			return fieldError("bookmark.resume_page", CodeOutOfRange, "devam edeceğin konum seçilen kaynağın konum aralığında olmalı")
+		}
 	}
 	return nil
 }

@@ -17,11 +17,11 @@ func TestPartialOriginalAndMakeupTotals(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc.clk = clock.Fake{Current: istanbul(t, "2026-10-28 21:00")}
-	rows, err := svc.Range(ctx, clock.Date{Year: 2026, Month: 10, Day: 26}, svc.TodayDate())
-	if err != nil {
+	if _, err := svc.Range(ctx, clock.Date{Year: 2026, Month: 10, Day: 26}, svc.TodayDate()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.SavePlan(ctx, SourceAPI, SavePlanRequest{From: "2026-10-28", To: "2026-10-28", Sessions: []SessionInput{{Date: "2026-10-28", StartTime: "19:00", DurationMin: 90, Kind: KindAksam, Items: rows[0].Items, MakeupOf: &SlotRef{Date: "2026-10-26", StartTime: "20:30"}}}}); err != nil {
+	makeupItems := []Item{{SourceKey: "M1", SectionOrdinal: ptr(1), LocFrom: ptr(1), LocTo: ptr(22)}}
+	if _, err := svc.SavePlan(ctx, SourceAPI, SavePlanRequest{From: "2026-10-28", To: "2026-10-28", Sessions: []SessionInput{{Date: "2026-10-28", StartTime: "19:00", DurationMin: 90, Kind: KindAksam, Items: makeupItems, MakeupOf: &SlotRef{Date: "2026-10-26", StartTime: "20:30"}}}}); err != nil {
 		t.Fatal(err)
 	}
 	makeup := sessionAt(t, st, "2026-10-28", "19:00").ID

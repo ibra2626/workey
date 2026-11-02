@@ -15,13 +15,13 @@ func TestSavePlanStartedProtection(t *testing.T) {
 			t.Run(status+"/"+change, func(t *testing.T) {
 				ctx := context.Background()
 				svc, st := newService(t, istanbul(t, "2026-10-26 09:00"))
-				week := loadWeek(t, svc)
+				week := loadWeek(t, svc, st)
 				if _, err := svc.SavePlan(ctx, SourceAPI, week); err != nil {
 					t.Fatal(err)
 				}
 				input := week.Sessions[0]
 				before := sessionAt(t, st, input.Date, input.StartTime)
-				stage, ordinal, page := "konu", 0, before.Items[0].PageFrom
+				stage, ordinal, page := "konu", 0, *before.Items[0].LocFrom
 				study := &store.Study{SessionID: before.ID, Status: status, EntryMode: "normal", FirstStartedAt: svc.nowUTC(), LastStartedAt: svc.nowUTC(), UpdatedAt: svc.nowUTC(), ItemOrdinal: &ordinal, Stage: &stage, ResumePage: &page, Version: 1}
 				if err := st.InsertStudy(ctx, st.DB(), study); err != nil {
 					t.Fatal(err)
@@ -32,10 +32,10 @@ func TestSavePlanStartedProtection(t *testing.T) {
 				case "same":
 					wantUnchanged = 5
 				case "source":
-					week.Sessions[0].Items[0].ChapterTitle = "Değişen temsili kaynak"
+					week.Sessions[0].Items[0].SectionOrdinal = ptr(2)
 					wantSkip = 1
 				case "page":
-					week.Sessions[0].Items[0].PageTo++
+					week.Sessions[0].Items[0].LocTo = ptr(*week.Sessions[0].Items[0].LocTo + 1)
 					wantSkip = 1
 				case "extra-item":
 					week.Sessions[0].Items = append(week.Sessions[0].Items, week.Sessions[0].Items[0])
@@ -111,7 +111,7 @@ func TestSavePlanStartedProtection(t *testing.T) {
 func TestStartedSkipPrecedence(t *testing.T) {
 	ctx := context.Background()
 	svc, st := newService(t, istanbul(t, "2026-10-26 09:00"))
-	week := loadWeek(t, svc)
+	week := loadWeek(t, svc, st)
 	if _, err := svc.SavePlan(ctx, SourceAPI, week); err != nil {
 		t.Fatal(err)
 	}

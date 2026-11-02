@@ -49,7 +49,7 @@ func TestStudyReadSnapshotsAndProgress(t *testing.T) {
 		t.Fatalf("paused: %+v", v)
 	}
 	bm := v.Study.Bookmark
-	if bm == nil || bm.ItemOrdinal != 1 || bm.ResumePage != 105 || bm.Item.Book != "G1" || bm.Notation != "G1·1, s. 100–110" {
+	if bm == nil || bm.ItemOrdinal != 1 || bm.ResumePage != 105 || bm.Item.SourceKey != "G1" || bm.Notation != "G1·1, s. 100–110" {
 		t.Fatalf("resolved bookmark: %+v", bm)
 	}
 	week, err := svc.Week(ctx, date)
@@ -80,7 +80,7 @@ func TestStudyReadSnapshotsAndProgress(t *testing.T) {
 		t.Fatalf("midnight: %+v", day)
 	}
 	// A makeup link remains separate from the original study/bookmark.
-	req := SavePlanRequest{From: "2026-10-28", To: "2026-10-28", Sessions: []SessionInput{{Date: "2026-10-28", StartTime: "19:00", Kind: KindAksam, DurationMin: 90, Items: []Item{v.Items[0]}, MakeupOf: &SlotRef{Date: "2026-10-26", StartTime: "20:30"}}}}
+	req := SavePlanRequest{From: "2026-10-28", To: "2026-10-28", Sessions: []SessionInput{{Date: "2026-10-28", StartTime: "19:00", Kind: KindAksam, DurationMin: 90, Items: []Item{{SourceKey: "M1", SectionOrdinal: ptr(1), LocFrom: ptr(1), LocTo: ptr(22)}}, MakeupOf: &SlotRef{Date: "2026-10-26", StartTime: "20:30"}}}}
 	if _, err := svc.SavePlan(ctx, SourceAPI, req); err != nil {
 		t.Fatal(err)
 	}

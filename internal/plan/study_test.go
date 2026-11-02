@@ -18,8 +18,8 @@ var studyExam = clock.Date{Year: 2027, Month: 7, Day: 18}
 func studyFixture(t *testing.T) (*Service, *store.Store, int64, int64) {
 	t.Helper()
 	svc, st := newService(t, istanbul(t, "2026-10-26 21:00"))
-	req := loadWeek(t, svc)
-	req.Sessions[0].Items = append(req.Sessions[0].Items, Item{Book: "G1", ChapterNo: 1, ChapterTitle: "Temsili kaynak", PageFrom: 100, PageTo: 110})
+	req := loadWeek(t, svc, st)
+	req.Sessions[0].Items = append(req.Sessions[0].Items, Item{SourceKey: "G1", SectionOrdinal: ptr(1), LocFrom: ptr(100), LocTo: ptr(110)})
 	if _, err := svc.SavePlan(context.Background(), SourceAPI, req); err != nil {
 		t.Fatal(err)
 	}
@@ -136,14 +136,18 @@ func TestStudyLifecycleVersionsAndBookmarks(t *testing.T) {
 }
 
 func TestStudyBookmarkValidation(t *testing.T) {
+	// Under the catalog model the resume position is validated against the
+	// item's location range only; the akşam konu/soru sub-ranges are gone. The
+	// stage gate stays: konu/soru/yanlis_defteri for akşam, calisma otherwise.
 	for _, kind := range []string{KindAksam, KindUzunBlok, KindDeneme} {
 		for _, stage := range []string{StageKonu, StageSoru, StageYanlisDefteri, StageCalisma, ""} {
 			for _, page := range []int{0, 9, 10, 12, 13, 14, 20, 21} {
-				ss := store.Session{Kind: kind, Items: []store.SessionItem{{Ordinal: 0, PageFrom: 10, PageTo: 20, KonuFrom: ptr(10), KonuTo: ptr(12), SoruFrom: ptr(13), SoruTo: ptr(20)}}}
-				valid := kind != KindAksam && stage == StageCalisma && page >= 10 && page <= 20
+				ss := store.Session{Kind: kind, Items: []store.SessionItem{{Ordinal: 0, LocFrom: ptr(10), LocTo: ptr(20)}}}
+				stageOK := stage == StageCalisma
 				if kind == KindAksam {
-					valid = (stage == StageKonu && page >= 10 && page <= 12) || (stage == StageSoru && page >= 13 && page <= 20) || (stage == StageYanlisDefteri && page >= 10 && page <= 20)
+					stageOK = stage == StageKonu || stage == StageSoru || stage == StageYanlisDefteri
 				}
+				valid := stageOK && page >= 10 && page <= 20
 				err := validateBookmark(ss, Bookmark{0, stage, page})
 				if (err == nil) != valid {
 					t.Errorf("kind=%s stage=%s page=%d err=%v", kind, stage, page, err)
@@ -254,7 +258,7 @@ func TestStudyTemporalRulesAndMakeup(t *testing.T) {
 		t.Fatal(err)
 	}
 	// A makeup points to the old work without inheriting its bookmark.
-	req := SavePlanRequest{From: "2026-10-27", To: "2026-10-27", Sessions: []SessionInput{{Date: "2026-10-27", StartTime: "20:30", Kind: KindAksam, DurationMin: 90, Items: []Item{{Book: "M1", ChapterNo: 1, ChapterTitle: "Temsili", PageFrom: 1, PageTo: 5}}, MakeupOf: &SlotRef{Date: "2026-10-26", StartTime: "20:30"}}}}
+	req := SavePlanRequest{From: "2026-10-27", To: "2026-10-27", Sessions: []SessionInput{{Date: "2026-10-27", StartTime: "20:30", Kind: KindAksam, DurationMin: 90, Items: []Item{{SourceKey: "M1", SectionOrdinal: ptr(1), LocFrom: ptr(1), LocTo: ptr(5)}}, MakeupOf: &SlotRef{Date: "2026-10-26", StartTime: "20:30"}}}}
 	if _, err := svc.SavePlan(ctx, SourceAPI, req); err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +268,7 @@ func TestStudyTemporalRulesAndMakeup(t *testing.T) {
 		t.Fatalf("moved: %v", err)
 	}
 	c, err = svc.ReadStudyContext(ctx)
-	if err != nil || c.LatestPaused.MovedTo.ID != future || c.LatestPaused.BookmarkItem.Book != "G1" {
+	if err != nil || c.LatestPaused.MovedTo.ID != future || c.LatestPaused.BookmarkItem.SourceID != sourceID(t, st, "G1") {
 		t.Fatalf("resolved context: %+v %v", c, err)
 	}
 	if _, err := svc.Complete(ctx, SourceWeb, id, 2); err != nil {
@@ -381,7 +385,7 @@ func TestStudyContextSurvivesReopenAndSelectsLastPaused(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc := New(st, clock.Fake{Current: istanbul(t, "2026-10-26 21:00")})
-	req := loadWeek(t, svc)
+	req := loadWeek(t, svc, st)
 	if _, err := svc.SavePlan(ctx, SourceAPI, req); err != nil {
 		t.Fatal(err)
 	}

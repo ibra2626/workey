@@ -53,6 +53,11 @@ const (
 	CodeMakeupTarget = "makeup_target" // makeup_of does not point at a missed session
 	CodeReferenced   = "referenced"    // deleting an entity still referenced by sessions
 	CodeFuture       = "future"        // completing or undoing a session dated after today
+
+	// Catalog-reference codes (an item points at something not in the catalog).
+	CodeUnknownSource  = "unknown_source"    // source_key names no stored source
+	CodeUnknownSection = "unknown_section"   // section_ordinal has no section in that source
+	CodeUnitOutOfRange = "unit_out_of_range" // unit range exceeds the section's units
 )
 
 // fieldError builds a *ValidationError carrying a single field error, for the

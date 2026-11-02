@@ -38,6 +38,60 @@ func newService(t *testing.T, now time.Time) (*Service, *store.Store) {
 	return New(st, clock.Fake{Current: now}), st
 }
 
+// seedCatalog inserts the sample 'M1' source the sample week references: four
+// page-ranged sections and, under section 3, three "Antrenman" units. Sources
+// have no SavePlan-style service path yet (WKY-24/25), so tests seed the catalog
+// through the store directly.
+func seedCatalog(t *testing.T, st *store.Store) {
+	t.Helper()
+	ctx := context.Background()
+	db := st.DB()
+	src := &store.Source{Key: "M1", Name: "Antrenmanlarla Matematik 1", Kind: "book",
+		LocationUnit: "page", Ordinal: 1, CreatedAt: "2026-10-01T00:00:00Z", UpdatedAt: "2026-10-01T00:00:00Z"}
+	if err := st.InsertSource(ctx, db, src); err != nil {
+		t.Fatalf("InsertSource: %v", err)
+	}
+	ptr := func(n int) *int { return &n }
+	secs := []store.Section{
+		{SourceID: src.ID, Ordinal: 1, Name: "Temel kavramlar", LocFrom: ptr(1), LocTo: ptr(22)},
+		{SourceID: src.ID, Ordinal: 2, Name: "Sayı basamakları", LocFrom: ptr(23), LocTo: ptr(40)},
+		{SourceID: src.ID, Ordinal: 3, Name: "Üslü ifadeler", LocFrom: ptr(41), LocTo: ptr(58)},
+		{SourceID: src.ID, Ordinal: 4, Name: "Köklü ifadeler", LocFrom: ptr(59), LocTo: ptr(76)},
+	}
+	for i := range secs {
+		if err := st.InsertSection(ctx, db, &secs[i]); err != nil {
+			t.Fatalf("InsertSection: %v", err)
+		}
+	}
+	// Section 3 (Üslü ifadeler) carries three Antrenman units.
+	for n := 1; n <= 3; n++ {
+		u := &store.Unit{SectionID: secs[2].ID, Ordinal: n, Label: "Antrenman", Number: ptr(n)}
+		if err := st.InsertUnit(ctx, db, u); err != nil {
+			t.Fatalf("InsertUnit: %v", err)
+		}
+	}
+	// A second source the study tests reference as a distinct bookmark source.
+	g1 := &store.Source{Key: "G1", Name: "Antrenmanlarla Geometri 1", Kind: "book",
+		LocationUnit: "page", Ordinal: 2, CreatedAt: "2026-10-01T00:00:00Z", UpdatedAt: "2026-10-01T00:00:00Z"}
+	if err := st.InsertSource(ctx, db, g1); err != nil {
+		t.Fatalf("InsertSource G1: %v", err)
+	}
+	g1sec := &store.Section{SourceID: g1.ID, Ordinal: 1, Name: "Temsili kaynak", LocFrom: ptr(100), LocTo: ptr(110)}
+	if err := st.InsertSection(ctx, db, g1sec); err != nil {
+		t.Fatalf("InsertSection G1: %v", err)
+	}
+}
+
+// sourceID returns the stored source id for a key, failing if it is absent.
+func sourceID(t *testing.T, st *store.Store, key string) int64 {
+	t.Helper()
+	src, err := st.SourceByKey(context.Background(), st.DB(), key)
+	if err != nil || src == nil {
+		t.Fatalf("SourceByKey %s: %v", key, err)
+	}
+	return src.ID
+}
+
 // loadFixture decodes testdata/<name> into v.
 func loadFixture(t *testing.T, name string, v any) {
 	t.Helper()
@@ -79,9 +133,10 @@ func sessionAt(t *testing.T, st *store.Store, date, startTime string) *store.Ses
 
 // loadWeek applies the sample outline then the sample week at the service's
 // clock, returning the decoded week request.
-func loadWeek(t *testing.T, svc *Service) SavePlanRequest {
+func loadWeek(t *testing.T, svc *Service, st *store.Store) SavePlanRequest {
 	t.Helper()
 	ctx := context.Background()
+	seedCatalog(t, st)
 	var outline SaveOutlineRequest
 	loadFixture(t, "sample-outline.json", &outline)
 	if _, err := svc.SaveOutline(ctx, SourceAPI, outline); err != nil {
@@ -95,7 +150,7 @@ func loadWeek(t *testing.T, svc *Service) SavePlanRequest {
 func TestSavePlanSampleWeekCreateAndIdempotent(t *testing.T) {
 	ctx := context.Background()
 	svc, st := newService(t, istanbul(t, "2026-10-26 09:00"))
-	week := loadWeek(t, svc)
+	week := loadWeek(t, svc, st)
 
 	res, err := svc.SavePlan(ctx, SourceAPI, week)
 	if err != nil {
@@ -108,14 +163,14 @@ func TestSavePlanSampleWeekCreateAndIdempotent(t *testing.T) {
 		t.Fatalf("unexpected non-create results: %+v", res)
 	}
 
-	// The Wednesday session round-trips its konu/soru/antrenman split.
+	// The Wednesday session round-trips its Antrenman unit range (1–3).
 	wed := sessionAt(t, st, "2026-10-28", "20:30")
 	if wed == nil || len(wed.Items) != 1 {
 		t.Fatalf("wednesday session not stored as expected: %+v", wed)
 	}
 	it := wed.Items[0]
-	if it.AntrenmanFrom == nil || *it.AntrenmanFrom != 1 || it.AntrenmanTo == nil || *it.AntrenmanTo != 3 {
-		t.Errorf("wednesday antrenman = %v..%v, want 1..3", it.AntrenmanFrom, it.AntrenmanTo)
+	if it.UnitFrom == nil || *it.UnitFrom != 1 || it.UnitTo == nil || *it.UnitTo != 3 {
+		t.Errorf("wednesday unit range = %v..%v, want 1..3", it.UnitFrom, it.UnitTo)
 	}
 
 	auditAfterCreate := sessionAuditCount(t, st)
@@ -139,14 +194,14 @@ func TestSavePlanSampleWeekCreateAndIdempotent(t *testing.T) {
 func TestSavePlanChangeOneSession(t *testing.T) {
 	ctx := context.Background()
 	svc, st := newService(t, istanbul(t, "2026-10-26 09:00"))
-	week := loadWeek(t, svc)
+	week := loadWeek(t, svc, st)
 	if _, err := svc.SavePlan(ctx, SourceAPI, week); err != nil {
 		t.Fatalf("SavePlan: %v", err)
 	}
 	before := auditCount(t, st)
 
-	// Change only Thursday's page range.
-	week.Sessions[3].Items[0].PageTo = 80
+	// Change only Thursday's location range.
+	week.Sessions[3].Items[0].LocTo = ptr(80)
 	res, err := svc.SavePlan(ctx, SourceAPI, week)
 	if err != nil {
 		t.Fatalf("SavePlan change: %v", err)
@@ -158,8 +213,8 @@ func TestSavePlanChangeOneSession(t *testing.T) {
 		t.Errorf("updated session date = %s, want 2026-10-29", res.Updated[0].Date)
 	}
 	thu := sessionAt(t, st, "2026-10-29", "20:30")
-	if thu.Items[0].PageTo != 80 {
-		t.Errorf("thursday page_to = %d, want 80", thu.Items[0].PageTo)
+	if thu.Items[0].LocTo == nil || *thu.Items[0].LocTo != 80 {
+		t.Errorf("thursday loc_to = %v, want 80", thu.Items[0].LocTo)
 	}
 	if n := auditCount(t, st); n != before+1 {
 		t.Errorf("audit rows = %d, want %d (one update)", n, before+1)
@@ -168,8 +223,8 @@ func TestSavePlanChangeOneSession(t *testing.T) {
 
 func TestSavePlanPastDateSkipped(t *testing.T) {
 	ctx := context.Background()
-	svc, _ := newService(t, istanbul(t, "2026-10-28 09:00"))
-	week := loadWeek(t, svc)
+	svc, st := newService(t, istanbul(t, "2026-10-28 09:00"))
+	week := loadWeek(t, svc, st)
 
 	res, err := svc.SavePlan(ctx, SourceAPI, week)
 	if err != nil {
@@ -191,7 +246,7 @@ func TestSavePlanPastDateSkipped(t *testing.T) {
 func TestSavePlanCompletedUntouched(t *testing.T) {
 	ctx := context.Background()
 	svc, st := newService(t, istanbul(t, "2026-10-26 09:00"))
-	week := loadWeek(t, svc)
+	week := loadWeek(t, svc, st)
 	if _, err := svc.SavePlan(ctx, SourceAPI, week); err != nil {
 		t.Fatalf("SavePlan: %v", err)
 	}
@@ -205,8 +260,8 @@ func TestSavePlanCompletedUntouched(t *testing.T) {
 	}
 	before := auditCount(t, st)
 
-	// Try to change Wednesday's pages: it must be skipped and left intact.
-	week.Sessions[2].Items[0].PageTo = 60
+	// Try to change Wednesday's location range: it must be skipped and left intact.
+	week.Sessions[2].Items[0].LocTo = ptr(60)
 	res, err := svc.SavePlan(ctx, SourceAPI, week)
 	if err != nil {
 		t.Fatalf("SavePlan: %v", err)
@@ -218,8 +273,8 @@ func TestSavePlanCompletedUntouched(t *testing.T) {
 		t.Fatalf("a completed session must never be deleted, got %+v", res.Deleted)
 	}
 	again := sessionAt(t, st, "2026-10-28", "20:30")
-	if again.Items[0].PageTo != 58 {
-		t.Errorf("completed session changed: page_to = %d, want 58", again.Items[0].PageTo)
+	if again.Items[0].LocTo == nil || *again.Items[0].LocTo != 58 {
+		t.Errorf("completed session changed: loc_to = %v, want 58", again.Items[0].LocTo)
 	}
 	if n := auditCount(t, st); n != before {
 		t.Errorf("audit rows changed for a frozen session: %d -> %d", before, n)
@@ -229,7 +284,7 @@ func TestSavePlanCompletedUntouched(t *testing.T) {
 func TestSavePlanShrinkDeletesOpenFuture(t *testing.T) {
 	ctx := context.Background()
 	svc, st := newService(t, istanbul(t, "2026-10-26 09:00"))
-	week := loadWeek(t, svc)
+	week := loadWeek(t, svc, st)
 	if _, err := svc.SavePlan(ctx, SourceAPI, week); err != nil {
 		t.Fatalf("SavePlan: %v", err)
 	}
@@ -258,6 +313,7 @@ func TestSavePlanShrinkDeletesOpenFuture(t *testing.T) {
 func TestSavePlanMakeupLink(t *testing.T) {
 	ctx := context.Background()
 	svc, st := newService(t, istanbul(t, "2026-10-28 09:00"))
+	seedCatalog(t, st)
 
 	// A past, uncompleted session: the missed Tuesday block.
 	now := svc.nowUTC()
@@ -266,7 +322,7 @@ func TestSavePlanMakeupLink(t *testing.T) {
 		t.Fatalf("insert missed: %v", err)
 	}
 
-	item := Item{Book: "M1", ChapterNo: 2, ChapterTitle: "Sayı basamakları", PageFrom: 23, PageTo: 40}
+	item := Item{SourceKey: "M1", SectionOrdinal: ptr(2), LocFrom: ptr(23), LocTo: ptr(40)}
 
 	t.Run("valid past target links", func(t *testing.T) {
 		req := SavePlanRequest{From: "2026-10-28", To: "2026-10-31", Sessions: []SessionInput{
@@ -324,7 +380,7 @@ func TestSavePlanMakeupLink(t *testing.T) {
 func TestSavePlanIdempotencyKey(t *testing.T) {
 	ctx := context.Background()
 	svc, st := newService(t, istanbul(t, "2026-10-26 09:00"))
-	week := loadWeek(t, svc)
+	week := loadWeek(t, svc, st)
 	week.IdempotencyKey = "week-1-v1"
 
 	res, err := svc.SavePlan(ctx, SourceAPI, week)
@@ -360,11 +416,11 @@ func TestSavePlanIdempotencyKey(t *testing.T) {
 func TestSavePlanAuditBeforeAfter(t *testing.T) {
 	ctx := context.Background()
 	svc, st := newService(t, istanbul(t, "2026-10-26 09:00"))
-	week := loadWeek(t, svc)
+	week := loadWeek(t, svc, st)
 	if _, err := svc.SavePlan(ctx, SourceAPI, week); err != nil {
 		t.Fatalf("SavePlan: %v", err)
 	}
-	week.Sessions[0].Items[0].PageTo = 25
+	week.Sessions[0].Items[0].LocTo = ptr(25)
 	if _, err := svc.SavePlan(ctx, SourceAPI, week); err != nil {
 		t.Fatalf("SavePlan update: %v", err)
 	}
@@ -420,6 +476,7 @@ func TestSaveOutlineReplaceAndReferencedDelete(t *testing.T) {
 	}
 
 	// A session references the "temel-kavramlar" group.
+	seedCatalog(t, st)
 	var week SavePlanRequest
 	loadFixture(t, "sample-week.json", &week)
 	if _, err := svc.SavePlan(ctx, SourceAPI, week); err != nil {

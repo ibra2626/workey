@@ -2,6 +2,19 @@
 
 Record accepted decisions with date, context, decision, alternatives, and consequences. Do not record proposals as accepted decisions.
 
+## 2026-11-02 — WKY-22: plan domain bound to the catalog (implementation)
+- Context: rebind `internal/plan` to the catalog `store.SessionItem`/`TopicGroup` from WKY-21. Changing `plan.Item` breaks every downstream layer that renders the v1 book/chapter/page/konu/soru/antrenman concepts; those concepts no longer exist.
+- Decision:
+  - **Items reference the source by its stable `key`, the section by `ordinal`, the unit range by 1-based unit ordinals within the section, and a raw location range in the source's location unit.** `plan.Item = {SourceKey, SectionOrdinal *int, UnitFrom/UnitTo *int, LocFrom/LocTo *int}`. The service resolves key→id and section ordinal→id at write time (a per-tx `catalog` snapshot in `resolve.go`). Alternative — items carry raw ids — rejected: the agent writes by human-readable key; ids are internal.
+  - **An item needs a unit range or a location range; a unit range requires a section.** Structural checks in `validate.go`; catalog-reference checks in the service against the stored catalog, as typed `ValidationError`s with codes `unknown_source` / `unknown_section` / `unit_out_of_range` (unit range vs the section's unit ordinals).
+  - **`kind` is a free label** — the `validKinds` enum gate is dropped (store imposes no CHECK); the `KindAksam/UzunBlok/Deneme` constants stay as display hints. `TopicGroupInput`/read models rename `DGSQuestion*`/`DGSMin/Max` → `Question*`/`QuestionMin/Max`.
+  - **Notation is resolved-data-in, string-out** (`notation.go`): `FormatRef(ItemRef)` renders `M1·4, Antrenman 5–7, Test 1–2` — source key · section ordinal, then unit label groups (consecutive same-label units collapse to a number range using each unit's `number`), then the location range with a unit prefix (page→"s. ", minute→"dk ", lesson→"ders ", other→none). U+00B7 / U+2013 preserved; multi-item join with " · ". Read models resolve items via the catalog (`read.go`, `ItemView` with source/section/unit display fields).
+  - **Session-study flow adapted minimally, not redesigned:** `Bookmark.ResumePage` is kept but is now a location value validated against the item's loc range (the v1 konu/soru sub-range narrowing is gone); the stage gate (konu/soru/yanlis_defteri for akşam, calisma otherwise) stays. Fuller stage semantics under the catalog are revisited in WKY-27.
+  - **Catalog write-path input types** (`SaveSourceRequest{Source, Sections[]}` with units per section) are defined now for WKY-24/25 to share, though unused this task.
+  - **Scope split (user, 2026-11-02):** WKY-22 keeps only `internal/plan` + `internal/store` building and green. The downstream compile-and-rebind of `internal/mcpserver`+`internal/apidoc` (WKY-24), `internal/api` (WKY-25) and `internal/web`(+views) (WKY-26/27) moves to those tasks; the whole-tree `go build ./...` is intentionally red until WKY-28.
+- Alternatives: items carry raw ids (rejected, above); full web/transport compile-fix now (rejected by the user — it would gut real logic owned by WKY-24..27); leave the study flow fully to a later task (rejected — it lives in `internal/plan`, which must compile).
+- Consequences: `go test ./internal/plan/... ./internal/store/...` green, `go vet` clean, both packages build normal + `CGO_ENABLED=0`, gofmt-clean on LF content. `testdata/sample-*.json` moved to the catalog shape (so the deferred api/mcp/web tests that read them stay red). No commit/push.
+
 ## 2026-11-02 — WKY-21: catalog schema and store layer (implementation)
 - Context: first task of the v2 catalog feature — rebuild the embedded schema and the `internal/store` API for the direction below. No committed data to preserve, so `0001_init.sql` is rewritten in place (not a second migration); `0002_study_flow.sql` is kept unchanged (it references only `sessions`).
 - Decision:

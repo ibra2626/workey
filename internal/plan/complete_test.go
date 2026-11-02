@@ -21,7 +21,7 @@ func actionAuditCount(t *testing.T, st *store.Store, action string) int {
 func TestCompleteFutureRejected(t *testing.T) {
 	ctx := context.Background()
 	svc, st := newService(t, istanbul(t, "2026-10-26 09:00"))
-	week := loadWeek(t, svc)
+	week := loadWeek(t, svc, st)
 	if _, err := svc.SavePlan(ctx, SourceAPI, week); err != nil {
 		t.Fatalf("SavePlan: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestCompleteMissingSession(t *testing.T) {
 func TestCompleteIdempotentOneAudit(t *testing.T) {
 	ctx := context.Background()
 	svc, st := newService(t, istanbul(t, "2026-10-26 09:00"))
-	week := loadWeek(t, svc)
+	week := loadWeek(t, svc, st)
 	if _, err := svc.SavePlan(ctx, SourceAPI, week); err != nil {
 		t.Fatalf("SavePlan: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestCompleteIdempotentOneAudit(t *testing.T) {
 func TestUndoRestores(t *testing.T) {
 	ctx := context.Background()
 	svc, st := newService(t, istanbul(t, "2026-10-26 09:00"))
-	week := loadWeek(t, svc)
+	week := loadWeek(t, svc, st)
 	if _, err := svc.SavePlan(ctx, SourceAPI, week); err != nil {
 		t.Fatalf("SavePlan: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestUndoRestores(t *testing.T) {
 func TestCompleteMidnightBoundary(t *testing.T) {
 	ctx := context.Background()
 	svc, st := newService(t, istanbul(t, "2026-10-26 09:00"))
-	week := loadWeek(t, svc)
+	week := loadWeek(t, svc, st)
 	if _, err := svc.SavePlan(ctx, SourceAPI, week); err != nil {
 		t.Fatalf("SavePlan: %v", err)
 	}

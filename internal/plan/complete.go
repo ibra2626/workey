@@ -82,11 +82,15 @@ func (s *Service) setCompletion(ctx context.Context, source Source, sessionID in
 		if err != nil {
 			return err
 		}
+		cat, err := s.loadCatalog(ctx, tx)
+		if err != nil {
+			return err
+		}
 
 		if done == alreadyDone {
 			// No-op: already in the requested state. No write, no audit row.
-			sv := buildSessionView(*ss, today, movedBy, tgName, tgKey)
-			attachStudy(&sv, study, ss.Items)
+			sv := buildSessionView(*ss, today, cat, movedBy, tgName, tgKey)
+			attachStudy(&sv, cat, study, ss.Items)
 			view = &sv
 			return nil
 		}
@@ -134,8 +138,8 @@ func (s *Service) setCompletion(ctx context.Context, source Source, sessionID in
 			return err
 		}
 
-		sv := buildSessionView(*ss, today, movedBy, tgName, tgKey)
-		attachStudy(&sv, study, ss.Items)
+		sv := buildSessionView(*ss, today, cat, movedBy, tgName, tgKey)
+		attachStudy(&sv, cat, study, ss.Items)
 		view = &sv
 		return nil
 	})

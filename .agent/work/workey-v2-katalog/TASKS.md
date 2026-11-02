@@ -10,7 +10,7 @@ feature; these tasks deliver the generalized machinery. Work one task per sessio
 | ID | Task | Status | Depends on |
 | --- | --- | --- | --- |
 | WKY-21 | [Katalog şeması ve store katmanı (sources/sections/units/unit_progress)](tasks/WKY-21.md) | planned | — |
-| WKY-22 | [Plan domain modelini kataloğa bağla (Item → kaynak/bölüm/birim, notasyon)](tasks/WKY-22.md) | planned | WKY-21 |
+| WKY-22 | [Plan domain modelini kataloğa bağla (Item → kaynak/bölüm/birim, notasyon)](tasks/WKY-22.md) | done | WKY-21 |
 | WKY-23 | [Birim ilerlemesi ve D/Y/B servis yolu (tamamlamadan bağımsız)](tasks/WKY-23.md) | planned | WKY-22 |
 | WKY-24 | [MCP: save_source/get_sources, bookEnum kaldırma, ajan rehberi](tasks/WKY-24.md) | planned | WKY-22, WKY-23 |
 | WKY-25 | [REST API: katalog uçları ve plan item sözleşmesi](tasks/WKY-25.md) | planned | WKY-22, WKY-23 |
@@ -22,3 +22,13 @@ feature; these tasks deliver the generalized machinery. Work one task per sessio
 WKY-21 → 22 → 23 are the backbone (store → domain → unit progress) and must go in
 order. WKY-24 (MCP) and WKY-25 (REST) are independent of each other once 22/23
 land. WKY-26 then WKY-27 build the web flows. WKY-28 closes the gate end to end.
+
+## Whole-tree build is red between WKY-22 and WKY-24..27 (user split, 2026-11-02)
+WKY-22 rebinds `plan.Item` to the catalog and keeps `internal/plan` + `internal/store`
+building and green, but it deliberately does **not** touch the layers that render the
+v1 book/chapter/page concepts. Each downstream task now also carries the job of making
+its own layer compile again against the catalog `plan.Item`/notation:
+- WKY-24 → `internal/mcpserver`, `internal/apidoc`
+- WKY-25 → `internal/api`
+- WKY-26/27 → `internal/web`, `internal/web/views` (present.go, study.go, *.templ)
+`go build ./...` / `go vet ./...` over the whole module only go green again at WKY-28.
