@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // Source is one book / video / course the user studies. Key is a short
@@ -394,6 +395,128 @@ func (s *Store) DeleteUnitProgress(ctx context.Context, q dbtx, unitID int64) er
 		return fmt.Errorf("store: delete unit progress %d: %w", unitID, err)
 	}
 	return nil
+}
+
+// UnitRef is a unit together with its owning section ordinal and source
+// identity, for callers that start from a unit id alone (unit-progress writes
+// need the source kind to decide whether D/Y/B apply, and reads want the
+// source key and section ordinal to render notation).
+type UnitRef struct {
+	Unit
+	SectionOrdinal int
+	SourceID       int64
+	SourceKey      string
+	SourceName     string
+	SourceKind     string // 'book' | 'video' | 'course' | 'other'
+	LocationUnit   string // 'page' | 'minute' | 'lesson' | 'other'
+}
+
+// UnitByID returns the unit with the given id joined to its section and source,
+// or (nil, nil) if no unit has that id.
+func (s *Store) UnitByID(ctx context.Context, q dbtx, unitID int64) (*UnitRef, error) {
+	var r UnitRef
+	err := q.QueryRowContext(ctx, `
+		SELECT u.id, u.section_id, u.ordinal, u.label, u.number, u.loc_from, u.loc_to,
+		       sec.ordinal, src.id, src.key, src.name, src.kind, src.location_unit
+		FROM units u
+		JOIN sections sec ON sec.id = u.section_id
+		JOIN sources src ON src.id = sec.source_id
+		WHERE u.id = ?`, unitID,
+	).Scan(&r.ID, &r.SectionID, &r.Ordinal, &r.Label, &r.Number, &r.LocFrom, &r.LocTo,
+		&r.SectionOrdinal, &r.SourceID, &r.SourceKey, &r.SourceName, &r.SourceKind, &r.LocationUnit)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("store: get unit %d: %w", unitID, err)
+	}
+	return &r, nil
+}
+
+// UnitProgressByUnits returns the progress rows of the done units among unitIDs,
+// keyed by unit id. Unit ids with no row are simply absent (not done). An empty
+// input yields an empty map with no query.
+func (s *Store) UnitProgressByUnits(ctx context.Context, q dbtx, unitIDs []int64) (map[int64]UnitProgress, error) {
+	out := map[int64]UnitProgress{}
+	if len(unitIDs) == 0 {
+		return out, nil
+	}
+	placeholders := make([]string, len(unitIDs))
+	args := make([]any, len(unitIDs))
+	for i, id := range unitIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	rows, err := q.QueryContext(ctx, `
+		SELECT unit_id, done_at, correct, wrong, blank, completed_source
+		FROM unit_progress WHERE unit_id IN (`+strings.Join(placeholders, ",")+`)`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("store: query unit progress by units: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var p UnitProgress
+		if err := rows.Scan(&p.UnitID, &p.DoneAt, &p.Correct, &p.Wrong, &p.Blank, &p.CompletedSource); err != nil {
+			return nil, fmt.Errorf("store: scan unit progress by units: %w", err)
+		}
+		out[p.UnitID] = p
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: iterate unit progress by units: %w", err)
+	}
+	return out, nil
+}
+
+// UnitProgressTotals aggregates a group's done units and their D/Y/B sums. A
+// unit that is done but left its D/Y/B null contributes 0 to the sums; DoneCount
+// counts the row regardless.
+type UnitProgressTotals struct {
+	DoneCount int
+	Correct   int
+	Wrong     int
+	Blank     int
+}
+
+// UnitProgressTotalsBySource returns the done-count and D/Y/B sums of every
+// source that has at least one done unit, keyed by source id.
+func (s *Store) UnitProgressTotalsBySource(ctx context.Context, q dbtx) (map[int64]UnitProgressTotals, error) {
+	return s.unitProgressTotals(ctx, q, "sec.source_id")
+}
+
+// UnitProgressTotalsBySection returns the done-count and D/Y/B sums of every
+// section that has at least one done unit, keyed by section id.
+func (s *Store) UnitProgressTotalsBySection(ctx context.Context, q dbtx) (map[int64]UnitProgressTotals, error) {
+	return s.unitProgressTotals(ctx, q, "u.section_id")
+}
+
+// unitProgressTotals groups unit_progress by the given key column (a source or
+// section id reached through the join) and sums the optional D/Y/B with
+// COALESCE so a missing value counts as zero.
+func (s *Store) unitProgressTotals(ctx context.Context, q dbtx, groupCol string) (map[int64]UnitProgressTotals, error) {
+	rows, err := q.QueryContext(ctx, `
+		SELECT `+groupCol+` AS grp, COUNT(p.unit_id),
+		       COALESCE(SUM(p.correct), 0), COALESCE(SUM(p.wrong), 0), COALESCE(SUM(p.blank), 0)
+		FROM unit_progress p
+		JOIN units u ON u.id = p.unit_id
+		JOIN sections sec ON sec.id = u.section_id
+		GROUP BY grp`)
+	if err != nil {
+		return nil, fmt.Errorf("store: query unit progress totals by %s: %w", groupCol, err)
+	}
+	defer rows.Close()
+	out := map[int64]UnitProgressTotals{}
+	for rows.Next() {
+		var id int64
+		var t UnitProgressTotals
+		if err := rows.Scan(&id, &t.DoneCount, &t.Correct, &t.Wrong, &t.Blank); err != nil {
+			return nil, fmt.Errorf("store: scan unit progress totals by %s: %w", groupCol, err)
+		}
+		out[id] = t
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: iterate unit progress totals by %s: %w", groupCol, err)
+	}
+	return out, nil
 }
 
 // requireOne turns a zero-rows UPDATE into sql.ErrNoRows so callers can tell a

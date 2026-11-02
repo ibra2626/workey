@@ -2,6 +2,18 @@
 
 Record accepted decisions with date, context, decision, alternatives, and consequences. Do not record proposals as accepted decisions.
 
+## 2026-11-02 — WKY-23: unit progress + D/Y/B service path (implementation)
+- Context: a business-logic path to mark a unit "bitti" with optional D/Y/B, fully independent of session completion (user decision 2026-11-02, recorded in the v2 direction entry and the feature README). The store already carried `unit_progress` CRUD and `UnitProgressByUnit`/`UnitProgressBySource` from WKY-21; this task adds the service and the missing reads.
+- Decision:
+  - **`Service.SetUnitResult(ctx, source, UnitResultRequest{UnitID, Done, Correct/Wrong/Blank *int})`** in a new `internal/plan/units.go`. `done=true` upserts the progress row; `done=false` clears it (undo). Returns a `UnitResultView` with the unit's catalog identity, resolved notation (`M1·3, Antrenman 1`) and current result.
+  - **First-completion done_at is sticky.** On a repeat or a D/Y/B change the original `done_at` is kept (the unit stays "done since" its first mark); only undo→redo re-stamps it. Alternative — restamp on every write — rejected: the done-at is the moment the user first finished.
+  - **Idempotent, audited like completion.** A no-op (same stored state, compared over done_at + D/Y/B + completed_source) writes nothing and no audit row; a real set/undo writes one `audit_log` row (entity `unit`, action `complete`/`undo` reused from `complete.go`, before/after JSON, source, NULL request hash — no request payload to hash, mirroring session completion).
+  - **D/Y/B are non-negative and null for video units.** Structural `checkNonNeg` rejects a negative count (`CodeInvalid`); a `video`-kind source rejects any D/Y/B (`CodeInvalid`) but can still be marked done with them null. Kind is read via a new `store.UnitByID` (unit joined to section+source). No CHECK that D/Y/B sum to anything — the user reports what they did.
+  - **No coupling to session completion.** `SetUnitResult` never touches `sessions`; `Complete`/`Undo` never touch `unit_progress`. Verified by a two-direction independence test.
+  - **Reads for WKY-26/27.** `UnitResults(unitIDs)` (map keyed by unit id, absent = not done) and `SourceProgress()`/`SectionProgress()` (done-count + D/Y/B sums per source/section). The aggregation is SQL in the store (`UnitProgressByUnits`, `UnitProgressTotalsBySource/BySection` with `COALESCE(SUM(...),0)` so a null D/Y/B counts as 0 but the row still counts toward done-count); the plan layer maps store aggregates to its own `ProgressTotals`/`UnitResult` types so the web layer never sees store types.
+- Alternatives: aggregate in Go from `UnitProgressBySource` (rejected — the task wants store aggregate queries, and `GROUP BY` is cheaper and clearer); restamp done_at every write (rejected, above); silently ignore D/Y/B on a video unit (rejected — rejecting it surfaces the mistake to the agent/UI).
+- Consequences: `internal/plan` + `internal/store` stay green — `go test ./internal/plan/... ./internal/store/...`, `go vet`, normal + `CGO_ENABLED=0` builds, gofmt-clean on the changed files. The whole tree stays red by design until WKY-28 (transport/web expose this). No commit/push.
+
 ## 2026-11-02 — WKY-22: plan domain bound to the catalog (implementation)
 - Context: rebind `internal/plan` to the catalog `store.SessionItem`/`TopicGroup` from WKY-21. Changing `plan.Item` breaks every downstream layer that renders the v1 book/chapter/page/konu/soru/antrenman concepts; those concepts no longer exist.
 - Decision:

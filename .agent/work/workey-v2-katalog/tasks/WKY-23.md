@@ -48,4 +48,33 @@ idempotent and audited; reading it feeds per-source/section progress.
   in PRODUCT.md must stay primary; units are a finer, optional overlay.
 
 ## Progress
-(planned)
+Done 2026-11-02.
+- Store (`internal/store/sources.go`): added `UnitByID` (unit joined to its
+  section ordinal + source id/key/name/kind/location_unit), `UnitProgressByUnits`
+  (read-by-unit-set, empty input → empty map, no query), and aggregate queries
+  `UnitProgressTotalsBySource`/`UnitProgressTotalsBySection` (shared
+  `unitProgressTotals(groupCol)`, `COUNT` + `COALESCE(SUM(...),0)` for D/Y/B) with
+  a `UnitProgressTotals` struct. The WKY-21 `unit_progress` CRUD was reused as-is.
+- Plan (`internal/plan/units.go`, new): `SetUnitResult(source, UnitResultRequest)`
+  — done upserts (sticky first `done_at`, optional D/Y/B, writing source), undo
+  clears; idempotent no-op writes no audit; one `audit_log` row per real change
+  (entity `unit`, actions `complete`/`undo` reused, before/after JSON, NULL hash).
+  `checkNonNeg` rejects negative D/Y/B; a `video` source rejects any D/Y/B but can
+  still be marked done (null). Returns `UnitResultView` with notation via
+  `FormatRef`. Read helpers `UnitResults(unitIDs)`, `SourceProgress()`,
+  `SectionProgress()` mapping store aggregates to plan types `UnitResult` /
+  `ProgressTotals`.
+- Tests (`internal/plan/units_test.go`): done without/with D/Y/B; idempotent
+  (stable done_at, 1 audit row); D/Y/B change keeps done_at + audits; undo clears +
+  second undo no-op; negative rejected; missing unit not_found; video rejects D/Y/B
+  but marks done; two-direction independence (units done ⇏ session complete;
+  session complete ⇏ units touched); source/section aggregates + read-by-units.
+  New helpers `sectionUnitIDs`, `sectionID`, `seedVideoUnit`, `unitAuditCount`.
+
+### Checks (2026-11-02, Go 1.27.3)
+- `go test ./internal/plan/... ./internal/store/...` ok.
+- `go vet ./internal/plan/... ./internal/store/...` clean.
+- `go build` + `CGO_ENABLED=0 go build` of plan+store ok.
+- `gofmt -l` on the three changed files prints nothing.
+- NOT run: whole-tree build/vet (web/transport red by design until WKY-28),
+  govulncheck. No commit/push.

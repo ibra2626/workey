@@ -11,7 +11,7 @@ feature; these tasks deliver the generalized machinery. Work one task per sessio
 | --- | --- | --- | --- |
 | WKY-21 | [Katalog şeması ve store katmanı (sources/sections/units/unit_progress)](tasks/WKY-21.md) | planned | — |
 | WKY-22 | [Plan domain modelini kataloğa bağla (Item → kaynak/bölüm/birim, notasyon)](tasks/WKY-22.md) | done | WKY-21 |
-| WKY-23 | [Birim ilerlemesi ve D/Y/B servis yolu (tamamlamadan bağımsız)](tasks/WKY-23.md) | planned | WKY-22 |
+| WKY-23 | [Birim ilerlemesi ve D/Y/B servis yolu (tamamlamadan bağımsız)](tasks/WKY-23.md) | done | WKY-22 |
 | WKY-24 | [MCP: save_source/get_sources, bookEnum kaldırma, ajan rehberi](tasks/WKY-24.md) | planned | WKY-22, WKY-23 |
 | WKY-25 | [REST API: katalog uçları ve plan item sözleşmesi](tasks/WKY-25.md) | planned | WKY-22, WKY-23 |
 | WKY-26 | [Web: Kaynaklar düzeltme sayfası ve D/Y/B raporu](tasks/WKY-26.md) | planned | WKY-22, WKY-23 |
