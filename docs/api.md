@@ -40,8 +40,9 @@ vardır. Pano reddinde/yokluğunda kod odaklanıp seçilir ve elle kopyalama bil
 gösterilir. JS kapalıyken bu düğmeler gizlidir; kod metni seçilebilir kalır.
 
 - `GET /api/v1/agent-guide`: Bearer korumalı, salt okunur ajan başlangıç rehberi.
-  `today`, `timezone`, `exam_date`, `books`, `session_kinds`, `rules`, `workflow`
-  döner. Tarih, plan yazımıyla aynı enjekte edilebilir İstanbul saatinden gelir.
+  `today`, `timezone`, `exam_date`, `source_kinds`, `location_units`,
+  `session_kinds`, `rules`, `workflow` döner. Tarih, plan yazımıyla aynı enjekte
+  edilebilir İstanbul saatinden gelir.
 - `GET /api/v1/openapi.json`: Bearer korumalı OpenAPI 3.1 sözleşmesi. Tüm REST
   işlemlerini, JSON alanlarını, hata zarflarını ve örnekleri kapsar.
 - `GET /kullanim/api/openapi.json`: aynı belgenin web oturumu korumalı indirmesi.
@@ -98,6 +99,56 @@ by a makeup session; the row carries `moved_to: {date, weekday}`).
 
 ## Routes
 
+### `GET /api/v1/sources`
+The whole source catalog: sources ordered by ordinal, each with its ordered
+sections and units. Every unit carries its `id` (used by the unit-result write)
+and the source `key` / section `ordinal` / unit ordinals are the references a
+plan item uses. References only — never topic or question content.
+
+```
+200 → { "sources": [
+  { "id": 1, "key": "M1", "name": "Matematik 1", "kind": "book",
+    "location_unit": "page", "ordinal": 1, "sections": [
+      { "id": 1, "ordinal": 1, "name": "Sayı basamakları", "loc_from": 1, "loc_to": 22, "units": [] },
+      { "id": 3, "ordinal": 3, "name": "Üslü ifadeler", "loc_from": 41, "loc_to": 58, "units": [
+        { "id": 1, "ordinal": 1, "label": "Antrenman", "number": 1, "loc_from": 41, "loc_to": 46 }, … ] }, … ] } ] }
+```
+
+### `POST /api/v1/sources`
+Create or replace one source whole, keyed by `source.key`. Sections match on
+ordinal and units on their ordinal within the section, so a re-write keeps unit
+ids — and the user's unit progress (done + doğru/yanlış/boş) — wherever a unit's
+place is preserved; sections and units omitted from the request are deleted and
+their progress cascades away. `kind` is `book/video/course/other`;
+`location_unit` is `page/minute/lesson/other`. Idempotent: an identical
+structure writes nothing and reports `unchanged`. Optional `Idempotency-Key`
+header (non-empty value takes precedence over the body `idempotency_key`). Body
+is a `SaveSourceRequest`. This endpoint never touches unit progress directly.
+
+```
+POST /api/v1/sources
+{ "source": { "key": "M1", "name": "Matematik 1", "kind": "book",
+              "location_unit": "page", "ordinal": 1 },
+  "sections": [ { "ordinal": 1, "name": "Sayı basamakları", "loc_from": 1, "loc_to": 22, "units": [] }, … ] }
+200 → { "source": { "id": 1, "key": "M1", … }, "created": true, "unchanged": false }
+```
+
+### `POST /api/v1/units/{id}/result`
+Mark a catalog unit done (`done: true`) or undo it (`done: false`), addressed by
+the `{id}` path value (the unit `id` from `GET /api/v1/sources`). Optionally
+record non-negative `correct`/`wrong`/`blank` counts; a video source's unit
+stores none. This is independent of session completion — it records per-unit
+progress only. The first completion stamps `done_at`; a later change keeps it.
+Idempotent. A non-positive id → `422`; an unknown id → `404`.
+
+```
+POST /api/v1/units/1/result
+{ "done": true, "correct": 5, "wrong": 1, "blank": 0 }
+200 → { "unit_id": 1, "source_key": "M1", "section_ordinal": 3, "label": "Antrenman",
+        "number": 1, "notation": "M1·3, Antrenman 1", "done": true,
+        "done_at": "2026-10-26T06:00:00Z", "correct": 5, "wrong": 1, "blank": 0 }
+```
+
 ### `GET /api/v1/plan?from=YYYY-MM-DD&to=YYYY-MM-DD`
 Sessions in `[from, to]` with items, derived `state` and `notation`. Both
 params are required (`422` otherwise).
@@ -108,8 +159,9 @@ GET /api/v1/plan?from=2026-10-26&to=2026-11-01
   { "id": 1, "date": "2026-10-26", "start_time": "20:30", "duration_min": 90,
     "kind": "aksam", "completed": false, "state": "today",
     "topic_group_key": "temel-kavramlar", "topic_group_name": "Temel kavramlar",
-    "items": [ { "book": "M1", "chapter_no": 1, "chapter_title": "Temel kavramlar",
-                 "page_from": 1, "page_to": 22 } ],
+    "items": [ { "source_key": "M1", "source_name": "Matematik 1",
+                 "section_ordinal": 1, "section_name": "Sayı basamakları",
+                 "loc_from": 1, "loc_to": 22 } ],
     "notation": "M1·1, s. 1–22" }
 ] }
 ```
@@ -140,7 +192,7 @@ The saved phases and topic groups, ordered by ordinal.
 200 → { "phases": [ { "key": "faz-1", "ordinal": 1, "name": "Faz 1 · İşlem temeli",
                       "start_date": "2026-10-26", "end_date": "2026-12-13" } ],
         "topic_groups": [ { "key": "temel-kavramlar", "name": "Temel kavramlar",
-                            "ordinal": 1, "dgs_question_min": 8, "dgs_question_max": 10 }, … ] }
+                            "ordinal": 1, "question_min": 8, "question_max": 10 }, … ] }
 ```
 
 ### `PUT /api/v1/outline`
@@ -184,7 +236,7 @@ completion, exam countdown (from `WORKEY_EXAM_DATE`) and the 38-week strip.
         "done_hours": "1,5", "planned_hours": "9", "current_phase": "Faz 1 · İşlem temeli",
         "days_to_exam": 265, "exam_date": "18 Tem",
         "groups": [ { "key": "temel-kavramlar", "name": "Temel kavramlar",
-                      "dgs_min": 8, "dgs_max": 10, "planned_min": 180, "done_min": 90,
+                      "question_min": 8, "question_max": 10, "planned_min": 180, "done_min": 90,
                       "done_fraction": 0.5, "percent": 50 }, … ],
         "strip": [ { "week_number": 1, "phase_key": "faz-1",
                      "phase_name": "Faz 1 · İşlem temeli", "planned_min": 540,

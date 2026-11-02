@@ -71,9 +71,19 @@ func do(t *testing.T, h http.Handler, method, target string, body []byte, header
 	return rec
 }
 
-// seed loads the sample outline then the sample week through the API.
+// seedSources loads the sample source catalog through the API, so the sample
+// week's items can resolve their source/section/unit references.
+func seedSources(t *testing.T, h http.Handler) {
+	t.Helper()
+	if rec := do(t, h, http.MethodPost, "/api/v1/sources", fixture(t, "sample-sources.json"), nil); rec.Code != http.StatusOK {
+		t.Fatalf("seed sources: status %d, body %s", rec.Code, rec.Body)
+	}
+}
+
+// seed loads the sample catalog, then the outline, then the sample week.
 func seed(t *testing.T, h http.Handler) {
 	t.Helper()
+	seedSources(t, h)
 	if rec := do(t, h, http.MethodPut, "/api/v1/outline", fixture(t, "sample-outline.json"), nil); rec.Code != http.StatusOK {
 		t.Fatalf("seed outline: status %d, body %s", rec.Code, rec.Body)
 	}
@@ -121,7 +131,8 @@ func TestAuth(t *testing.T) {
 func TestRoundTrip(t *testing.T) {
 	h, _ := newAPI(t)
 
-	// PUT outline then plan.
+	// POST sources, then PUT outline then plan.
+	seedSources(t, h)
 	var planRes plan.SavePlanResult
 	rec := do(t, h, http.MethodPut, "/api/v1/outline", fixture(t, "sample-outline.json"), nil)
 	if rec.Code != http.StatusOK {
@@ -214,6 +225,7 @@ func TestPutPlanTwiceUnchanged(t *testing.T) {
 
 func TestIdempotencyKey(t *testing.T) {
 	h, _ := newAPI(t)
+	seedSources(t, h)
 	if rec := do(t, h, http.MethodPut, "/api/v1/outline", fixture(t, "sample-outline.json"), nil); rec.Code != http.StatusOK {
 		t.Fatalf("outline: %d", rec.Code)
 	}

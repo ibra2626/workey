@@ -20,6 +20,9 @@ type Operation struct{ Method, Path, ID, Summary, Input, Output string }
 func Operations() []Operation {
 	return []Operation{
 		{"GET", "/agent-guide", "getAgentGuide", "Ajan rehberini ve sunucu tarihini oku", "", "AgentGuide"},
+		{"GET", "/sources", "getSources", "Kaynak kataloğunun tamamını oku", "", "Catalog"},
+		{"POST", "/sources", "saveSource", "Bir kaynağı tam bölüm/birim listesiyle yaz", "SaveSource", "SaveSourceResult"},
+		{"POST", "/units/{id}/result", "setUnitResult", "Birimi tamamlandı işaretle veya geri al", "UnitResult", "UnitResultView"},
 		{"GET", "/outline", "getOutline", "Fazları ve konu gruplarını oku", "", "Outline"},
 		{"PUT", "/outline", "saveOutline", "Faz ve grupların tam listesini değiştir", "SaveOutline", "OutlineResult"},
 		{"GET", "/plan", "getPlan", "from–to dahil aralıktaki seansları oku", "", "Plan"},
@@ -47,6 +50,28 @@ const ExampleOutline = `{
   "phases": [{"key": "faz-1", "ordinal": 1, "name": "İşlem temeli", "start_date": "2026-10-26", "end_date": "2026-12-13"}],
   "topic_groups": [{"key": "temel", "name": "Temel kavramlar", "ordinal": 1}]
 }`
+
+// ExampleSource writes source "M1" whole: a book counted in pages, four sections,
+// with three Antrenman units in section 3. The contract test seeds the catalog
+// with it so the plan example's M1 references resolve; exampleM1Source mirrors the
+// read view it produces.
+const ExampleSource = `{
+  "source": {"key": "M1", "name": "Matematik 1", "kind": "book", "location_unit": "page", "ordinal": 1},
+  "sections": [
+    {"ordinal": 1, "name": "Sayı basamakları", "loc_from": 1, "loc_to": 22, "units": []},
+    {"ordinal": 2, "name": "Bölme ve bölünebilme", "loc_from": 23, "loc_to": 40, "units": []},
+    {"ordinal": 3, "name": "Üslü ifadeler", "loc_from": 41, "loc_to": 58, "units": [
+      {"ordinal": 1, "label": "Antrenman", "number": 1, "loc_from": 41, "loc_to": 46},
+      {"ordinal": 2, "label": "Antrenman", "number": 2, "loc_from": 47, "loc_to": 52},
+      {"ordinal": 3, "label": "Antrenman", "number": 3, "loc_from": 53, "loc_to": 58}
+    ]},
+    {"ordinal": 4, "name": "Köklü ifadeler", "loc_from": 59, "loc_to": 76, "units": []}
+  ]
+}`
+
+// ExampleUnitResult marks the first Antrenman unit done with doğru/yanlış/boş.
+// The unit is addressed by the path id, so the body carries no unit_id.
+const ExampleUnitResult = `{"done": true, "correct": 5, "wrong": 1, "blank": 0}`
 
 var document = sync.OnceValues(build)
 
@@ -103,8 +128,12 @@ func nullableArrays(v any) {
 					p["pattern"] = `^([01]\d|2[0-3]):[0-5]\d$`
 				case "kind":
 					p["examples"] = []string{plan.KindAksam, plan.KindUzunBlok, plan.KindDeneme}
-				case "section_ordinal", "unit_from", "unit_to", "loc_from", "loc_to", "duration_min", "id":
+				case "section_ordinal", "unit_from", "unit_to", "loc_from", "loc_to", "duration_min", "id", "ordinal", "number", "unit_id":
 					p["minimum"] = 1
+				case "correct", "wrong", "blank":
+					p["minimum"] = 0
+				case "done_at":
+					p["format"] = "date-time"
 				case "status":
 					p["enum"] = []string{plan.StudyActive, plan.StudyPaused, plan.StudyClosed}
 				case "entry_mode":
@@ -171,6 +200,14 @@ func build() ([]byte, error) {
 		"OutlineResult": schema[plan.SaveOutlineResult], "Outline": schema[plan.OutlineView],
 		"Session": schema[plan.SessionView], "Day": schema[plan.DayView],
 		"Week": schema[plan.WeekView], "Progress": schema[plan.ProgressView],
+		"Catalog": schema[plan.CatalogView], "SaveSource": schema[plan.SaveSourceRequest],
+		"SaveSourceResult": schema[plan.SaveSourceResult], "UnitResultView": schema[plan.UnitResultView],
+		"UnitResult": schema[struct {
+			Done    bool `json:"done"`
+			Correct *int `json:"correct,omitempty"`
+			Wrong   *int `json:"wrong,omitempty"`
+			Blank   *int `json:"blank,omitempty"`
+		}],
 		"Plan": schema[struct {
 			Sessions []plan.SessionView `json:"sessions"`
 		}],
@@ -188,8 +225,12 @@ func build() ([]byte, error) {
 	// Domain constraints and full-replacement semantics supplement inferred shapes.
 	requestSchema(schemas["SavePlan"])
 	requestSchema(schemas["SaveOutline"])
+	requestSchema(schemas["SaveSource"])
+	requestSchema(schemas["UnitResult"])
 	schemas["SavePlan"].(object)["description"] = strings.Join(plan.GuideRules(), "\n")
 	schemas["SaveOutline"].(object)["description"] = "Tam faz/grup listesi; eksik key silinir. Kullanılan grup silinemez. Boş olmayan Idempotency-Key başlığı gövdedeki anahtardan önceliklidir."
+	schemas["SaveSource"].(object)["description"] = "Bir kaynağı (key ile) tam bölüm/birim listesiyle oluştur veya değiştir. Bölümler ordinal, birimler bölüm içi ordinal ile eşleşir; yeniden yazma korunan birimlerin id'sini ve ilerlemesini (done + doğru/yanlış/boş) korur. İstekte olmayan bölüm/birim silinir. kind=book/video/course/other, location_unit=page/minute/lesson/other. Boş olmayan Idempotency-Key başlığı gövdedeki anahtardan önceliklidir."
+	schemas["UnitResult"].(object)["description"] = "Birimi tamamlandı (done=true) işaretle veya geri al (done=false). İsteğe bağlı doğru/yanlış/boş negatif olamaz; video kaynağının birimi bunları tutmaz. Birim yol parametresindeki id ile adreslenir."
 	paths := object{}
 	for _, op := range Operations() {
 		responseSchema := any(object{"type": "object"})
@@ -220,11 +261,20 @@ func build() ([]byte, error) {
 			param("id", "path", true, object{"type": "integer", "minimum": 1})
 		}
 		if op.Input != "" {
-			param("Idempotency-Key", "header", false, object{"type": "string", "description": "Boş değilse gövdenin idempotency_key alanından önceliklidir."})
+			// The idempotency-key replay applies to the declarative whole-set writes;
+			// the unit-result write is idempotent by state and takes no key.
+			if op.Input != "UnitResult" {
+				param("Idempotency-Key", "header", false, object{"type": "string", "description": "Boş değilse gövdenin idempotency_key alanından önceliklidir."})
+			}
 			c := content(ref(op.Input))
 			example := ExamplePlan
-			if op.Input == "SaveOutline" {
+			switch op.Input {
+			case "SaveOutline":
 				example = ExampleOutline
+			case "SaveSource":
+				example = ExampleSource
+			case "UnitResult":
+				example = ExampleUnitResult
 			}
 			c["application/json"].(object)["example"] = json.RawMessage(example)
 			entry["requestBody"] = object{"required": true, "content": c}

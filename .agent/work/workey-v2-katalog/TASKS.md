@@ -13,7 +13,7 @@ feature; these tasks deliver the generalized machinery. Work one task per sessio
 | WKY-22 | [Plan domain modelini kataloğa bağla (Item → kaynak/bölüm/birim, notasyon)](tasks/WKY-22.md) | done | WKY-21 |
 | WKY-23 | [Birim ilerlemesi ve D/Y/B servis yolu (tamamlamadan bağımsız)](tasks/WKY-23.md) | done | WKY-22 |
 | WKY-24 | [MCP: save_source/get_sources, bookEnum kaldırma, ajan rehberi](tasks/WKY-24.md) | done | WKY-22, WKY-23 |
-| WKY-25 | [REST API: katalog uçları ve plan item sözleşmesi](tasks/WKY-25.md) | planned | WKY-22, WKY-23 |
+| WKY-25 | [REST API: katalog uçları ve plan item sözleşmesi](tasks/WKY-25.md) | done | WKY-22, WKY-23 |
 | WKY-26 | [Web: Kaynaklar düzeltme sayfası ve D/Y/B raporu](tasks/WKY-26.md) | planned | WKY-22, WKY-23 |
 | WKY-27 | [Web: Bugün/Hafta/İlerleme birim görünümü ve işaretleme](tasks/WKY-27.md) | planned | WKY-23, WKY-26 |
 | WKY-28 | [Uçtan uca doğrulama ve v2 kapısı](tasks/WKY-28.md) | planned | WKY-24, WKY-25, WKY-27 |
@@ -30,7 +30,10 @@ v1 book/chapter/page concepts. Each downstream task now also carries the job of 
 its own layer compile again against the catalog `plan.Item`/notation:
 - WKY-24 → `internal/mcpserver`, `internal/apidoc` — DONE (both build/vet/test green;
   `internal/api` non-test also builds now as a side effect of the apidoc fix).
-- WKY-25 → `internal/api` (its _test files still reference the v1 item shape)
-- WKY-26/27 → `internal/web`, `internal/web/views` (present.go, study.go, *.templ)
+- WKY-25 → `internal/api` + `internal/apidoc` — DONE (catalog endpoints added; all
+  _test files updated to seed the catalog; build/vet/test green).
+- WKY-26/27 → `internal/web`, `internal/web/views` (present.go, study.go, *.templ;
+  also the in-app API usage guide text in usage_content.go and the verbatim-synced
+  study-contract/planning-inputs docs).
 `go build ./...` / `go vet ./...` over the whole module only go green again at WKY-28.
-Remaining red after WKY-24: `internal/web/views` (→ web, cmd) and `internal/api` tests.
+Remaining red after WKY-25: `internal/web/views` (→ web, cmd).
