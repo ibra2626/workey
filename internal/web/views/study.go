@@ -74,19 +74,12 @@ func studyStartLabel(sv plan.SessionView) string {
 	}
 	return "Çalışmaya geç"
 }
-func sourceRanges(item plan.Item, kind string) string {
-	base := plan.FormatItem(item)
-	if kind != plan.KindAksam {
-		return base + " · Çalışma: s. " + numSpan(item.PageFrom, item.PageTo)
-	}
-	kf, kt, sf, st := item.PageFrom, item.PageTo, item.PageFrom, item.PageTo
-	if item.KonuFrom != nil && item.KonuTo != nil {
-		kf, kt = *item.KonuFrom, *item.KonuTo
-	}
-	if item.SoruFrom != nil && item.SoruTo != nil {
-		sf, st = *item.SoruFrom, *item.SoruTo
-	}
-	return base + " · Konu: s. " + numSpan(kf, kt) + "; Soru: s. " + numSpan(sf, st) + "; Yanlış defteri: s. " + numSpan(item.PageFrom, item.PageTo)
+
+// sourceRanges renders the i-th session item for the study room's source list:
+// its exact notation and section name. The per-stage page splits of the v1 book
+// model no longer exist in the catalog item, so the reference stands alone.
+func sourceRanges(sv plan.SessionView, i int) string {
+	return itemLabel(sv, i)
 }
 func studyFirstStep(sv plan.SessionView) string {
 	if sv.Study != nil && sv.Study.Bookmark != nil {
@@ -97,14 +90,10 @@ func studyFirstStep(sv plan.SessionView) string {
 		return "Seans kaynaklarını aç."
 	}
 	it := sv.Items[0]
-	page, stage := it.PageFrom, "Çalışma"
-	if sv.Kind == plan.KindAksam {
-		stage = "Konu"
-		if it.KonuFrom != nil {
-			page = *it.KonuFrom
-		}
+	if it.LocFrom != nil {
+		return itemRef(it) + " · s. " + strconv.Itoa(*it.LocFrom) + " sayfasını aç."
 	}
-	return plan.FormatItem(it) + " · " + stage + ": s. " + strconv.Itoa(page) + " sayfasını aç."
+	return itemRef(it) + " ile başla."
 }
 func studyStartTime(value string) string {
 	t, err := time.Parse(time.RFC3339, value)
@@ -142,25 +131,30 @@ func studyTopic(sv plan.SessionView) string {
 	if sv.TopicGroupName != "" {
 		parts = append(parts, "Konu: "+sv.TopicGroupName)
 	}
-	var item *plan.Item
+	var item *plan.ItemView
 	if sv.Study != nil && sv.Study.Bookmark != nil {
 		item = &sv.Study.Bookmark.Item
 	} else if len(sv.Items) > 0 {
 		item = &sv.Items[0]
 	}
 	if item != nil {
-		book := bookName(item.Book)
-		if item.ChapterNo > 0 {
-			book += ", " + strconv.Itoa(item.ChapterNo) + ". bölüm"
+		source := item.SourceName
+		if item.SectionName != "" {
+			if source != "" {
+				source += ", "
+			}
+			source += item.SectionName
 		}
-		parts = append(parts, book)
+		if source != "" {
+			parts = append(parts, source)
+		}
 	}
 	return strings.Join(parts, " "+middleDot+" ")
 }
 
 func studyTitle(sv plan.SessionView) string {
 	if sv.Study != nil && sv.Study.Bookmark != nil {
-		return sv.Study.Bookmark.Item.ChapterTitle
+		return itemTitle(sv.Study.Bookmark.Item)
 	}
 	return chapterTitle(sv)
 }

@@ -11,7 +11,7 @@ import (
 
 func TestWeekPartialContextAndCompletion(t *testing.T) {
 	sv := plan.SessionView{ID: 42, Kind: plan.KindAksam, State: plan.StateMissed,
-		StudyVersion: 2, Items: []plan.Item{{Book: "M1", ChapterNo: 1, ChapterTitle: "Temsili bölüm", PageFrom: 10, PageTo: 20}},
+		StudyVersion: 2, Items: []plan.ItemView{{SourceKey: "M1", SectionOrdinal: ptr(1), SectionName: "Temsili bölüm", LocFrom: ptr(10), LocTo: ptr(20)}},
 		Study: &plan.StudyView{Status: plan.StudyPaused, Bookmark: &plan.BookmarkView{Notation: "G1·2, s. 100–120", Stage: plan.StageSoru, ResumePage: 105}}}
 	for _, moved := range []bool{false, true} {
 		if moved {
@@ -54,3 +54,5 @@ func TestWeekPartialContextAndCompletion(t *testing.T) {
 		t.Fatal("legacy row changed")
 	}
 }
+
+func ptr[T any](v T) *T { return &v }

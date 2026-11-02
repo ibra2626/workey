@@ -62,7 +62,7 @@ func TestStudyFormsLifecycleAndIndependentSessions(t *testing.T) {
 		t.Fatal("refresh lost active study")
 	}
 	post(second, "birak", csrf2+"expected_study_version=0&pause_mode=bookmark&item_ordinal=0&stage=soru&resume_page=51", true, 409, `value="51"`, `name="expected_study_version" value="0"`, "başka bir sekmede")
-	post(first, "birak", csrf+"expected_study_version=1&pause_mode=bookmark&item_ordinal=0&stage=konu&resume_page=999", true, 422, `value="999"`, "aşama aralığında", "Geçerli sayfa aralıkları")
+	post(first, "birak", csrf+"expected_study_version=1&pause_mode=bookmark&item_ordinal=0&stage=konu&resume_page=999", true, 422, `value="999"`, "konum aralığında", "Geçerli sayfa aralıkları")
 	post(first, "birak", csrf+"expected_study_version=1&pause_mode=bookmark&item_ordinal=0&stage=konu&resume_page=abc", false, 422, `value="abc"`, "<!doctype html>")
 	post(first, "birak", csrf+"expected_study_version=1&pause_mode=bookmark&item_ordinal=0&stage=soru&resume_page=58", false, 303)
 	v, err := st.StudyBySession(ctx, st.DB(), id)

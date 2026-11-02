@@ -49,6 +49,8 @@ func (a *Auth) Handler() http.Handler {
 	mux.Handle("GET /hafta", a.requireAuth(http.HandlerFunc(a.screenWeek)))
 	mux.Handle("GET /ilerleme", a.requireAuth(http.HandlerFunc(a.screenProgress)))
 	mux.Handle("GET /plan", a.requireAuth(http.HandlerFunc(a.screenPlan)))
+	mux.Handle("GET /kaynaklar", a.requireAuth(http.HandlerFunc(a.screenSources)))
+	mux.Handle("POST /kaynaklar/{key}", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.saveSource))))
 	mux.Handle("POST /oturum/{id}/baslat", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.startStudy))))
 	mux.Handle("POST /oturum/{id}/birak", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.pauseStudy))))
 	mux.Handle("POST /oturum/{id}/tamamla", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.completeSession))))

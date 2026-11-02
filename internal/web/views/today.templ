@@ -164,14 +164,13 @@ templ todayPlanPanel(p TodayPage) {
 // state with a quiet "Geri al" link).
 templ todaySession(sv plan.SessionView, p TodayPage) {
 	<p class="cn text-numeral-inline font-semibold text-ink-2 md:text-numeral-inline-lg">
-		{ chapterRef(sv) }<span class="hidden md:inline">· { chapterBook(sv) }</span>
+		{ itemNotation(sv, 0) }<span class="hidden md:inline">· { chapterBook(sv) }</span>
 	</p>
 	<div class="flex items-baseline justify-between gap-4">
 		<h1 class="text-headline font-bold leading-tight md:text-headline-display">{ chapterTitle(sv) }</h1>
-		<p class="hidden shrink-0 cn text-numeral-page font-semibold text-ink md:block">{ headPages(sv) }</p>
 	</div>
 	<p class="mt-1 text-body text-ink-2 md:hidden">
-		{ chapterBook(sv) } · <span class="tnum font-semibold text-ink">{ headPages(sv) }</span>
+		{ chapterBook(sv) }
 	</p>
 	if sv.TopicGroupName != "" {
 		<p class="mt-1 text-body text-ink-2">Konu: { sv.TopicGroupName }</p>
@@ -183,8 +182,8 @@ templ todaySession(sv plan.SessionView, p TodayPage) {
 	}
 	if len(sv.Items) > 1 {
 		<ul class="mt-3 divide-y divide-line text-body-small text-ink-2" aria-label="Seans kaynakları">
-			for _, item := range sv.Items {
-				<li class="py-1.5">{ plan.FormatItem(item) } · { item.ChapterTitle }</li>
+			for i := range sv.Items {
+				<li class="py-1.5">{ itemLabel(sv, i) }</li>
 			}
 		</ul>
 	}

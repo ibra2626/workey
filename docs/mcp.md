@@ -196,7 +196,7 @@ go test -tags webworkflow ./internal/mcpserver -run '^TestVisualReview$' -v -tim
 <!-- study-contract:start -->
 ## Çalışma durumu ve yer imini okuma
 
-SessionView\.study opsiyonel, salt okunur çalışma bağlamıdır: status=active/paused/closed, first\_started\_at/last\_started\_at/updated\_at (UTC), entry\_mode=normal/ten\_minutes ve version\. bookmark varsa item\_ordinal (sıfır tabanlı), stage (akşam: konu/soru/yanlis\_defteri; diğer: calisma), resume\_page, çözülmüş item ve notation içerir\. resume\_page devam edilecek kitap sayfasıdır; yarım sayfa aynı kalır, otomatik \+1 yapılmaz\. Yanlış defteri aşamasında da kitap sayfasıdır\. Yer imi yoksa uydurma; study yokluğu hiç çalışılmadığını kanıtlamaz\. SessionState planned/today/done/missed/moved değişmez; geçmiş kısmi emeği ayrıca study üzerinden oku\. GET /api/v1/today active\_study ve latest\_paused\_study ile tarih dışındaki devam bağlamını da sunar; aktif önceliklidir, yarım işe dönüş açık seçimdir, bugünün planı korunur\. get\_plan yalnız istenen aralığı döndürür; gerekirse geçmiş aralığı da oku\. Yeni çalışma yazma REST endpoint'i veya MCP aracı yoktur\. Kısmi sayfa ve ten\_minutes hedefi ilerlemeyi artırmaz; done\_min tamamlanan seansların planlı süresidir, ölçülmüş süre veya öğrenme yüzdesi değildir\. Telafi bağlantısı yer imini veya tamamlamayı otomatik taşımaz; eski ve telafi ayrı tamamlanırsa mevcut toplam ikisini de sayar\.
+SessionView\.study opsiyonel, salt okunur çalışma bağlamıdır: status=active/paused/closed, first\_started\_at/last\_started\_at/updated\_at (UTC), entry\_mode=normal/ten\_minutes ve version\. bookmark varsa item\_ordinal (sıfır tabanlı), stage (akşam: konu/soru/yanlis\_defteri; diğer: calisma), resume\_page, çözülmüş item ve notation içerir\. resume\_page devam edilecek konumdur (kaynağın konum biriminde: sayfa/dakika/ders…); yarım kalan konum aynı kalır, otomatik \+1 yapılmaz\. Yanlış defteri aşamasında da aynı konum birimindedir\. Yer imi yoksa uydurma; study yokluğu hiç çalışılmadığını kanıtlamaz\. SessionState planned/today/done/missed/moved değişmez; geçmiş kısmi emeği ayrıca study üzerinden oku\. GET /api/v1/today active\_study ve latest\_paused\_study ile tarih dışındaki devam bağlamını da sunar; aktif önceliklidir, yarım işe dönüş açık seçimdir, bugünün planı korunur\. get\_plan yalnız istenen aralığı döndürür; gerekirse geçmiş aralığı da oku\. Yeni çalışma yazma REST endpoint'i veya MCP aracı yoktur\. Kısmi sayfa ve ten\_minutes hedefi ilerlemeyi artırmaz; done\_min tamamlanan seansların planlı süresidir, ölçülmüş süre veya öğrenme yüzdesi değildir\. Telafi bağlantısı yer imini veya tamamlamayı otomatik taşımaz; eski ve telafi ayrı tamamlanırsa mevcut toplam ikisini de sayar\.
 
 26 Ekim 2026 tarihli temsili okuma → yazma → tekrar okuma örneği; gerçek kullanıcı planı değildir\. Önce ajan rehberini, outline, ilgili get\_plan / GET /api/v1/plan aralığını ve ilerlemeyi okuyun\. Aşağıda yarım kalmış örnek seansın okuma yanıtı var\.
 
@@ -214,11 +214,12 @@ SessionView\.study opsiyonel, salt okunur çalışma bağlamıdır: status=activ
       "stage": "soru",
       "resume_page": 5,
       "item": {
-        "book": "M1",
-        "chapter_no": 1,
-        "chapter_title": "Temel kavramlar",
-        "page_from": 1,
-        "page_to": 10
+        "source_key": "M1",
+        "source_name": "Matematik 1",
+        "section_ordinal": 1,
+        "section_name": "Sayı basamakları",
+        "loc_from": 1,
+        "loc_to": 10
       },
       "notation": "M1·1, s. 1–10"
     }
@@ -234,11 +235,12 @@ SessionView\.study opsiyonel, salt okunur çalışma bağlamıdır: status=activ
   "topic_group_name": "Temel kavramlar",
   "items": [
     {
-      "book": "M1",
-      "chapter_no": 1,
-      "chapter_title": "Temel kavramlar",
-      "page_from": 1,
-      "page_to": 10
+      "source_key": "M1",
+      "source_name": "Matematik 1",
+      "section_ordinal": 1,
+      "section_name": "Sayı basamakları",
+      "loc_from": 1,
+      "loc_to": 10
     }
   ],
   "notation": "M1·1, s. 1–10"

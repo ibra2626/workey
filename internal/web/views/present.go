@@ -99,8 +99,8 @@ func sessionProfile(sv plan.SessionView) []zoneBlock {
 		soru := sv.DurationMin * 5 / 9
 		yanlis := sv.DurationMin - konu - soru
 		return []zoneBlock{
-			{Label: "Konu", Pages: konuPages(sv), Duration: dk(konu), Fill: "var(--color-z1)", Flex: konu, HeightPct: 43},
-			{Label: "Soru", Pages: soruPages(sv), Duration: dk(soru), Fill: "var(--color-z3)", Flex: soru, HeightPct: 92},
+			{Label: "Konu", Duration: dk(konu), Fill: "var(--color-z1)", Flex: konu, HeightPct: 43},
+			{Label: "Soru", Duration: dk(soru), Fill: "var(--color-z3)", Flex: soru, HeightPct: 92},
 			{Label: "Yanlış defteri", Duration: dk(yanlis), Fill: "var(--color-z2)", Flex: yanlis, HeightPct: 64},
 		}
 	}
@@ -113,31 +113,9 @@ func sessionProfile(sv plan.SessionView) []zoneBlock {
 	}
 }
 
-// konuPages renders the konu page span of a session from its items' konu
-// splits, e.g. "s. 41–44"; "" when no item carries a konu split.
-func konuPages(sv plan.SessionView) string {
-	if from, to, ok := spanOf(sv.Items, func(it plan.Item) (*int, *int) { return it.KonuFrom, it.KonuTo }); ok {
-		return "s. " + numSpan(from, to)
-	}
-	return ""
-}
-
-// soruPages renders the soru page span and antrenman range, e.g.
-// "s. 45–58, Antr. 1–3"; "" when nothing is known.
-func soruPages(sv plan.SessionView) string {
-	var parts []string
-	if from, to, ok := spanOf(sv.Items, func(it plan.Item) (*int, *int) { return it.SoruFrom, it.SoruTo }); ok {
-		parts = append(parts, "s. "+numSpan(from, to))
-	}
-	if from, to, ok := spanOf(sv.Items, func(it plan.Item) (*int, *int) { return it.AntrenmanFrom, it.AntrenmanTo }); ok {
-		parts = append(parts, "Antr. "+numSpan(from, to))
-	}
-	return strings.Join(parts, ", ")
-}
-
 // spanOf returns the min-from and max-to over the items whose selected pair of
 // optional bounds is present, and false when none is.
-func spanOf(items []plan.Item, pick func(plan.Item) (*int, *int)) (from, to int, ok bool) {
+func spanOf(items []plan.ItemView, pick func(plan.ItemView) (*int, *int)) (from, to int, ok bool) {
 	for _, it := range items {
 		f, t := pick(it)
 		if f == nil || t == nil {
@@ -180,38 +158,106 @@ func firstSession(d *plan.DayView) plan.SessionView {
 	return d.Sessions[0]
 }
 
-// chapterRef renders a session's leading book·chapter reference, e.g. "M1·3",
-// from its first item.
+// chapterRef renders a session's leading source·section reference, e.g. "M1·3",
+// from its first item (source key, with the section ordinal when present).
 func chapterRef(sv plan.SessionView) string {
 	if len(sv.Items) == 0 {
 		return ""
 	}
-	return plan.Ref(sv.Items[0])
+	return itemHead(sv.Items[0])
 }
 
-// chapterTitle returns the first item's chapter title.
+// chapterTitle returns the first item's section name, falling back to its
+// source name when the item names no section.
 func chapterTitle(sv plan.SessionView) string {
 	if len(sv.Items) == 0 {
 		return ""
 	}
-	return sv.Items[0].ChapterTitle
+	return itemTitle(sv.Items[0])
 }
 
-// chapterBook returns the full book name behind the first item's book code.
+// chapterBook returns the first item's source name.
 func chapterBook(sv plan.SessionView) string {
 	if len(sv.Items) == 0 {
 		return ""
 	}
-	return bookName(sv.Items[0].Book)
+	return sv.Items[0].SourceName
 }
 
-// headPages renders the session's overall page span, e.g. "s. 41–58", across
-// all its items.
+// headPages renders the session's overall location span across its items, e.g.
+// "41–58". The location unit is resolved in sv.Notation, so the view layer
+// renders the bare numeric span here.
 func headPages(sv plan.SessionView) string {
-	if from, to, ok := spanOf(sv.Items, func(it plan.Item) (*int, *int) { return &it.PageFrom, &it.PageTo }); ok {
-		return "s. " + numSpan(from, to)
+	if from, to, ok := spanOf(sv.Items, func(it plan.ItemView) (*int, *int) { return it.LocFrom, it.LocTo }); ok {
+		return numSpan(from, to)
 	}
 	return ""
+}
+
+// itemHead renders one item's source·section lead, e.g. "M1·3" or "M1".
+func itemHead(it plan.ItemView) string {
+	if it.SectionOrdinal != nil {
+		return it.SourceKey + middleDot + strconv.Itoa(*it.SectionOrdinal)
+	}
+	return it.SourceKey
+}
+
+// itemTitle returns an item's section name, or its source name when the item
+// names no section.
+func itemTitle(it plan.ItemView) string {
+	if it.SectionName != "" {
+		return it.SectionName
+	}
+	return it.SourceName
+}
+
+// itemRef renders one item's canonical reference through the plan formatter,
+// e.g. "M1·3, Antrenman 1–3". The location unit is left empty so a location
+// range prints as a bare span (the prefixed form lives in sv.Notation).
+func itemRef(it plan.ItemView) string {
+	return plan.FormatRef(plan.ItemRef{
+		SourceKey:      it.SourceKey,
+		SectionOrdinal: it.SectionOrdinal,
+		Units:          it.Units,
+		LocFrom:        it.LocFrom,
+		LocTo:          it.LocTo,
+	})
+}
+
+// itemNotations splits the session's canonical notation into its per-item
+// references. The service built sv.Notation with the one formatter, joining the
+// items with " · " (space–middle-dot–space, distinct from the prefix-less dot
+// inside a head like "M1·3"), so this recovers each item's exact, unit-prefixed
+// notation without re-deriving it in the view layer.
+func itemNotations(sv plan.SessionView) []string {
+	if sv.Notation == "" {
+		return nil
+	}
+	return strings.Split(sv.Notation, " "+middleDot+" ")
+}
+
+// itemNotation returns the i-th item's exact notation, falling back to the
+// bare view-layer reference when the split does not line up with the items.
+func itemNotation(sv plan.SessionView, i int) string {
+	if ns := itemNotations(sv); i >= 0 && i < len(ns) {
+		return ns[i]
+	}
+	if i >= 0 && i < len(sv.Items) {
+		return itemRef(sv.Items[i])
+	}
+	return ""
+}
+
+// itemLabel renders the i-th item for a session's source list: its exact
+// notation and section title, e.g. "M1·2, s. 23–40 · Karma tekrar (1–4)".
+func itemLabel(sv plan.SessionView, i int) string {
+	label := itemNotation(sv, i)
+	if i >= 0 && i < len(sv.Items) {
+		if t := itemTitle(sv.Items[i]); t != "" {
+			label += " " + middleDot + " " + t
+		}
+	}
+	return label
 }
 
 // tomorrowLine renders the "Yarın" sub-line: "s. 59–76 · 20:30 · 90 dk".
@@ -226,25 +272,6 @@ func tomorrowLine(sv plan.SessionView) string {
 
 // middleDot is U+00B7, the separator joining a session's meta fields.
 const middleDot = "·"
-
-// bookName maps a book code to its full title for the book line under a chapter
-// (e.g. "M1" → "Antrenmanlarla Matematik 1"). Unknown codes render as the code.
-func bookName(code string) string {
-	switch code {
-	case "M1":
-		return "Antrenmanlarla Matematik 1"
-	case "M2":
-		return "Antrenmanlarla Matematik 2"
-	case "M3":
-		return "Antrenmanlarla Matematik 3"
-	case "G1":
-		return "Antrenmanlarla Geometri 1"
-	case "G2":
-		return "Antrenmanlarla Geometri 2"
-	default:
-		return code
-	}
-}
 
 // axisTicks returns the time-axis labels under a session profile: every 30
 // minutes from the start to the end for an akşam session, or just the start and
@@ -465,10 +492,10 @@ func rowMeta(sv plan.SessionView) string {
 	return pages + " " + middleDot + " " + detail
 }
 
-// pagesPlain renders a session's page span without the "s." prefix, for the
-// Hafta table "Sayfa" column, e.g. "41–58".
+// pagesPlain renders a session's location span for the Hafta table column,
+// e.g. "41–58" (the location unit is carried by sv.Notation).
 func pagesPlain(sv plan.SessionView) string {
-	if from, to, ok := spanOf(sv.Items, func(it plan.Item) (*int, *int) { return &it.PageFrom, &it.PageTo }); ok {
+	if from, to, ok := spanOf(sv.Items, func(it plan.ItemView) (*int, *int) { return it.LocFrom, it.LocTo }); ok {
 		return numSpan(from, to)
 	}
 	return ""
@@ -591,10 +618,10 @@ type stripCell struct {
 // dgsLabel renders a topic group's DGS question weight, e.g. "8–10 soru" (never
 // abbreviated "s."); "" when the group carries no weight.
 func dgsLabel(gp plan.GroupProgress) string {
-	if gp.DGSMin == nil || gp.DGSMax == nil {
+	if gp.QuestionMin == nil || gp.QuestionMax == nil {
 		return ""
 	}
-	return numSpan(*gp.DGSMin, *gp.DGSMax) + " soru"
+	return numSpan(*gp.QuestionMin, *gp.QuestionMax) + " soru"
 }
 
 // currentPhaseRange returns the first and last plan week of the current phase,
