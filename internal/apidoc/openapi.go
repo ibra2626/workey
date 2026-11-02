@@ -39,7 +39,7 @@ const ExamplePlan = `{
   "sessions": [{
     "date": "2026-10-26", "start_time": "20:30", "duration_min": 90,
     "kind": "aksam", "topic_group": "temel",
-    "items": [{"book": "M1", "chapter_no": 1, "chapter_title": "Temel kavramlar", "page_from": 1, "page_to": 10}]
+    "items": [{"source_key": "M1", "section_ordinal": 1, "loc_from": 1, "loc_to": 10}]
   }]
 }`
 
@@ -101,14 +101,10 @@ func nullableArrays(v any) {
 					p["format"] = "date"
 				case "start_time":
 					p["pattern"] = `^([01]\d|2[0-3]):[0-5]\d$`
-				case "book":
-					p["enum"] = []string{"M1", "M2", "M3", "G1", "G2"}
 				case "kind":
-					p["enum"] = []string{plan.KindAksam, plan.KindUzunBlok, plan.KindDeneme}
-				case "chapter_no", "page_from", "page_to", "duration_min", "id":
+					p["examples"] = []string{plan.KindAksam, plan.KindUzunBlok, plan.KindDeneme}
+				case "section_ordinal", "unit_from", "unit_to", "loc_from", "loc_to", "duration_min", "id":
 					p["minimum"] = 1
-				case "chapter_title":
-					p["minLength"] = 1
 				case "status":
 					p["enum"] = []string{plan.StudyActive, plan.StudyPaused, plan.StudyClosed}
 				case "entry_mode":

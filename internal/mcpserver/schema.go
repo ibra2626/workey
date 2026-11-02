@@ -63,11 +63,23 @@ const (
 	timePattern = `^([01]\d|2[0-3]):[0-5]\d$` // 'HH:MM', 24-hour
 )
 
-// bookEnum and kindEnum list the accepted item books and session kinds.
+// sourceKindEnum and locationUnitEnum list the closed sets the store enforces on
+// a source; sessionKinds are the known session kinds, given only as examples
+// since a session's kind is a free label.
 var (
-	bookEnum = []any{"M1", "M2", "M3", "G1", "G2"}
-	kindEnum = []any{plan.KindAksam, plan.KindUzunBlok, plan.KindDeneme}
+	sourceKindEnum   = toAnySlice(plan.SourceKinds())
+	locationUnitEnum = toAnySlice(plan.LocationUnits())
+	sessionKinds     = []string{plan.KindAksam, plan.KindUzunBlok, plan.KindDeneme}
 )
+
+// toAnySlice widens a string slice to the []any an enum schema expects.
+func toAnySlice(ss []string) []any {
+	out := make([]any, len(ss))
+	for i, s := range ss {
+		out[i] = s
+	}
+	return out
+}
 
 // setProp sets a child property's attributes when it is present, so schema
 // enrichment is resilient to the inferred shape. It returns the child so calls
@@ -138,10 +150,7 @@ func enrichSessionSchema(sess *jsonschema.Schema) {
 		dur.Minimum = jsonschema.Ptr(1.0)
 		dur.Maximum = jsonschema.Ptr(1440.0)
 	}
-	kind := setProp(sess, "kind", "Session kind: 'aksam' (evening block), 'uzun_blok' (long block) or 'deneme' (mock exam, no results are stored).")
-	if kind != nil {
-		kind.Enum = kindEnum
-	}
+	setProp(sess, "kind", "Session kind, a free label. Known values used by the screens: 'aksam' (evening block), 'uzun_blok' (long block), 'deneme' (mock exam, no results are stored). Any other label is accepted.")
 	setProp(sess, "topic_group", "Optional topic-group key (from save_outline). Used only to attribute planned/done minutes in progress; it is not topic text.")
 
 	makeup := setProp(sess, "makeup_of", "Optional link to the missed session this one makes up, addressed by its date + start_time. The target must be a past, uncompleted session; the missed day then reads as moved.")
@@ -156,41 +165,26 @@ func enrichSessionSchema(sess *jsonschema.Schema) {
 		}
 	}
 
-	items := setProp(sess, "items", "One or more book references for the session. Only book, chapter and page/range references are stored — never topic explanations or question content.")
+	items := setProp(sess, "items", "One or more catalog references for the session. Only source/section/unit/location references are stored — never topic explanations or question content. The source catalog must already exist (save_source).")
 	if items != nil {
 		items.MinItems = jsonschema.Ptr(1)
 	}
 	enrichItemSchema(itemsOf(items))
 }
 
-// enrichItemSchema annotates one item object's schema.
+// enrichItemSchema annotates one item object's schema (the new catalog reference
+// shape: a source key, an optional section ordinal, and a unit range and/or a
+// location range).
 func enrichItemSchema(it *jsonschema.Schema) {
 	if it == nil {
 		return
 	}
-	book := setProp(it, "book", "Book code: M1, M2, M3 (matematik) or G1, G2 (geometri).")
-	if book != nil {
-		book.Enum = bookEnum
-	}
-	ch := setProp(it, "chapter_no", "Chapter number within the book.")
-	if ch != nil {
-		ch.Minimum = jsonschema.Ptr(1.0)
-	}
-	setProp(it, "chapter_title", "Chapter title as printed in the book (a reference label, not topic content).")
-	pf := setProp(it, "page_from", "First page of the range (inclusive).")
-	if pf != nil {
-		pf.Minimum = jsonschema.Ptr(1.0)
-	}
-	pt := setProp(it, "page_to", "Last page of the range (inclusive); must be >= page_from.")
-	if pt != nil {
-		pt.Minimum = jsonschema.Ptr(1.0)
-	}
-	boundOptional(it, "konu_from", "Optional first 'konu' (lesson) page of the range.")
-	boundOptional(it, "konu_to", "Optional last 'konu' (lesson) page; must be >= konu_from.")
-	boundOptional(it, "soru_from", "Optional first 'soru' (question) page of the range.")
-	boundOptional(it, "soru_to", "Optional last 'soru' (question) page; must be >= soru_from.")
-	boundOptional(it, "antrenman_from", "Optional first 'antrenman' (drill) number of the range.")
-	boundOptional(it, "antrenman_to", "Optional last 'antrenman' (drill) number; must be >= antrenman_from.")
+	setProp(it, "source_key", "Stable key of the source this item references (from save_source / get_sources). Required.")
+	boundOptional(it, "section_ordinal", "Optional 1-based ordinal of the section within the source.")
+	boundOptional(it, "unit_from", "Optional first unit ordinal of the range (1-based, within the section). Requires section_ordinal.")
+	boundOptional(it, "unit_to", "Optional last unit ordinal of the range; must be >= unit_from.")
+	boundOptional(it, "loc_from", "Optional first location number of the range, in the source's location unit (page/minute/lesson/other).")
+	boundOptional(it, "loc_to", "Optional last location number; must be >= loc_from.")
 }
 
 // boundOptional annotates an optional positive-integer field.
@@ -235,10 +229,87 @@ func saveOutlineSchema() (*jsonschema.Schema, error) {
 		if ord != nil {
 			ord.Minimum = jsonschema.Ptr(0.0)
 		}
-		boundOptional(g, "dgs_question_min", "Optional lower bound of the group's expected DGS question count.")
-		boundOptional(g, "dgs_question_max", "Optional upper bound of the group's expected DGS question count.")
+		boundOptional(g, "question_min", "Optional lower bound of the group's expected question count.")
+		boundOptional(g, "question_max", "Optional upper bound of the group's expected question count.")
 	}
 
+	return s, nil
+}
+
+// saveSourceSchema infers and enriches the schema for plan.SaveSourceRequest: a
+// source (with its closed kind/location-unit sets) and its full ordered set of
+// sections, each carrying its ordered units.
+func saveSourceSchema() (*jsonschema.Schema, error) {
+	s, err := jsonschema.For[plan.SaveSourceRequest](nil)
+	if err != nil {
+		return nil, err
+	}
+	setProp(s, "idempotency_key", "Optional caller-chosen key, with the same replay semantics as save_plan.")
+
+	src := setProp(s, "source", "The source's own fields. The structure is replaced whole, keyed by 'key'.")
+	if src != nil {
+		setProp(src, "key", "Stable machine key for the source (e.g. 'M1', 'algoritma-101'). Re-writing the same key preserves unit progress where unit places are kept.")
+		setProp(src, "name", "Display name of the source.")
+		kind := setProp(src, "kind", "Source kind: book, video, course or other. A video source's units carry no doğru/yanlış/boş.")
+		if kind != nil {
+			kind.Enum = sourceKindEnum
+		}
+		lu := setProp(src, "location_unit", "How the source counts ranges: page, minute, lesson or other. Drives the notation prefix (page → 's. ', minute → 'dk ', lesson → 'ders ').")
+		if lu != nil {
+			lu.Enum = locationUnitEnum
+		}
+		ord := setProp(src, "ordinal", "Order of the source in the catalog, from 1.")
+		if ord != nil {
+			ord.Minimum = jsonschema.Ptr(0.0)
+		}
+	}
+
+	sections := setProp(s, "sections", "The complete ordered set of sections for the source. A section is matched by its ordinal; an ordinal absent from the request is deleted (cascading its units and their progress).")
+	if sec := itemsOf(sections); sec != nil {
+		so := setProp(sec, "ordinal", "1-based order of the section within the source; also its stable match key across re-writes.")
+		if so != nil {
+			so.Minimum = jsonschema.Ptr(1.0)
+		}
+		setProp(sec, "name", "Section name as printed in the source (a reference label, not topic content).")
+		boundOptional(sec, "loc_from", "Optional first location number of the section's span, in the source's location unit.")
+		boundOptional(sec, "loc_to", "Optional last location number; must be >= loc_from.")
+
+		units := setProp(sec, "units", "The complete ordered set of units in the section. A unit is matched by its ordinal within the section; keeping the ordinal keeps the unit id and its progress.")
+		if u := itemsOf(units); u != nil {
+			uo := setProp(u, "ordinal", "1-based order of the unit within the section; its stable match key across re-writes.")
+			if uo != nil {
+				uo.Minimum = jsonschema.Ptr(1.0)
+			}
+			setProp(u, "label", "The source's own word for the unit (e.g. 'Antrenman', 'Test', 'Föy', 'Ders'). Free text; never enumerated.")
+			boundOptional(u, "number", "Optional number the reader sees (e.g. Antrenman 5); defaults to the ordinal when absent.")
+			boundOptional(u, "loc_from", "Optional first location number of the unit, in the source's location unit.")
+			boundOptional(u, "loc_to", "Optional last location number; must be >= loc_from.")
+		}
+	}
+
+	return s, nil
+}
+
+// setUnitResultSchema infers and enriches the schema for plan.UnitResultRequest.
+func setUnitResultSchema() (*jsonschema.Schema, error) {
+	s, err := jsonschema.For[plan.UnitResultRequest](nil)
+	if err != nil {
+		return nil, err
+	}
+	id := setProp(s, "unit_id", "Id of the unit to mark, from get_sources.")
+	if id != nil {
+		id.Minimum = jsonschema.Ptr(1.0)
+	}
+	setProp(s, "done", "true to mark the unit done, false to undo. Independent of session completion.")
+	boundOptional(s, "correct", "Optional doğru count (non-negative). Not allowed for a video source's unit.")
+	boundOptional(s, "wrong", "Optional yanlış count (non-negative). Not allowed for a video source's unit.")
+	boundOptional(s, "blank", "Optional boş count (non-negative). Not allowed for a video source's unit.")
+	// D/Y/B are non-negative, not strictly positive; relax the shared min to 0.
+	for _, name := range []string{"correct", "wrong", "blank"} {
+		if c := s.Properties[name]; c != nil {
+			c.Minimum = jsonschema.Ptr(0.0)
+		}
+	}
 	return s, nil
 }
 

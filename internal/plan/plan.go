@@ -38,6 +38,35 @@ const (
 	KindDeneme   = "deneme"
 )
 
+// Source kinds. Unlike a session kind these are a closed set the store enforces
+// with a CHECK; a video source's units carry no D/Y/B (see units.go kindVideo).
+const (
+	SourceKindBook   = "book"
+	SourceKindVideo  = "video"
+	SourceKindCourse = "course"
+	SourceKindOther  = "other"
+)
+
+// Location units name how a source counts ranges; a closed set the store
+// enforces with a CHECK. The notation formatter prefixes a range accordingly
+// (page → "s. ", minute → "dk ", lesson → "ders ").
+const (
+	LocationUnitPage   = "page"
+	LocationUnitMinute = "minute"
+	LocationUnitLesson = "lesson"
+	LocationUnitOther  = "other"
+)
+
+// SourceKinds and LocationUnits list the accepted values, shared by validation,
+// the MCP/REST schemas and the agent guide.
+func SourceKinds() []string {
+	return []string{SourceKindBook, SourceKindVideo, SourceKindCourse, SourceKindOther}
+}
+
+func LocationUnits() []string {
+	return []string{LocationUnitPage, LocationUnitMinute, LocationUnitLesson, LocationUnitOther}
+}
+
 // Item is one catalog reference inside a session: a source (named by its stable
 // key), an optional section (by ordinal within the source), and a unit range
 // and/or a location range. unit_from/unit_to are 1-based unit ordinals within

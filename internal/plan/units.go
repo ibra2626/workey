@@ -11,7 +11,7 @@ import (
 
 // kindVideo is the source kind whose units carry no D/Y/B: a video has nothing
 // to score right, wrong or blank, so marking it done leaves those fields null.
-const kindVideo = "video"
+const kindVideo = SourceKindVideo
 
 // UnitResultRequest marks one unit done (or not), optionally recording its D/Y/B
 // (doğru/yanlış/boş). D/Y/B are non-negative counts; the service does not check

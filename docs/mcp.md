@@ -114,7 +114,7 @@ isteyin. Desktop için yukarıdaki ayarlar ekranını kullanın.
 ChatGPT bağlantısı sonraki aşamadır; bu sürümde çalışır bağlantı olarak sunulmaz.
 HTTPS/tünel ve uygun kimlik doğrulama ayrıca hazırlanmalıdır.
 
-Workey, `/mcp` adresinde Bearer doğrulamalı Streamable HTTP sunar. REST ve web ile aynı SQLite verisini ve plan servisini kullanır. Uygulama çalışma içeriği üretmez; asistan yalnızca kitap, bölüm ve sayfa referanslarını kaydeder.
+Workey, `/mcp` adresinde Bearer doğrulamalı Streamable HTTP sunar. REST ve web ile aynı SQLite verisini ve plan servisini kullanır. Uygulama çalışma içeriği üretmez; asistan yalnızca kaynak yapısını (kaynak → bölüm → birim) ve seansların bu kataloğa referanslarını kaydeder, konu veya soru metni tutmaz.
 
 ## Yerel bağlantı
 
@@ -133,7 +133,10 @@ Bu komut tokenı yerel Claude yapılandırmasına yazar; yapılandırmayı Git'e
 
 | Araç | İşlev |
 | --- | --- |
-| `get_agent_guide` | İlk çağrı: İstanbul bugünü, sınav tarihi, kitap/tür listeleri, işlem kuralları ve önerilen akış. |
+| `get_agent_guide` | İlk çağrı: İstanbul bugünü, sınav tarihi, kaynak türü/konum birimi/seans türü listeleri, işlem kuralları ve önerilen akış. |
+| `get_sources` | Kaynak kataloğunu (kaynak → bölüm → birim, birim id'leriyle) oku. |
+| `save_source` | Bir kaynağı bölüm ve birimleriyle key üzerinden tam yaz (oluştur/değiştir). Bölümler ordinal, birimler bölüm ordinal + birim ordinal ile eşleşir; yeri korunan birimin id'si ve ilerlemesi korunur. Birim ilerlemesine dokunmaz. |
+| `set_unit_result` | Bir birimi (opsiyonel doğru/yanlış/boş ile) bitti işaretle veya geri al; seans tamamlamasından bağımsız. Video kaynağının birimi D/Y/B tutmaz. |
 | `get_outline` | Fazları ve konu gruplarının anahtarlarını oku. |
 | `save_outline` | Faz ve grupların tam listesini anahtara göre değiştir. Kullanılan grup silinemez. |
 | `get_plan` | `from`–`to` dahil aralıktaki seansları, kimliklerini ve durumlarını oku. |
@@ -141,26 +144,28 @@ Bu komut tokenı yerel Claude yapılandırmasına yazar; yapılandırmayı Git'e
 | `complete_session` | `session_id` için tamamla; `done=false` ile geri al. Gelecek seans tamamlanamaz. |
 | `get_progress` | Seans, dakika, saat, konu grubu ve 38 haftalık ilerlemeyi oku. |
 
-Tarihler `YYYY-MM-DD`, saatler `HH:MM`, takvim Europe/Istanbul. Kitaplar `M1`, `M2`, `M3`, `G1`, `G2`; türler `aksam`, `uzun_blok`, `deneme`. `tools/list` açıklamaları ve şemaları alan sınırlarını bildirir.
+Tarihler `YYYY-MM-DD`, saatler `HH:MM`, takvim Europe/Istanbul. Kaynak türleri `book`, `video`, `course`, `other`; konum birimleri `page`, `minute`, `lesson`, `other`; seans türleri `aksam`, `uzun_blok`, `deneme` (seans türü serbest etikettir, bu değerler örnektir). Kaynaklar sabit bir listeden gelmez; asistan her kaynağın yapısını `save_source` ile yazar. `tools/list` açıklamaları ve şemaları alan sınırlarını bildirir.
 
 Geçmiş tarihler ve tamamlanan seanslar plan yazımında korunur; sonuçta `skipped` olarak bildirilir. Aynı istek tekrarlandığında kayıt/denetim satırı çoğalmaz. `idempotency_key` verilirse ilk sonuç tekrar döner; aynı anahtar farklı içerikle kullanılamaz. Telafi için `makeup_of` geçmiş, tamamlanmamış seansın tarih ve saatini taşır.
 
 ## Örnek istemler
 
-- “Önce araç açıklamalarını ve mevcut faz/planı oku. Verdiğim kitap ve sayfa referanslarıyla bugünden başlayan haftayı yaz. Mevcut açık seansları değiştirmeden önce tam hafta listesini koru; geçmiş veya tamamlanmış seansları değiştirme.”
+- “Önce araç açıklamalarını, mevcut kaynakları (get_sources) ve faz/planı oku. Verdiğim içindekilerden kaynağın yapısını çıkarıp save_source ile yaz, get_sources ile geri oku. Sonra bu kaynağa referansla bugünden başlayan haftayı yaz; mevcut açık seansları koru, geçmiş veya tamamlanmış seansları değiştirme.”
 - “Bu haftanın planını oku. Yapılamayan salı seansını cumartesi için telafi seansına bağla; mevcut cumartesi içeriğini koru. Ardından planı ve ilerlemeyi tekrar okuyup sonucu bildir.”
-- “İlerlemeyi oku; tamamlanan dakika ve seansları özetle. Çalışma içeriği veya soru üretme.”
+- “Bitirdiğim birimi (get_sources'tan id'siyle) set_unit_result ile doğru/yanlış/boş sayılarıyla işaretle. İlerlemeyi oku; tamamlanan dakika ve seansları özetle. Çalışma içeriği veya soru üretme.”
 
-`testdata/sample-*.json` yalnızca örnek veridir. Sabit 26 Ekim 2026 haftasını bugünün gerçek planı gibi göndermeyin: geçmiş kayıtlar korunacağı için `skipped` dönebilir. Gerçek kitap referanslarını kullanıcı sağlar.
+`testdata/sample-*.json` yalnızca örnek veridir (`sample-sources.json` kaynak kataloğu, `sample-outline.json` ve `sample-week.json` plan). Sabit 26 Ekim 2026 haftasını bugünün gerçek planı gibi göndermeyin: geçmiş kayıtlar korunacağı için `skipped` dönebilir. Gerçek kaynak yapısını ve referansları kullanıcı sağlar.
 
 ## Tekrarlanabilir doğrulama (2026-10-27)
 
 ```powershell
 go test ./internal/mcpserver/... ./internal/plan/...
-go test ./internal/mcpserver -run '^TestMCPWebWorkflow$' -v
+go test -tags webworkflow ./internal/mcpserver -run '^TestMCPWebWorkflow$' -v
 ```
 
-`TestMCPWebWorkflow`, resmî Go MCP istemcisiyle gerçek Streamable HTTP üzerinden `save_outline → save_plan → get_progress → web POST tamamla → get_progress → save_plan tekrar → web POST geri-al → get_progress` zincirini çalıştırır. Sahte saat 2026-10-26 09:00 İstanbul; geçici veritabanı kullanılır. Beş seans/540 dakika kaydolur; web tamamlama sonrası bir seans/90 dakika/1,5 saat görünür; geri al sonrası sıfıra döner. Tekrarda beş kayıt korunur, tamamlanan seans atlanır, dört seans değişmeden kalır ve yeni audit satırı yazılmaz.
+v2 katalog geçişinde `internal/web` görünümleri WKY-26/27'ye kadar kasıtlı olarak kırmızıdır; çapraz-taşıma testi (`TestMCPWebWorkflow`) ve görsel inceleme (`TestVisualReview`) `webworkflow` yapı etiketi arkasındadır ve ancak web yeniden derlendiğinde (WKY-28) varsayılan olarak çalışır. Aşağıdaki sayımlar web yeşile döndüğünde yeniden doğrulanacaktır.
+
+`TestMCPWebWorkflow`, resmî Go MCP istemcisiyle gerçek Streamable HTTP üzerinden `save_source → save_outline → save_plan → get_progress → web POST tamamla → get_progress → save_plan tekrar → web POST geri-al → get_progress` zincirini çalıştırır. Sahte saat 2026-10-26 09:00 İstanbul; geçici veritabanı kullanılır. Beş seans/540 dakika kaydolur; web tamamlama sonrası bir seans/90 dakika/1,5 saat görünür; geri al sonrası sıfıra döner. Tekrarda beş kayıt korunur, tamamlanan seans atlanır, dört seans değişmeden kalır ve yeni audit satırı yazılmaz.
 
 Denetim sorgusu:
 
@@ -183,7 +188,7 @@ Geçici görsel senaryoları açmak için:
 
 ```powershell
 $env:WORKEY_VISUAL_REVIEW='1'
-go test ./internal/mcpserver -run '^TestVisualReview$' -v -timeout 35m
+go test -tags webworkflow ./internal/mcpserver -run '^TestVisualReview$' -v -timeout 35m
 ```
 
 18114: çarşamba, 18115: dinlenme, 18116: boş plan, 18117: giriş, 18118: uzun blok. Yalnızca loopback; örnek veriler test sonrasında silinir. Ctrl-C ile durdurun. Bu sunucular gerçek çalışma planı için kullanılmaz.

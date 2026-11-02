@@ -8,12 +8,15 @@ import (
 	"github.com/ibra2626/workey/internal/plan"
 )
 
+// pint returns a pointer to i, for the optional integer fields of an example item.
+func pint(i int) *int { return &i }
+
 // ResponseExample describes a disposable scenario on 26 October 2026, never live data.
 // The contract test runs this scenario and compares every example with its real response.
 func ResponseExample(name string) any {
 	date := time.Date(2026, 10, 26, 9, 0, 0, 0, clock.Location)
-	item := plan.Item{Book: "M1", ChapterNo: 1, ChapterTitle: "Temel kavramlar", PageFrom: 1, PageTo: 10}
-	session := plan.SessionView{ID: 1, Date: "2026-10-26", StartTime: "20:30", DurationMin: 90, Kind: plan.KindAksam, State: plan.StateToday, TopicGroupKey: "temel", TopicGroupName: "Temel kavramlar", Items: []plan.Item{item}, Notation: "M1·1, s. 1–10"}
+	item := plan.ItemView{SourceKey: "M1", SourceName: "Matematik 1", SectionOrdinal: pint(1), SectionName: "Temel kavramlar", LocFrom: pint(1), LocTo: pint(10)}
+	session := plan.SessionView{ID: 1, Date: "2026-10-26", StartTime: "20:30", DurationMin: 90, Kind: plan.KindAksam, State: plan.StateToday, TopicGroupKey: "temel", TopicGroupName: "Temel kavramlar", Items: []plan.ItemView{item}, Notation: "M1·1, s. 1–10"}
 	switch name {
 	case "AgentGuide":
 		return plan.New(nil, clock.Fake{Current: date}).AgentGuide(clock.Date{Year: 2027, Month: 7, Day: 18})

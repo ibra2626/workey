@@ -1,54 +1,63 @@
-# CURRENT — WKY-23 done (unit progress + D/Y/B service path); WKY-24 next
+# CURRENT — WKY-24 done (MCP catalog tools + guide); WKY-25 next
 
 Updated 2026-11-02.
-Active task: .agent/work/workey-v2-katalog/tasks/WKY-23.md (DONE)
-Next: WKY-24 — MCP tools (`save_source`/`get_sources`/`set_unit_result`) +
-`internal/mcpserver`/`internal/apidoc`, which also restores that layer's build
-against the catalog Item/notation (see "Whole-tree build is red by design").
+Active task: .agent/work/workey-v2-katalog/tasks/WKY-24.md (DONE)
+Next: WKY-25 — REST API catalog endpoints + plan item contract (`internal/api`),
+which also restores that layer's _test files against the catalog Item/notation.
+WKY-24 and WKY-25 are independent once WKY-22/23 landed; the plan catalog service
+path (`SaveSource`/`Sources`, `SetUnitResult`) is already in place for REST to reuse.
 
 ## Feature: workey-v2-katalog (WKY-21..28)
 Generalize workey from a fixed DGS/5-book tracker to a general source catalog
 (Kaynak → Bölüm → Birim) with separate unit progress + D/Y/B. Direction + WKY-21
-+ WKY-22 + WKY-23 decisions: `.agent/state/DECISIONS.md` (four 2026-11-02
++ WKY-22 + WKY-23 + WKY-24 decisions: `.agent/state/DECISIONS.md` (five 2026-11-02
 entries). Shared rules: `.agent/work/workey-v2-katalog/README.md`. No data
 migration; schema rebuilt clean (WKY-21).
 
-## WKY-23 result — 2026-11-02 (unit progress + D/Y/B service path)
-A business-logic path to mark a unit "bitti" with optional D/Y/B, independent of
-session completion. Details: DECISIONS.md "WKY-23" + the task's Progress section.
-- **Store** (`internal/store/sources.go`): added `UnitByID` (unit joined to its
-  section ordinal + source id/key/name/kind/location_unit), `UnitProgressByUnits`
-  (read-by-unit-set; empty input → empty map), and aggregates
-  `UnitProgressTotalsBySource`/`...BySection` (shared `unitProgressTotals`,
-  `COUNT` + `COALESCE(SUM(...),0)`) with a `UnitProgressTotals` struct. WKY-21's
-  `unit_progress` CRUD (`UpsertUnitProgress`/`DeleteUnitProgress`/
-  `UnitProgressByUnit`/`...BySource`) reused as-is.
-- **Plan** (`internal/plan/units.go`, new): `SetUnitResult(source,
-  UnitResultRequest{UnitID, Done, Correct/Wrong/Blank *int})` — done upserts
-  (sticky first `done_at`, optional D/Y/B, writing source), undo clears.
-  Idempotent no-op (compare done_at + D/Y/B + completed_source) writes nothing +
-  no audit; a real change writes one `audit_log` row (entity `unit`, actions
-  `complete`/`undo` reused from complete.go, before/after JSON, NULL request
-  hash). `checkNonNeg` rejects negative D/Y/B; a `video` source rejects any D/Y/B
-  but can still be marked done (null). Returns `UnitResultView` (identity +
-  `FormatRef` notation + result). Reads `UnitResults(unitIDs)`,
-  `SourceProgress()`, `SectionProgress()` map store aggregates → plan types
-  `UnitResult` / `ProgressTotals` (web never sees store types).
-- **Tests** (`internal/plan/units_test.go`): done ±D/Y/B; idempotent (stable
-  done_at, 1 audit row); D/Y/B change keeps done_at + audits; undo clears + second
-  undo no-op; negative rejected; missing unit; video rejects D/Y/B yet marks done;
-  two-direction independence; source/section aggregates + read-by-units. Helpers
-  `sectionUnitIDs`/`sectionID`/`seedVideoUnit`/`unitAuditCount` (reuse
-  `seedCatalog`, `ptr` from notation_test.go).
+## WKY-24 result — 2026-11-02 (MCP catalog tools + agent guide)
+MCP exposes the catalog; the fixed book enum is gone. Details: DECISIONS.md
+"WKY-24" + the task's Progress section.
+- **Plan catalog service path** (`internal/plan/sources.go`, new): `SaveSource`
+  (validated, idempotent, audited; key-based whole-source replace reconciling
+  sections by ordinal and units by section+unit ordinal via store Update*/Insert*/
+  Delete*, so kept units keep their id and `unit_progress`; one `audit_log` row,
+  entity `source`, structural snapshot excl. ids/timestamps drives no-op) and
+  `Sources → CatalogView`. Views `UnitView`/`SectionView`/`SourceView`,
+  `SaveSourceResult`. `validateSaveSource` (kind/location_unit against store CHECK
+  sets; positive+unique ordinals; paired/ordered ranges). `plan.go` SourceKind*/
+  LocationUnit* consts + `SourceKinds()`/`LocationUnits()`.
+- **MCP** (`internal/mcpserver`): new tools `get_sources`/`save_source`/
+  `set_unit_result` (thin handlers → service). `schema.go` dropped `bookEnum`;
+  item schema → source_key/section_ordinal/unit_from/to/loc_from/to; session kind
+  a free label (no enum); outline `dgs_question_*`→`question_*`; source
+  kind/location_unit enums; set_unit_result D/Y/B min 0. Guide (guide.go) drops
+  `Books` → `SourceKinds`/`LocationUnits`; rules/workflow rewritten for the catalog
+  flow, all DGS/five-book wording gone.
+- **apidoc restored** against the catalog (examples use `ItemView`; openapi item
+  fields + kind-as-examples). `internal/api` non-test builds as a side effect.
+- **Tests**: `mcpserver_test.go` web-free (`newMCP`); cross-transport
+  `TestMCPWebWorkflow`/`TestVisualReview` + the `web` import moved behind
+  `//go:build webworkflow` (web red until WKY-26/27; WKY-28 re-enables). New
+  `TestSaveSourceRoundTripKeepsProgress`, `TestSavePlanUnknownSource`; fixture
+  `testdata/sample-sources.json` (M1, 4 sections, section 3 = 3 Antrenman units);
+  `seedPlan` seeds sources first.
+- **Docs**: docs/mcp.md tool table/intro/examples updated; verification commands
+  note the `webworkflow` tag. The verbatim-synced study-contract/planning-inputs
+  blocks are regenerated by `internal/web/views` in WKY-26/27.
 
 ### Checks (2026-11-02, Go 1.27.3)
-- `go test ./internal/plan/... ./internal/store/...` ok.
-- `go vet ./internal/plan/... ./internal/store/...` clean.
-- `go build` + `CGO_ENABLED=0 go build` of plan+store ok.
-- `gofmt -l` on the three changed files prints nothing (whole-tree `gofmt -l .`
-  still flags pre-existing CRLF working-tree artifacts; environmental only).
-- NOT run: whole-tree build/vet (web/transport red by design), govulncheck. No
-  commit/push.
+- `go test -count=1 ./internal/mcpserver/... ./internal/plan/... ./internal/store/...` ok.
+- `go build` + `CGO_ENABLED=0 go build` + `go vet` of plan/store/mcpserver/apidoc ok.
+- `go build ./...`: only `internal/web/views` (→web, cmd) red by design; `api`
+  _test files remain for WKY-25.
+- gofmt: changed files clean on LF content (working-tree CRLF = core.autocrlf
+  checkout artifact). NOT run: govulncheck (no dep change). No commit/push.
+
+## WKY-23 result — 2026-11-02 (unit progress + D/Y/B service path)
+`internal/plan/units.go` `SetUnitResult` + reads (`UnitResults`, `SourceProgress`,
+`SectionProgress`); store `UnitByID`/`UnitProgressByUnits`/`UnitProgressTotals*`.
+Idempotent, audited (entity `unit`), video units reject D/Y/B. Full detail:
+DECISIONS.md "WKY-23" + WKY-23.md Progress.
 
 ## WKY-22 result — 2026-11-02 (plan domain bound to the catalog)
 Rebound `internal/plan` to the WKY-21 catalog store. `plan.Item = {SourceKey,
@@ -62,20 +71,19 @@ defined for WKY-24/25, unused there. Full detail: DECISIONS.md "WKY-22".
 
 ## Whole-tree build is RED by design (user split, 2026-11-02)
 Changing `plan.Item` breaks the v1-concept layers; the user chose to split rather
-than gut WKY-24..27's work. Each also restores its layer's compile against the
-catalog Item/notation:
-- WKY-24 → `internal/mcpserver`, `internal/apidoc`
-- WKY-25 → `internal/api`
+than gut WKY-24..27's work. Each restores its layer's compile against the catalog
+Item/notation:
+- WKY-24 → `internal/mcpserver`, `internal/apidoc` — DONE (green).
+- WKY-25 → `internal/api` (non-test already builds; its _test files remain).
 - WKY-26/27 → `internal/web`, `internal/web/views` (present.go, study.go, *.templ;
   the akşam konu/soru/yanlış-defteri profile and page/stage bookmark rendering are
-  redefined there)
-`go build ./...` / `go vet ./...` go green again at WKY-28. Details: WKY-22.md
-"Scope split" and TASKS.md. The catalog unit-write path (SetUnitResult) and its
-reads are now in place for WKY-24 (MCP `set_unit_result`) and WKY-27 (web
-controls) to expose.
+  redefined there; the verbatim-synced usage docs regenerate here).
+Remaining red after WKY-24: `internal/web/views` (→ web, cmd) and `internal/api`
+tests. `go build ./...` / `go vet ./...` go green again at WKY-28. Details:
+WKY-22.md "Scope split" and TASKS.md.
 
 ## Prior state (unchanged)
 SF-01..06 study flow, study room, Plan calendar shipped on main (merged PR #1).
 PRODUCT.md / DESIGN.md / `.impeccable/design.json` are v1 truth; the catalog
 feature supersedes the v1 item model only. WKY-12 deploy held; WKY-20 200% zoom
-pending. Branch: feat/v2-katalog. No commits for WKY-22/23 yet.
+pending. Branch: feat/v2-katalog. No commits for WKY-22/23/24 yet.

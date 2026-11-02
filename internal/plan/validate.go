@@ -132,6 +132,75 @@ func validateOptionalRange(b *errBuilder, p, name string, from, to *int) {
 	}
 }
 
+// knownSet reports whether v is one of allowed.
+func knownSet(v string, allowed []string) bool {
+	for _, a := range allowed {
+		if v == a {
+			return true
+		}
+	}
+	return false
+}
+
+// validateSaveSource checks a source write structurally, without touching the
+// store: the source's own fields (key, name, kind and location_unit against their
+// closed sets), and each section and unit (required fields, positive and unique
+// ordinals, paired/ordered ranges). The catalog is replaced whole, so there is no
+// cross-source check here.
+func validateSaveSource(req SaveSourceRequest) error {
+	var b errBuilder
+
+	if req.Source.Key == "" {
+		b.add("source.key", CodeRequired, "key is required")
+	}
+	if req.Source.Name == "" {
+		b.add("source.name", CodeRequired, "name is required")
+	}
+	if !knownSet(req.Source.Kind, SourceKinds()) {
+		b.add("source.kind", CodeInvalid, "kind must be one of book, video, course, other")
+	}
+	if !knownSet(req.Source.LocationUnit, LocationUnits()) {
+		b.add("source.location_unit", CodeInvalid, "location_unit must be one of page, minute, lesson, other")
+	}
+
+	secOrdinals := map[int]int{}
+	for i, sec := range req.Sections {
+		p := fmt.Sprintf("sections[%d]", i)
+		if sec.Name == "" {
+			b.add(p+".name", CodeRequired, "name is required")
+		}
+		if sec.Ordinal < 1 {
+			b.add(p+".ordinal", CodeInvalid, "ordinal must be greater than zero")
+		} else if j, dup := secOrdinals[sec.Ordinal]; dup {
+			b.add(p+".ordinal", CodeDuplicate, fmt.Sprintf("duplicate ordinal also used by sections[%d]", j))
+		} else {
+			secOrdinals[sec.Ordinal] = i
+		}
+		validateOptionalRange(&b, p, "loc", sec.LocFrom, sec.LocTo)
+
+		unitOrdinals := map[int]int{}
+		for k, u := range sec.Units {
+			up := fmt.Sprintf("%s.units[%d]", p, k)
+			if u.Label == "" {
+				b.add(up+".label", CodeRequired, "label is required")
+			}
+			if u.Ordinal < 1 {
+				b.add(up+".ordinal", CodeInvalid, "ordinal must be greater than zero")
+			} else if j, dup := unitOrdinals[u.Ordinal]; dup {
+				b.add(up+".ordinal", CodeDuplicate, fmt.Sprintf("duplicate ordinal also used by sections[%d].units[%d]", i, j))
+			} else {
+				unitOrdinals[u.Ordinal] = k
+			}
+			if u.Number != nil && *u.Number < 1 {
+				b.add(up+".number", CodeInvalid, "number must be greater than zero")
+			}
+			validateOptionalRange(&b, up, "loc", u.LocFrom, u.LocTo)
+		}
+	}
+
+	return b.result()
+}
+
 // validateSaveOutline checks phases and topic groups without touching the store:
 // required fields, date ordering, question ranges and key uniqueness within the
 // request.

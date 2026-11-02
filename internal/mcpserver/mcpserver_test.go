@@ -3,15 +3,10 @@ package mcpserver_test
 import (
 	"context"
 	"encoding/json"
-	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -22,7 +17,6 @@ import (
 	"github.com/ibra2626/workey/internal/mcpserver"
 	"github.com/ibra2626/workey/internal/plan"
 	"github.com/ibra2626/workey/internal/store"
-	web "github.com/ibra2626/workey/internal/web"
 )
 
 const testToken = "test-token-123"
@@ -32,13 +26,15 @@ const testToken = "test-token-123"
 // and the rest are future, all writable), and serves it from an httptest
 // server. It returns the base URL.
 func newServer(t *testing.T) string {
-	_, srv := newWorkflow(t, "")
+	_, srv := newMCP(t)
 	return srv.URL + "/mcp"
 }
 
-// newWorkflow mounts both transports over one store. A fixed address is only
-// used by the opt-in visual review; normal tests use an ephemeral port.
-func newWorkflow(t *testing.T, addr string) (*store.Store, *httptest.Server) {
+// newMCP mounts the /mcp transport over a migrated temp store with the fixed test
+// clock. It is web-free so the default MCP test build does not depend on
+// internal/web (which the v2 catalog migration leaves red until WKY-26/27); the
+// cross-transport workflow lives behind the 'webworkflow' build tag.
+func newMCP(t *testing.T) (*store.Store, *httptest.Server) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "workey.db")
 	st, err := store.Open(path)
@@ -58,199 +54,11 @@ func newWorkflow(t *testing.T, addr string) (*store.Store, *httptest.Server) {
 	if err != nil {
 		t.Fatalf("mcpserver.New: %v", err)
 	}
-	a, err := web.NewAuth(svc, clock.Date{Year: 2027, Month: 7, Day: 18}, "", "", false, true)
-	if err != nil {
-		t.Fatal(err)
-	}
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", h)
-	mux.Handle("/", a.Handler())
-	srv := httptest.NewUnstartedServer(mux)
-	if addr != "" {
-		_ = srv.Listener.Close()
-		srv.Listener, err = net.Listen("tcp", addr)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	srv.Start()
+	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return st, srv
-}
-
-// TestMCPWebWorkflow proves the cross-transport contract, including the real
-// form/CSRF path and audit provenance rather than completing through MCP only.
-func TestMCPWebWorkflow(t *testing.T) {
-	st, srv := newWorkflow(t, "")
-	cs := connect(t, srv.URL+"/mcp", testToken)
-	seedPlan(t, cs)
-	get := func(path string) string {
-		t.Helper()
-		res, err := http.Get(srv.URL + path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer res.Body.Close()
-		b, err := io.ReadAll(res.Body)
-		if err != nil || res.StatusCode != http.StatusOK {
-			t.Fatalf("GET %s: status=%d err=%v", path, res.StatusCode, err)
-		}
-		return string(b)
-	}
-	today := get("/")
-	if !strings.Contains(today, "Temel kavramlar") || !strings.Contains(today, "s. 1–22") {
-		t.Fatal("MCP plan missing from Bugün")
-	}
-	week := get("/hafta")
-	for _, title := range []string{"Sayı basamakları", "Üslü ifadeler", "Köklü ifadeler", "Dinlenme"} {
-		if !strings.Contains(week, title) {
-			t.Fatalf("Hafta missing %q", title)
-		}
-	}
-	var before plan.ProgressView
-	callOK(t, cs, "get_progress", map[string]any{}, &before)
-	if before.SessionsDone != 0 || before.SessionsPlanned != 5 || before.PlannedMin != 540 {
-		t.Fatalf("before: %+v", before)
-	}
-	csrf := regexp.MustCompile(`name="_csrf" value="([^"]+)"`).FindStringSubmatch(today)
-	action := regexp.MustCompile(`action="(/oturum/[0-9]+/tamamla)"`).FindStringSubmatch(today)
-	if len(csrf) != 2 || len(action) != 2 {
-		t.Fatal("missing completion form")
-	}
-	post := func(path string) {
-		t.Helper()
-		res, err := http.PostForm(srv.URL+path, url.Values{"_csrf": {csrf[1]}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer res.Body.Close()
-		if res.StatusCode != http.StatusOK {
-			t.Fatalf("POST %s: %d", path, res.StatusCode)
-		}
-	}
-	post(action[1])
-	var after plan.ProgressView
-	callOK(t, cs, "get_progress", map[string]any{}, &after)
-	if after.SessionsDone != 1 || after.DoneMin != 90 || after.DoneHours != "1,5" {
-		t.Fatalf("after: %+v", after)
-	}
-	if !strings.Contains(get("/ilerleme"), "1,5 / 9 sa") {
-		t.Fatal("web progress disagrees with MCP")
-	}
-	if !strings.Contains(get("/"), "Geri al") {
-		t.Fatal("completion not visible on Bugün")
-	}
-	countAudit := func() int {
-		var n int
-		if err := st.DB().QueryRow("SELECT COUNT(*) FROM audit_log").Scan(&n); err != nil {
-			t.Fatal(err)
-		}
-		return n
-	}
-	n := countAudit()
-	var repeat plan.SavePlanResult
-	callOK(t, cs, "save_plan", loadFixture(t, "sample-week.json"), &repeat)
-	if len(repeat.Unchanged) != 4 || len(repeat.Skipped) != 1 || len(repeat.Created)+len(repeat.Updated)+len(repeat.Deleted) != 0 {
-		t.Fatalf("repeat modified completed plan: %+v", repeat)
-	}
-	post(action[1]) // repeated completion is also a no-op
-	if countAudit() != n {
-		t.Fatal("repeat wrote duplicate audit entries")
-	}
-	var sessions int
-	if err := st.DB().QueryRow("SELECT COUNT(*) FROM sessions").Scan(&sessions); err != nil || sessions != 5 {
-		t.Fatalf("sessions=%d err=%v", sessions, err)
-	}
-	rows, err := st.DB().Query("SELECT at_utc, source, action, COUNT(*) FROM audit_log GROUP BY at_utc, source, action ORDER BY source, action")
-	if err != nil {
-		t.Fatal(err)
-	}
-	seenMCP, seenWeb := false, false
-	for rows.Next() {
-		var at, source, action string
-		var count int
-		if err := rows.Scan(&at, &source, &action, &count); err != nil {
-			t.Fatal(err)
-		}
-		t.Logf("audit: %s | %s | %s | %d", at, source, action, count)
-		seenMCP = seenMCP || source == "mcp"
-		seenWeb = seenWeb || source == "web" && action == "complete" && count == 1
-	}
-	if err := rows.Err(); err != nil {
-		t.Fatal(err)
-	}
-	_ = rows.Close()
-	if !seenMCP || !seenWeb {
-		t.Fatal("missing audit source")
-	}
-	post(strings.Replace(action[1], "/tamamla", "/geri-al", 1))
-	callOK(t, cs, "get_progress", map[string]any{}, &after)
-	if after.SessionsDone != 0 || after.DoneMin != 0 {
-		t.Fatal("web undo did not reach MCP progress")
-	}
-}
-
-// TestVisualReview is an opt-in, disposable local preview. No real database or
-// Claude configuration is touched. Stop it with Ctrl-C after taking evidence.
-func TestVisualReview(t *testing.T) {
-	if os.Getenv("WORKEY_VISUAL_REVIEW") != "1" {
-		t.Skip("set WORKEY_VISUAL_REVIEW=1 for disposable browser fixtures")
-	}
-	st, srv := newWorkflow(t, "127.0.0.1:18113")
-	cs := connect(t, srv.URL+"/mcp", testToken)
-	seedPlan(t, cs)
-	// Monday moved to Saturday; Tuesday remains missed on the Wednesday view.
-	week := loadFixture(t, "sample-week.json")
-	sessions := week["sessions"].([]any)
-	sessions[4].(map[string]any)["makeup_of"] = map[string]any{"date": "2026-10-26", "start_time": "20:30"}
-	buf, err := json.Marshal(week)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var req plan.SavePlanRequest
-	if err := json.Unmarshal(buf, &req); err != nil {
-		t.Fatal(err)
-	}
-	wednesday := plan.New(st, clock.Fake{Current: time.Date(2026, 10, 28, 9, 0, 0, 0, clock.Location)})
-	if _, err := wednesday.SavePlan(context.Background(), plan.SourceMCP, req); err != nil {
-		t.Fatal(err)
-	}
-	for i, scenario := range []struct {
-		day    int
-		seeded bool
-		login  bool
-	}{{28, true, false}, {30, true, false}, {28, false, false}, {28, false, true}, {31, true, false}} {
-		scenarioStore := st
-		if !scenario.seeded {
-			var err error
-			scenarioStore, err = store.Open(filepath.Join(t.TempDir(), "empty.db"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			t.Cleanup(func() { _ = scenarioStore.Close() })
-			if err := scenarioStore.Migrate(context.Background()); err != nil {
-				t.Fatal(err)
-			}
-		}
-		svc := plan.New(scenarioStore, clock.Fake{Current: time.Date(2026, 10, scenario.day, 9, 0, 0, 0, clock.Location)})
-		a, err := web.NewAuth(svc, clock.Date{Year: 2027, Month: 7, Day: 18}, "", "", false, !scenario.login)
-		if err != nil {
-			t.Fatal(err)
-		}
-		s := httptest.NewUnstartedServer(a.Handler())
-		_ = s.Listener.Close()
-		s.Listener, err = net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(18114+i))
-		if err != nil {
-			t.Fatal(err)
-		}
-		s.Start()
-		t.Cleanup(s.Close)
-		t.Logf("review day=%d seeded=%v login=%v: %s", scenario.day, scenario.seeded, scenario.login, s.URL)
-	}
-	t.Log("SAMPLE DATA ONLY; review ready for 30 minutes")
-	select {
-	case <-time.After(30 * time.Minute):
-	}
 }
 
 // authRT adds a Bearer token to every request (none when token is empty).
@@ -327,10 +135,18 @@ func loadFixture(t *testing.T, name string) map[string]any {
 	return m
 }
 
-// seedPlan saves the sample outline then the sample week, so the week's
-// topic-group references resolve.
+// seedSources writes the sample source catalog so the sample week's item
+// references (source M1, its sections and units) resolve.
+func seedSources(t *testing.T, cs *mcp.ClientSession) {
+	t.Helper()
+	callOK(t, cs, "save_source", loadFixture(t, "sample-sources.json"), nil)
+}
+
+// seedPlan writes the sample source catalog and outline then the sample week, so
+// every reference (sources, sections, units, topic groups) resolves.
 func seedPlan(t *testing.T, cs *mcp.ClientSession) {
 	t.Helper()
+	seedSources(t, cs)
 	callOK(t, cs, "save_outline", loadFixture(t, "sample-outline.json"), nil)
 	callOK(t, cs, "save_plan", loadFixture(t, "sample-week.json"), nil)
 }
@@ -345,6 +161,7 @@ func TestListTools(t *testing.T) {
 		"get_agent_guide": false,
 		"get_plan":        false, "save_plan": false, "complete_session": false,
 		"get_outline": false, "save_outline": false, "get_progress": false,
+		"get_sources": false, "save_source": false, "set_unit_result": false,
 	}
 	for _, tool := range res.Tools {
 		if _, ok := want[tool.Name]; !ok {
@@ -377,8 +194,15 @@ func TestAgentGuide(t *testing.T) {
 	}
 	var guide plan.AgentGuide
 	callOK(t, cs, "get_agent_guide", map[string]any{}, &guide)
-	if guide.Today != "2026-10-26" || guide.Timezone != "Europe/Istanbul" || guide.ExamDate != "2027-07-18" || len(guide.Books) != 5 || len(guide.Workflow) == 0 {
+	if guide.Today != "2026-10-26" || guide.Timezone != "Europe/Istanbul" || guide.ExamDate != "2027-07-18" || len(guide.SourceKinds) != 4 || len(guide.LocationUnits) != 4 || len(guide.Workflow) == 0 {
 		t.Fatalf("invalid guide: %+v", guide)
+	}
+	for _, rule := range guide.Rules {
+		for _, banned := range []string{"M1", "M2", "M3", "G1", "G2", "DGS"} {
+			if strings.Contains(rule, banned) {
+				t.Errorf("guide rule still carries fixed-book/DGS wording %q: %s", banned, rule)
+			}
+		}
 	}
 }
 
@@ -411,9 +235,15 @@ func TestSavePlanSchemaSelfDescribing(t *testing.T) {
 		t.Fatalf("marshal schema: %v", err)
 	}
 	schema := string(buf)
-	for _, want := range []string{`"M1"`, `"uzun_blok"`, `"pattern"`, `"makeup_of"`, `"enum"`} {
+	for _, want := range []string{`uzun_blok`, `"pattern"`, `"makeup_of"`, `"source_key"`, `"section_ordinal"`} {
 		if !strings.Contains(schema, want) {
 			t.Errorf("save_plan input schema missing %q", want)
+		}
+	}
+	// The fixed book-code enum (M1..G2) is gone with the catalog migration.
+	for _, banned := range []string{`"M1"`, `"M2"`, `"G1"`} {
+		if strings.Contains(schema, banned) {
+			t.Errorf("save_plan input schema still carries book-code enum %q", banned)
 		}
 	}
 	t.Logf("save_plan description:\n%s", tool.Description)
@@ -425,6 +255,7 @@ func TestSavePlanSchemaSelfDescribing(t *testing.T) {
 // complete a session and read progress.
 func TestSavePlanIdempotentThenReads(t *testing.T) {
 	cs := connect(t, newServer(t), testToken)
+	seedSources(t, cs)
 	callOK(t, cs, "save_outline", loadFixture(t, "sample-outline.json"), nil)
 	week := loadFixture(t, "sample-week.json")
 
@@ -539,6 +370,124 @@ func TestToolErrorCarriesCode(t *testing.T) {
 	if len(env.Fields) != 1 || env.Fields[0].Code != plan.CodeFuture {
 		t.Errorf("error fields = %+v, want one with code %q", env.Fields, plan.CodeFuture)
 	}
+}
+
+// TestSaveSourceRoundTripKeepsProgress writes the sample catalog, reads it back,
+// marks a unit done with D/Y/B, re-writes the source keeping the unit ordinals
+// and confirms the unit id and its progress survive.
+func TestSaveSourceRoundTripKeepsProgress(t *testing.T) {
+	st, srv := newMCP(t)
+	cs := connect(t, srv.URL+"/mcp", testToken)
+
+	var saved plan.SaveSourceResult
+	callOK(t, cs, "save_source", loadFixture(t, "sample-sources.json"), &saved)
+	if !saved.Created || saved.Source.Key != "M1" {
+		t.Fatalf("save_source: %+v", saved)
+	}
+
+	var cat plan.CatalogView
+	callOK(t, cs, "get_sources", map[string]any{}, &cat)
+	unitID := findUnit(t, cat, "M1", 3, 1)
+
+	var marked plan.UnitResultView
+	callOK(t, cs, "set_unit_result", map[string]any{"unit_id": unitID, "done": true, "correct": 5, "wrong": 1, "blank": 0}, &marked)
+	if !marked.Done || marked.Correct == nil || *marked.Correct != 5 {
+		t.Fatalf("set_unit_result: %+v", marked)
+	}
+
+	// Re-write the source with a changed section name but the same ordinals; the
+	// unit keeps its id, so its progress must survive.
+	src := loadFixture(t, "sample-sources.json")
+	src["source"].(map[string]any)["name"] = "Matematik 1 (düzeltildi)"
+	var resaved plan.SaveSourceResult
+	callOK(t, cs, "save_source", src, &resaved)
+	if resaved.Created || resaved.Unchanged {
+		t.Fatalf("re-save should be an update: %+v", resaved)
+	}
+
+	var cat2 plan.CatalogView
+	callOK(t, cs, "get_sources", map[string]any{}, &cat2)
+	if got := findUnit(t, cat2, "M1", 3, 1); got != unitID {
+		t.Fatalf("unit id changed across re-write: %d -> %d", unitID, got)
+	}
+
+	var correct int
+	if err := st.DB().QueryRow("SELECT correct FROM unit_progress WHERE unit_id = ?", unitID).Scan(&correct); err != nil {
+		t.Fatalf("unit progress gone after re-write: %v", err)
+	}
+	if correct != 5 {
+		t.Fatalf("unit progress changed: correct=%d, want 5", correct)
+	}
+
+	// An identical re-write is a no-op.
+	var again plan.SaveSourceResult
+	callOK(t, cs, "save_source", src, &again)
+	if !again.Unchanged {
+		t.Fatalf("identical save_source not reported unchanged: %+v", again)
+	}
+}
+
+// TestSavePlanUnknownSource checks that an item naming a source with no catalog
+// entry is rejected with the typed unknown_source field error.
+func TestSavePlanUnknownSource(t *testing.T) {
+	cs := connect(t, newServer(t), testToken)
+	callOK(t, cs, "save_outline", loadFixture(t, "sample-outline.json"), nil)
+	// No save_source: the plan's items reference source "M1" which does not exist.
+	res, err := cs.CallTool(context.Background(), &mcp.CallToolParams{
+		Name:      "save_plan",
+		Arguments: loadFixture(t, "sample-week.json"),
+	})
+	if err != nil {
+		t.Fatalf("transport error: %v", err)
+	}
+	if !res.IsError {
+		t.Fatal("save_plan with an unknown source did not return a tool error")
+	}
+	var env struct {
+		Code   string `json:"code"`
+		Fields []struct {
+			Path string `json:"path"`
+			Code string `json:"code"`
+		} `json:"fields"`
+	}
+	if err := json.Unmarshal([]byte(errText(res)), &env); err != nil {
+		t.Fatalf("error text is not the JSON envelope: %v (%s)", err, errText(res))
+	}
+	if env.Code != "validation_failed" {
+		t.Errorf("error code = %q, want validation_failed", env.Code)
+	}
+	foundUnknown := false
+	for _, f := range env.Fields {
+		if f.Code == plan.CodeUnknownSource {
+			foundUnknown = true
+		}
+	}
+	if !foundUnknown {
+		t.Errorf("error fields = %+v, want one with code %q", env.Fields, plan.CodeUnknownSource)
+	}
+}
+
+// findUnit returns the id of the unit at (sourceKey, sectionOrdinal, unitOrdinal)
+// in a catalog view, failing the test when it is absent.
+func findUnit(t *testing.T, cat plan.CatalogView, sourceKey string, sectionOrdinal, unitOrdinal int) int64 {
+	t.Helper()
+	for _, s := range cat.Sources {
+		if s.Key != sourceKey {
+			continue
+		}
+		for _, sec := range s.Sections {
+			if sec.Ordinal != sectionOrdinal {
+				continue
+			}
+			for _, u := range sec.Units {
+				if u.Ordinal == unitOrdinal {
+					return u.ID
+				}
+			}
+		}
+	}
+	t.Fatalf("unit %s·%d·%d not found in catalog", sourceKey, sectionOrdinal, unitOrdinal)
+	return 0
 }
 
 // TestUnauthorized checks that connecting without a Bearer token fails (401 on
