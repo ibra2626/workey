@@ -102,6 +102,43 @@ func (c *catalog) unitsInRange(sectionID int64, from, to int) []RefUnit {
 	return out
 }
 
+// coveredUnits returns the catalog units an item view covers, for per-unit
+// marking: the units inside its explicit unit range, or every unit of its
+// section when it names a section without a unit range. An item with no section
+// (or an unresolvable one) covers no units.
+func (c *catalog) coveredUnits(it ItemView) []store.Unit {
+	if it.SectionOrdinal == nil {
+		return nil
+	}
+	src, ok := c.byKey[it.SourceKey]
+	if !ok {
+		return nil
+	}
+	sec, ok := c.sectionByOrdinal(src.ID, *it.SectionOrdinal)
+	if !ok {
+		return nil
+	}
+	units := c.units[sec.ID]
+	if it.UnitFrom == nil || it.UnitTo == nil {
+		return units
+	}
+	var out []store.Unit
+	for _, u := range units {
+		if u.Ordinal >= *it.UnitFrom && u.Ordinal <= *it.UnitTo {
+			out = append(out, u)
+		}
+	}
+	return out
+}
+
+// sourceKind returns a source's kind by key, or "" when the key is unknown.
+func (c *catalog) sourceKind(key string) string {
+	if src, ok := c.byKey[key]; ok {
+		return src.Kind
+	}
+	return ""
+}
+
 // itemView builds the read-model view of a stored item: its resolved source,
 // section and units plus the raw ranges, for screens and read responses.
 func (c *catalog) itemView(it store.SessionItem) ItemView {

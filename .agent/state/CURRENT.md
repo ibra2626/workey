@@ -1,79 +1,67 @@
-# CURRENT — WKY-26 done (Kaynaklar screen + web layer restored); WKY-27 next
+# CURRENT — WKY-27 done (Bugün/Hafta/İlerleme unit view + marking); WKY-28 next
 
-Updated 2026-11-02.
-Active task: .agent/work/workey-v2-katalog/tasks/WKY-26.md (DONE)
-Next: WKY-27 — Web: Bugün/Hafta/İlerleme birim görünümü ve işaretleme
-(unit-level done + D/Y/B marking from the day/week/progress screens).
+Updated 2026-11-04.
+Active task: .agent/work/workey-v2-katalog/tasks/WKY-27.md (DONE)
+Next: WKY-28 — Uçtan uca doğrulama ve v2 kapısı (end-to-end gate; depends on
+WKY-24, 25, 27 — all now done).
 
 ## Feature: workey-v2-katalog (WKY-21..28)
 Generalize workey from a fixed DGS/5-book tracker to a general source catalog
 (Kaynak → Bölüm → Birim + separate unit progress + D/Y/B). Decisions in
-`.agent/state/DECISIONS.md` (2026-11-02 entries). Shared rules:
+`.agent/state/DECISIONS.md` (2026-11-02). Shared rules:
 `.agent/work/workey-v2-katalog/README.md`. No data migration; schema rebuilt
 clean (WKY-21). Service path (`SaveSource`/`Sources`, `SetUnitResult`,
-`SourceProgress`/`SectionProgress`) since WKY-22/23; MCP WKY-24; REST WKY-25.
+`SourceProgress`/`SectionProgress`) since WKY-22/23; MCP WKY-24; REST WKY-25;
+web Kaynaklar WKY-26; web unit view + marking WKY-27.
 
-## WKY-26 result — 2026-11-02 (web layer restored to the catalog + Kaynaklar screen)
-`internal/web` + `internal/web/views` build/vet/test green; whole tree green.
+## WKY-27 result — 2026-11-04 (web unit view + marking)
 Full detail in the task's Progress section. Summary:
 
-**Compile restoration (no `plan`/`apidoc` changes):**
-- `views/present.go`: v1 item helpers rewritten against `ItemView`, names kept so
-  templ churn stayed small — `chapterRef`=`itemHead` (source·section),
-  `chapterTitle`=section name (→ source name), `chapterBook`=source name,
-  `headPages`/`pagesPlain`=bare loc span, `dgsLabel`→`QuestionMin/Max`. New
-  `itemRef` (via `plan.FormatRef`), `itemNotations`/`itemNotation` (split
-  `sv.Notation` on `" · "` — the formatter's own join — to recover per-item
-  **exact** unit-prefixed notation, since `ItemView` has no location unit),
-  `itemLabel(sv,i)`. Dropped `konuPages`/`soruPages`/`bookName`/`plan.Ref`.
-- `views/study.go`: `sourceRanges(sv,i)`, `studyFirstStep`, `studyTopic`,
-  `studyTitle` rebound to `ItemView`/`BookmarkView`; `plan.FormatItem` gone.
-- templ: `today.templ` hero shows `itemNotation(sv,0)`; multi-item list +
-  `study.templ` use `itemLabel`/`sourceRanges(sv,i)`. `*_templ.go` regenerated.
-- konu/soru/antrenman page-split presentation removed (no catalog backing); the
-  session profile keeps its 20/50/20 **time** partition with empty zone pages.
+**Plan read model:** `plan.UnitRow` + `SessionView.UnitRows []UnitRow`
+(`json:"-"`, web-only — API/MCP unaffected). `Service.LoadUnitRows(ctx,
+[]*SessionView)` resolves each session's covered units (unit range, or all of a
+section item's units; section-less item → none) with exact per-unit notation and
+current global done/D-Y-B, in one tx (catalog + one `UnitProgressByUnits`).
+Helpers `catalog.coveredUnits`/`catalog.sourceKind` (`resolve.go`).
 
-**Kaynaklar screen (new top-level, `/kaynaklar`):**
-- Nav: `views.go` `navItems` + `i-sources` sprite; mobile tab bar now
-  `grid-cols-6`. Routes in `web.go`: `GET /kaynaklar`, `POST /kaynaklar/{key}`.
-- `internal/web/sources.go`: `screenSources`/`buildSourcesPage`/`saveSource`.
-  `parseSaveSource` rebuilds the whole `SaveSourceRequest` from hidden ordinal
-  lists (`section_ordinals`, `s<o>_unit_ordinals`) + field scheme (`s<o>_*`,
-  `s<o>u<u>_*`), so reconcile-by-ordinal **preserves `unit_progress`**. htmx
-  swaps `#kaynaklar-main`; no-JS POST (hidden `_csrf`) redirects to `/kaynaklar`.
-- `views/sources.templ` + `sources_present.go`: `SourcesPage`, in-place edit
-  form, per-source/section report (`progressFigures`); **video** = done-only.
-- Scope = in-place editing only; add/remove/reorder deferred (user-chosen).
+**Web:** routes `POST /oturum/{id}/birim/{unitID}/sonuc` and
+`POST /hafta/oturum/{id}/birim/{unitID}/sonuc` (auth+CSRF). `applyUnitResult`
+parses `done` (button value) + optional D/Y/B and calls `SetUnitResult(SourceWeb)`
+— wholly independent of session completion. Bugün swaps `#bugun-main` / 303 → `/`;
+Hafta reads the viewed week from `tarih` (FormValue, action query) and swaps
+`#hafta-main` / 303 → `/hafta?tarih=`. `buildTodayPage`/`buildWeekPage` attach
+rows for every render via `daySessionPtrs`/`weekSessionPtrs`. `screenProgress`
+computes `unitAggregate` (total catalog units = honest denominator; done + D/Y/B
+summed from `SourceProgress`).
 
-**Docs:** `docs/api.md`/`docs/mcp.md` study-contract blocks re-synced to
-`StudyContractMarkdown()`; `usage_content.go` REST "Plan isteği" item description
-rewritten from v1 book/chapter/page to the catalog source_key/section/unit/loc.
+**Views:** new `views/units.templ` (`unitMarking`/`unitRow`/`dybField`): one form
+per unit, two `name="done"` submit buttons (Bitti/Kaydet + Geri al), D/Y/B omitted
+for video, done check + prefilled result, 44px targets, soft tokens. Wired into
+`today.templ` (todaySession + Bugünün planı list) and `week.templ` (mobile list
+row + desktop colspan row). İlerleme panel "Birim ilerlemesi" in `progress.templ`
+(`UnitAggregate`). Session completion control stays separate and primary.
 
-**Tests:** new `internal/web/sources_test.go` (render + figures match aggregates;
-edit preserves unit progress; no-JS 303 vs 403 without CSRF; video done-only).
-Updated v1 web tests to catalog output; `seedWeek` now seeds `sample-sources.json`
-before `SavePlan`; `usage_test.go` tab bar `grid-cols-6`.
+**Tests:** `internal/web/units_test.go` — Bugün/Hafta render units + controls;
+unit-done ≠ session-done (both directions); no-JS 303 + 403-without-CSRF; İlerleme
+aggregates (2/3 birim, D/Y/B, Çözülen 10).
 
-### Checks (2026-11-02, Go 1.27.3)
+### Checks (2026-11-04, Go 1.27.3)
 - templ generate + Tailwind rebuilt (`web/static/app.css`).
-- `go test ./internal/config/... ./internal/clock/... ./internal/store/...
-  ./internal/plan/... ./internal/web/... ./internal/web/views/... ./internal/api/...
-  ./internal/apidoc/... ./internal/mcpserver/... ./cmd/...` → all ok.
-- `go build ./...` + `CGO_ENABLED=0 go build ./...` + `go vet ./...` green
-  (whole tree compiles again — WKY-28 gate effectively reached for the web layer).
-- gofmt: edited/new files clean on LF (working-tree CRLF = autocrlf artifact).
-- Visual check (built-in browser) at 1280×800 and 390×844: no horizontal overflow
-  (scrollW==clientW), Turkish glyphs correct, 44px inputs, 6-item nav fits,
-  figures match aggregates, htmx save swaps with a "kaydedildi" banner and keeps
-  progress. NOT run: govulncheck (no dep change). No commit/push.
+- `go test` across config/clock/store/plan/web/web·views/api/apidoc/mcpserver/cmd
+  → all ok. `go build ./...` + `CGO_ENABLED=0 go build ./...` + `go vet ./...`
+  green. gofmt: new/edited files clean on LF (working-tree CRLF = autocrlf
+  artifact). NOT run: govulncheck (no dep change). No commit/push.
+- Visual check (built-in browser) 390×844 + 1280×800: no overflow, Turkish
+  glyphs, 44px controls; htmx Bitti marks a unit done and leaves the session
+  uncompleted (Seans 0/1); Hafta colspan unit row; İlerleme "Birim ilerlemesi ·
+  2/3 birim · Çözülen 10".
 
-## Whole-tree build is GREEN again (2026-11-02)
-WKY-22 left `internal/web`/`internal/web/views` un-compiling by design; WKY-26
-restored them. `go build ./...` / `go vet ./...` pass across the module. WKY-27
-(day/week/progress unit marking) and WKY-28 (end-to-end gate) remain.
+## Whole-tree build GREEN (since WKY-26)
+`go build ./...` / `CGO_ENABLED=0` / `go vet ./...` pass across the module.
+WKY-21..27 done; only WKY-28 (end-to-end gate) remains.
 
 ## Prior state (unchanged)
 SF-01..06 study flow, study room, Plan calendar shipped on main (merged PR #1).
 PRODUCT.md / DESIGN.md / `.impeccable/design.json` are v1 truth; the catalog
 feature supersedes the v1 item model only. WKY-12 deploy held; WKY-20 200% zoom
-pending. Branch: feat/v2-katalog. No commits for WKY-22..26 yet.
+pending. Branch: feat/v2-katalog. No commits for WKY-22..27 yet.

@@ -86,6 +86,31 @@ templ Progress(p ProgressPage) {
 					}
 				</ul>
 			</section>
+			<!-- Unit-level progress (D/Y/B), independent of session completion. -->
+			if p.Units.HasUnits() {
+				<section class="mt-3 rounded-panel bg-card p-5 md:mt-5 md:p-7">
+					<div class="flex items-baseline justify-between">
+						<p class="text-label font-semibold text-ink-3">Birim ilerlemesi</p>
+						<p class="cn text-numeral-inline font-semibold leading-none">
+							<span class={ percentClass(p.Units.DoneCount) }>{ strconv.Itoa(p.Units.DoneCount) }</span><span class="text-numeral-unit text-ink-3">/ { strconv.Itoa(p.Units.TotalUnits) } birim</span>
+						</p>
+					</div>
+					<div class="mt-3 h-[6px] overflow-hidden rounded-bar bg-line">
+						if p.Units.DonePct() > 0 {
+							<span class="chart-grow block h-full rounded-bar bg-ink" { styleAttr("width:" + pct(p.Units.DonePct()))... }></span>
+						}
+					</div>
+					if p.Units.Answered() > 0 {
+						<dl class="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-body-small">
+							@reportFigure("Doğru", strconv.Itoa(p.Units.Correct))
+							@reportFigure("Yanlış", strconv.Itoa(p.Units.Wrong))
+							@reportFigure("Boş", strconv.Itoa(p.Units.Blank))
+							@reportFigure("Çözülen", strconv.Itoa(p.Units.Answered()))
+						</dl>
+					}
+					<p class="mt-3 text-meta text-ink-3">Birim ilerlemesi kaydedilen birimlerden sayılır; seans tamamlamadan bağımsızdır. Doğru/yanlış/boş yalnızca kullanıcının girdiği değerlerdir.</p>
+				</section>
+			}
 		}
 	}
 }

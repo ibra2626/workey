@@ -57,6 +57,7 @@ templ TodayMain(p TodayPage) {
 									<p class="text-body-small text-ink-2">Başka bir seansa geçmek için önce <a class="study-link" href="#bugun-panel">açık çalışmayı kapat</a>.</p>
 									@studyFinish(sv, p.CSRF)
 								}
+								@unitMarking(sv, p.CSRF, "bugun", "")
 							}
 						}
 					</section>
@@ -233,6 +234,7 @@ templ todaySession(sv plan.SessionView, p TodayPage) {
 			</p>
 		}
 	</div>
+	@unitMarking(sv, p.CSRF, "bugun", "")
 	if sv.State == plan.StateDone {
 		@completeControl(sv, p.CSRF)
 	}

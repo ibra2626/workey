@@ -63,6 +63,11 @@ type SessionView struct {
 	Items          []ItemView   `json:"items"`
 	Notation       string       `json:"notation"`
 	MovedTo        *MovedInfo   `json:"moved_to,omitempty"`
+	// UnitRows is the session's catalog units with their current global
+	// done/D-Y-B, for the web Bugün/Hafta per-unit marking. It is filled only by
+	// LoadUnitRows (the web screens); the API/MCP session views leave it empty
+	// and never serialise it (json:"-").
+	UnitRows []UnitRow `json:"-"`
 }
 
 // DayView is the Bugün model for one date: the day's sessions, tomorrow's first

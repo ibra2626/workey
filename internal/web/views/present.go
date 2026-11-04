@@ -68,10 +68,40 @@ type WeekPage struct {
 // ProgressPage is the İlerleme screen model.
 type ProgressPage struct {
 	Progress   *plan.ProgressView
+	Units      UnitAggregate // unit-level done + D/Y/B over the whole catalog
 	DaysToExam int
 	HasExam    bool
 	ExamFull   string // "18 Temmuz 2027" for the rail
 	CSRF       string
+}
+
+// UnitAggregate is the İlerleme unit-level summary: units marked done out of the
+// units in the catalog, and the D/Y/B sums over the done units. Every figure is
+// saved data — no hard-coded total — so the denominators stay honest.
+type UnitAggregate struct {
+	DoneCount  int
+	TotalUnits int
+	Correct    int
+	Wrong      int
+	Blank      int
+}
+
+// Answered is the total questions reported across done units (D+Y+B).
+func (u UnitAggregate) Answered() int { return u.Correct + u.Wrong + u.Blank }
+
+// HasUnits reports whether the catalog has any unit to summarise.
+func (u UnitAggregate) HasUnits() bool { return u.TotalUnits > 0 }
+
+// DonePct is the done-unit share of the catalog, 0–100 (0 when empty).
+func (u UnitAggregate) DonePct() int {
+	if u.TotalUnits <= 0 {
+		return 0
+	}
+	p := int(math.Round(float64(u.DoneCount) / float64(u.TotalUnits) * 100))
+	if p > 100 {
+		p = 100
+	}
+	return p
 }
 
 // --- session interval profile -------------------------------------------
@@ -705,6 +735,40 @@ func completeForm(id int64, action string) templ.Attributes {
 		"hx-disabled-elt": "#bugun-main button, #bugun-main input, #bugun-main select",
 		"hx-sync":         "#bugun-main:drop",
 		"data-session-id": strconv.FormatInt(id, 10),
+		"hx-request":      `{"timeout":20000}`,
+	}
+}
+
+// unitResultForm returns the form attributes for a per-unit marking control.
+// screen is "bugun" (swaps #bugun-main, posts to the Bugün route) or "hafta"
+// (swaps #hafta-main, posts to the Hafta route with the viewed week's ?tarih= so
+// the swap and the no-JS redirect return to the same week). A click on either
+// submit button carries its own name="done" value, so done/undo share one form.
+func unitResultForm(screen string, sessionID, unitID int64, weekStart string) templ.Attributes {
+	sid := strconv.FormatInt(sessionID, 10)
+	uid := strconv.FormatInt(unitID, 10)
+	if screen == "hafta" {
+		url := "/hafta/oturum/" + sid + "/birim/" + uid + "/sonuc?tarih=" + weekStart
+		return templ.Attributes{
+			"action":          url,
+			"method":          "post",
+			"hx-post":         url,
+			"hx-target":       "#hafta-main",
+			"hx-swap":         "outerHTML",
+			"hx-disabled-elt": "#hafta-main button, #hafta-main input",
+			"hx-sync":         "#hafta-main:drop",
+			"hx-request":      `{"timeout":20000}`,
+		}
+	}
+	url := "/oturum/" + sid + "/birim/" + uid + "/sonuc"
+	return templ.Attributes{
+		"action":          url,
+		"method":          "post",
+		"hx-post":         url,
+		"hx-target":       "#bugun-main",
+		"hx-swap":         "outerHTML",
+		"hx-disabled-elt": "#bugun-main button, #bugun-main input",
+		"hx-sync":         "#bugun-main:drop",
 		"hx-request":      `{"timeout":20000}`,
 	}
 }

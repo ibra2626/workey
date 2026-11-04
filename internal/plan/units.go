@@ -42,6 +42,23 @@ type UnitResultView struct {
 	Blank          *int    `json:"blank,omitempty"`
 }
 
+// UnitRow is one catalog unit a session covers, prepared for the web Bugün and
+// Hafta screens: its id (to address set_unit_result), exact per-unit notation,
+// reader-facing label/number, whether its source carries no D/Y/B (a video), and
+// the current global done state with its optional D/Y/B. Unit progress is global
+// — the same unit marked done shows done in every session that references it.
+type UnitRow struct {
+	UnitID   int64  `json:"unit_id"`
+	Notation string `json:"notation"`
+	Label    string `json:"label"`
+	Number   int    `json:"number"`
+	IsVideo  bool   `json:"is_video"`
+	Done     bool   `json:"done"`
+	Correct  *int   `json:"correct,omitempty"`
+	Wrong    *int   `json:"wrong,omitempty"`
+	Blank    *int   `json:"blank,omitempty"`
+}
+
 // UnitResult is a unit's stored progress for a read model, keyed elsewhere by
 // unit id. The presence of the entry means the unit is done.
 type UnitResult struct {
@@ -168,6 +185,92 @@ func (s *Service) SetUnitResult(ctx context.Context, source Source, req UnitResu
 		return nil, err
 	}
 	return view, nil
+}
+
+// LoadUnitRows fills sv.UnitRows for each given session: the catalog units its
+// items cover, with their exact per-unit notation and current global done/D-Y-B.
+// A unit the session references more than once appears once per session. It
+// backs the web Bugün/Hafta per-unit marking and is independent of session
+// completion; the API/MCP session views never call it.
+func (s *Service) LoadUnitRows(ctx context.Context, sessions []*SessionView) error {
+	if len(sessions) == 0 {
+		return nil
+	}
+	return s.st.WithTx(ctx, func(tx *sql.Tx) error {
+		cat, err := s.loadCatalog(ctx, tx)
+		if err != nil {
+			return err
+		}
+		var ids []int64
+		seen := map[int64]bool{}
+		for _, sv := range sessions {
+			if sv == nil {
+				continue
+			}
+			var rows []UnitRow
+			rowSeen := map[int64]bool{}
+			for _, it := range sv.Items {
+				for _, u := range cat.coveredUnits(it) {
+					if rowSeen[u.ID] {
+						continue
+					}
+					rowSeen[u.ID] = true
+					rows = append(rows, unitRow(cat, it, u))
+					if !seen[u.ID] {
+						seen[u.ID] = true
+						ids = append(ids, u.ID)
+					}
+				}
+			}
+			sv.UnitRows = rows
+		}
+		if len(ids) == 0 {
+			return nil
+		}
+		prog, err := s.st.UnitProgressByUnits(ctx, tx, ids)
+		if err != nil {
+			return err
+		}
+		for _, sv := range sessions {
+			if sv == nil {
+				continue
+			}
+			for i := range sv.UnitRows {
+				if p, ok := prog[sv.UnitRows[i].UnitID]; ok {
+					sv.UnitRows[i].Done = true
+					sv.UnitRows[i].Correct = p.Correct
+					sv.UnitRows[i].Wrong = p.Wrong
+					sv.UnitRows[i].Blank = p.Blank
+				}
+			}
+		}
+		return nil
+	})
+}
+
+// unitRow builds one UnitRow from a covered unit and its item's source/section
+// context, rendering the exact single-unit notation through the formatter.
+func unitRow(cat *catalog, it ItemView, u store.Unit) UnitRow {
+	num := u.Ordinal
+	if u.Number != nil {
+		num = *u.Number
+	}
+	var ord *int
+	if it.SectionOrdinal != nil {
+		o := *it.SectionOrdinal
+		ord = &o
+	}
+	return UnitRow{
+		UnitID: u.ID,
+		Notation: FormatRef(ItemRef{
+			SourceKey:      it.SourceKey,
+			SectionOrdinal: ord,
+			Units:          []RefUnit{{Label: u.Label, Number: num}},
+		}),
+		Label:   u.Label,
+		Number:  num,
+		IsVideo: cat.sourceKind(it.SourceKey) == kindVideo,
+	}
 }
 
 // UnitResults returns the stored progress for the given unit ids, keyed by unit

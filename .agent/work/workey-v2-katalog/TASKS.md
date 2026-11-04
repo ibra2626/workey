@@ -15,7 +15,7 @@ feature; these tasks deliver the generalized machinery. Work one task per sessio
 | WKY-24 | [MCP: save_source/get_sources, bookEnum kaldırma, ajan rehberi](tasks/WKY-24.md) | done | WKY-22, WKY-23 |
 | WKY-25 | [REST API: katalog uçları ve plan item sözleşmesi](tasks/WKY-25.md) | done | WKY-22, WKY-23 |
 | WKY-26 | [Web: Kaynaklar düzeltme sayfası ve D/Y/B raporu](tasks/WKY-26.md) | done | WKY-22, WKY-23 |
-| WKY-27 | [Web: Bugün/Hafta/İlerleme birim görünümü ve işaretleme](tasks/WKY-27.md) | planned | WKY-23, WKY-26 |
+| WKY-27 | [Web: Bugün/Hafta/İlerleme birim görünümü ve işaretleme](tasks/WKY-27.md) | done | WKY-23, WKY-26 |
 | WKY-28 | [Uçtan uca doğrulama ve v2 kapısı](tasks/WKY-28.md) | planned | WKY-24, WKY-25, WKY-27 |
 
 ## Suggested session order
