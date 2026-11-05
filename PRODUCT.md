@@ -54,6 +54,8 @@ Name: Workey. The supplied logo is embedded from `web/static/workey.png`; the lo
 
 Personality, in the user's words: sakin, net, kararlı (calm, clear, decisive). It should feel calm, focused, and reassuring: "a long road, but I am moving forward." It must never feel like a tracker that makes the user feel guilty. Missed or late items are stated plainly, not as reproach.
 
+Warmth sanctioned (2026-11-05): the user found the earlier cool grey-green look too corporate, rigid and colourless. The system now runs on a warm off-white ground with warm greys and a single warm clay accent for non-zone energy (wayfinding, the open catalog row, the video badge). This loosens "minimal colour" toward warm and a little livelier, but stays calm — the rejected list below still binds, gamification included.
+
 Explicitly rejected by the user (binding):
 - purple-blue gradients
 - glassmorphism

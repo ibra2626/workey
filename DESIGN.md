@@ -2,19 +2,22 @@
 name: Workey
 description: A calm training log for a 38-week DGS sayısal plan; tonight's session first, one tap to mark it done.
 colors:
-  ground: "#eef1ee"
+  ground: "#f0eee6"
   card: "#ffffff"
   ink: "#16302a"
   ink-hover: "#0d211c"
   ink-2: "#4a5d57"
   ink-3: "#5f706a"
-  line: "#d5ddd8"
-  line-strong: "#b8c4be"
+  line: "#dcd8cc"
+  line-strong: "#c3beae"
   z1: "#66a69d"
   z2: "#8aa7c4"
   z3: "#d0963a"
   z1-soft: "#c3dcd8"
   z3-soft: "#f7ecd9"
+  accent: "#bf5733"
+  accent-ink: "#a2461f"
+  accent-soft: "#f6e4d8"
 typography:
   headline-display:
     fontFamily: "Barlow, system-ui, sans-serif"
@@ -227,13 +230,13 @@ components:
 
 Workey reads like the log of a calm, well-coached runner. The 38-week DGS plan is periodised like marathon preparation: phases (Faz), weekly volume in minutes, a fixed number of sessions (seans). Each evening session is drawn the way a training app draws an interval workout, as three blocks of intensity on a time axis. Numbers do the talking, set large in a narrow condensed face like a sports-watch display; words explain them in a plain humanist sans.
 
-The world is light and quiet: a pale grey-green ground, white panels, dark forest-green ink, and exactly three zone colours that belong to the three parts of a session (konu, soru, yanlış defteri). Nothing else is coloured. A missed evening is a measurement, not a verdict: it is hatched, labelled "cumartesiye taşındı", and the weekly total is shown unchanged. Volume and completed sessions are figures in the log, never rewards. v1 has no streak, target score, or deneme-results panels.
+The world is light and warm but still quiet: a soft warm off-white ground, white panels, dark forest-green ink, three zone colours that belong to the three parts of a session (konu, soru, yanlış defteri), and one warm clay accent that carries a little energy and warmth where the zones may not — the active nav marker, the open catalog row, the video-source badge. The accent is never a reward, badge or celebration; the ledger stays calm. A missed evening is a measurement, not a verdict: it is hatched, labelled "cumartesiye taşındı", and the weekly total is shown unchanged. Volume and completed sessions are figures in the log, never rewards. v1 has no streak, target score, or deneme-results panels.
 
 Density is moderate and glanceable. On the phone at 20:30 the first panel answers the whole question: book reference, chapter title, page range, the session profile, one dark pill button.
 
 **Key Characteristics:**
-- Flat white panels on a pale grey-green ground; no shadows, no nesting.
-- Three zone colours, each bound to one session part; everything else is ink, greys and line.
+- Flat white panels on a soft warm off-white ground; no shadows, no nesting.
+- Three zone colours, each bound to one session part; one warm clay accent for non-zone energy (active nav, open catalog row, video badge); everything else is ink, warm greys and line.
 - Condensed tabular numerals for every figure; humanist sans for every sentence.
 - State is carried by fill and pattern (ink, hatch, ochre outline, line grey, 3px rest stub), never by badges.
 - One primary action per surface: the dark ink pill “Çalışmaya geç” before starting, “Bitirdim · Seansı tamamla” during active work, or “Kaldığım yerden devam et” for paused work.
@@ -255,7 +258,22 @@ A cool, low-chroma forest palette with three muted "heart-rate zone" accents res
 - **Phase Mist** (z1-soft): planned weeks of the current phase in the 38-week strip and the phase-week blocks; also the text-selection highlight (Forest Ink text on Phase Mist).
 - **Today Sand** (z3-soft): the background of today's row in lists and tables, and the fill of today's bar.
 
+### Accent (non-zone)
+One warm clay, the only lively colour outside the session zones. It carries a
+little energy and warmth without reading as a reward or a status.
+- **Clay** (accent): the active-nav icon, and text/markers on card where a warm
+  emphasis is wanted. 4.63:1 on Card White.
+- **Deep Clay** (accent-ink): clay text on the soft tint (the video badge label,
+  the open section's index), where plain clay would be too light.
+- **Clay Mist** (accent-soft): the active rail/tab marker fill, the video-kind
+  badge, and the open catalog row's tint. Never used for a session part.
+
+The accent never colours a session zone's job, a primary button (those stay
+Forest Ink), a missed day, or any celebration. It is wayfinding and warmth only.
+
 ### Neutral
+The greys are warm (greige), not the earlier cool grey-green, so the ledger
+reads calm rather than clinical.
 - **Trail Ground** (ground): app background; also the active rail item's background on desktop.
 - **Card White** (card): panels, the bottom tab bar, the desktop rail.
 - **Moss Ink** (ink-2): secondary text that must hold on tinted fills (book line, chapter reference, sub-lines inside a today row).
@@ -439,6 +457,21 @@ colour. On failure, hidden text is revealed, focused and selected for manual
 copying. The long plan prompt keeps its copy button and replacement warning
 outside its initially closed preview. Full Markdown explicitly includes all
 clients, while formatted content shows only the selected client.
+
+### Catalog (Kaynaklar)
+The catalog can run to hundreds of units (two video courses already total ~114
+lessons), so the page never opens every field at once. Each source is a panel
+with a summary header — name, a kind badge (Clay Mist for video), the section
+and unit counts, and the Tamamlanan / (for non-video) Doğru-Yanlış-Boş figures —
+over its whole-source edit form. The form still re-submits every field, so the
+sections and their units sit in native disclosures, closed by default, and
+collapsing changes nothing it saves. A section summary reads "index · name ·
+range · N ders · M tamamlandı" and opens to its three fields plus a nested
+"Birimler (N)" disclosure; the open section takes a faint Clay Mist tint and a
+Deep Clay index. Disclosure chevrons are drawn, not native markers; dividers,
+never nested cards. The unit editor labels its columns once in a header row so
+the rows carry bare inputs with aria-labels instead of four repeated labels
+each. This replaced a flat always-open form that stood ~13 screens tall.
 
 ### Session profile (signature)
 Tonight's 90 minutes drawn as an interval workout on a 20:30-22:00 axis (ticks every 30 minutes, 12-13px tabular Lichen Ink). Three blocks share the width in proportion to their minutes (20 / 50 / 20) and stand at heights that read as intensity: konu low (about 43% of the chart height, Easy-Pace Teal), soru tall (about 92%, Main-Set Ochre), yanlış defteri mid (about 64%, Recovery Blue-Grey), with a 4px gap between them. On desktop each block carries its name (Barlow 15px semibold) and duration (Barlow Condensed 22px semibold) in Forest Ink; the profile is 150px tall. On mobile the 92px profile blocks are unlabelled and a three-row legend below pairs a 10px zone swatch, the part name with its pages, and the condensed duration.

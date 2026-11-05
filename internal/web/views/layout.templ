@@ -117,7 +117,7 @@ templ rail(p LayoutProps) {
 		for _, it := range append(append([]navItem(nil), navItems...), usageNavItems...) {
 			<a
 				href={ templ.SafeURL(it.Href) }
-				class="flex items-center gap-3 rounded-nav px-3 py-[10px] text-body text-ink-3 no-underline transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:2px] aria-[current=page]:bg-ground aria-[current=page]:font-semibold aria-[current=page]:text-ink"
+				class="flex items-center gap-3 rounded-nav px-3 py-[10px] text-body text-ink-3 no-underline transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:2px] aria-[current=page]:bg-accent-soft aria-[current=page]:font-semibold aria-[current=page]:text-ink aria-[current=page]:[&_svg]:text-accent"
 				{ ariaCurrent(p.Active == it.Key)... }
 			>
 				@icon(it.Icon, "w-5 h-5")
@@ -141,7 +141,7 @@ templ tabBar(active string) {
 		for _, it := range mobileNavItems() {
 			<a
 				href={ templ.SafeURL(it.Href) }
-				class="flex flex-col items-center justify-center gap-1 rounded-nav text-label text-ink-3 no-underline transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:-2px] aria-[current=page]:font-semibold aria-[current=page]:text-ink"
+				class="flex flex-col items-center justify-center gap-1 rounded-nav text-label text-ink-3 no-underline transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:-2px] aria-[current=page]:font-semibold aria-[current=page]:text-ink aria-[current=page]:[&_svg]:text-accent"
 				{ ariaCurrent(mobileActive(active) == it.Key)... }
 			>
 				@icon(it.Icon, "w-[22px] h-[22px]")

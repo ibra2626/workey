@@ -74,6 +74,58 @@ func unitLabel(unit string) string {
 func sourceKindOptions() []string   { return plan.SourceKinds() }
 func locationUnitOptions() []string { return plan.LocationUnits() }
 
+// --- catalog summary helpers --------------------------------------------
+//
+// The Kaynaklar page shows each source and section as a summary line first and
+// opens the editable fields on demand, so the catalog reviews in two screens
+// instead of hundreds of always-open inputs.
+
+// sourceUnitCount is the total number of study units under a source.
+func sourceUnitCount(src plan.SourceView) int {
+	n := 0
+	for i := range src.Sections {
+		n += len(src.Sections[i].Units)
+	}
+	return n
+}
+
+// unitNoun is the word for a study unit in the user's terms: "ders" for a
+// lesson-located source (video/course), "birim" otherwise.
+func unitNoun(src plan.SourceView) string {
+	if src.LocationUnit == plan.LocationUnitLesson {
+		return "ders"
+	}
+	return "birim"
+}
+
+// locRangeLabel renders a section's or unit's location span in the source's own
+// notation: "s. 210–225" for pages, "1–15. ders" for lessons, "20–40. dk" for
+// minutes. Returns "" when no bound is set.
+func locRangeLabel(unit string, from, to *int) string {
+	if from == nil && to == nil {
+		return ""
+	}
+	span := ""
+	switch {
+	case from != nil && to != nil && *from != *to:
+		span = strconv.Itoa(*from) + "–" + strconv.Itoa(*to)
+	case from != nil:
+		span = strconv.Itoa(*from)
+	default:
+		span = strconv.Itoa(*to)
+	}
+	switch unit {
+	case plan.LocationUnitPage:
+		return "s. " + span
+	case plan.LocationUnitLesson:
+		return span + ". ders"
+	case plan.LocationUnitMinute:
+		return span + ". dk"
+	default:
+		return span
+	}
+}
+
 // --- edit-form field helpers --------------------------------------------
 //
 // The whole source is re-submitted on every save; the hidden ordinal lists let

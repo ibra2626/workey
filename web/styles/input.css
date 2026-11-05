@@ -10,20 +10,32 @@
  * opacity modifiers on a variable colour (Soft Token Rule).
  * ------------------------------------------------------------------ */
 @theme {
-  /* Colours */
-  --color-ground: #eef1ee;
+  /* Colours. A warm, low-chroma forest palette: the ground and hairlines
+     carry a touch of warmth so the ledger reads calm, not clinical. The
+     session zones (z1/z2/z3) stay reserved for konu/soru/yanlış defteri;
+     one warm clay accent (and its soft tint) carries energy everywhere the
+     zones may not — active nav, the day's focus, the open-lesson affordance. */
+  --color-ground: #f0eee6;
   --color-card: #ffffff;
   --color-ink: #16302a;
   --color-ink-hover: #0d211c;
   --color-ink-2: #4a5d57;
   --color-ink-3: #5f706a;
-  --color-line: #d5ddd8;
-  --color-line-strong: #b8c4be;
+  --color-line: #dcd8cc;
+  --color-line-strong: #c3beae;
   --color-z1: #66a69d;
   --color-z2: #8aa7c4;
   --color-z3: #d0963a;
   --color-z1-soft: #c3dcd8;
   --color-z3-soft: #f7ecd9;
+
+  /* Warm clay accent: the one lively, non-zone colour. Used for the active
+     rail/tab marker, the day's focus, and the open-lesson affordance — never
+     as a reward, badge or celebration. clay has 4.63:1 on card for text;
+     clay-ink is the darker tone for text on the soft tint. */
+  --color-accent: #bf5733;
+  --color-accent-ink: #a2461f;
+  --color-accent-soft: #f6e4d8;
 
   /* Study room companion: the one warm lamp light. */
   --color-lamp: #f2e4c4;
@@ -649,6 +661,97 @@ ol.usage-list { list-style: decimal; }
   100% { opacity: 1; transform: scaleX(-1); }
 }
 @keyframes rc-eq { from { transform: scaleY(.3); } to { transform: scaleY(1); } }
+
+/* ------------------------------------------------------------------ *
+ * Kaynaklar: the catalog as nested disclosures, not a wall of inputs.
+ * A source shows a summary header; its sections and their units stay
+ * closed until opened. The whole-source form still submits every
+ * (hidden) field, so collapsing changes nothing it saves. Dividers, not
+ * nested cards; one warm clay accent marks the video kind and the open row.
+ * ------------------------------------------------------------------ */
+.cat-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--color-ground);
+  color: var(--color-ink-2);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+.cat-badge.is-video { background: var(--color-accent-soft); color: var(--color-accent-ink); }
+
+/* Source report figures sit at the top-right of the card on wide screens and
+   wrap under the title on phones. */
+.cat-figures { flex: none; }
+@media (max-width: 639px) { .cat-figures { flex: 1 1 100%; } }
+
+/* Shared disclosure summary row: a baseline-aligned line with a chevron that
+   rotates when open. Native marker removed; keyboard focus is visible. */
+.cat-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px 12px;
+  min-height: 48px;
+  padding: 12px 4px 12px 0;
+  list-style: none;
+  color: var(--color-ink);
+  font-weight: 600;
+}
+.cat-summary::-webkit-details-marker { display: none; }
+.cat-summary::after {
+  content: "";
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  flex: none;
+  border-right: 1.8px solid var(--color-ink-3);
+  border-bottom: 1.8px solid var(--color-ink-3);
+  transform: rotate(45deg);
+  transition: transform 150ms ease-out;
+}
+details[open] > .cat-summary::after { transform: rotate(225deg); }
+.cat-summary:hover::after { border-color: var(--color-ink); }
+.cat-summary:focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; border-radius: var(--radius-block); }
+.cat-summary-sub { min-height: 44px; padding-block: 10px; color: var(--color-ink-2); font-size: var(--text-body-small); }
+
+.cat-src-edit { border-bottom: 1px solid var(--color-line); }
+.cat-src-body { padding: 4px 0 16px; }
+
+.cat-sections { margin-top: 4px; }
+.cat-sec { border-top: 1px solid var(--color-line); }
+.cat-sec:last-child { border-bottom: 1px solid var(--color-line); }
+.cat-sec[open] { background: color-mix(in srgb, var(--color-accent-soft) 32%, transparent); margin-inline: -16px; padding-inline: 16px; border-radius: var(--radius-block); }
+.cat-sec[open] + .cat-sec { border-top-color: transparent; }
+.cat-sec-index {
+  flex: none;
+  min-width: 22px;
+  font-size: var(--text-numeral-inline);
+  color: var(--color-ink-3);
+}
+.cat-sec[open] > .cat-summary .cat-sec-index { color: var(--color-accent-ink); }
+.cat-sec-name { min-width: 0; flex: 1 1 12rem; overflow-wrap: anywhere; }
+.cat-sec-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--text-meta);
+  font-weight: 400;
+  color: var(--color-ink-3);
+}
+.cat-sec-done { color: var(--color-ink-2); font-weight: 600; }
+.cat-sec-body { display: grid; gap: 16px; padding: 4px 0 20px; }
+
+.cat-units { border-top: 1px solid var(--color-line); }
+.cat-unit-head {
+  padding-bottom: 2px;
+  font-size: var(--text-label);
+  font-weight: 600;
+  color: var(--color-ink-3);
+}
+@media (max-width: 767px) { .cat-unit-head { display: none; } }
 
 /* ------------------------------------------------------------------ *
  * Plan screen: the whole plan as wide month calendars; the current phase
