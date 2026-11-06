@@ -17,7 +17,7 @@ func setupMovedWeek(t *testing.T) (*Service, *store.Store) {
 	t.Helper()
 	ctx := context.Background()
 	svc, st := newService(t, istanbul(t, "2026-10-26 09:00"))
-	week := loadWeek(t, svc)
+	week := loadWeek(t, svc, st)
 	if _, err := svc.SavePlan(ctx, SourceAPI, week); err != nil {
 		t.Fatalf("SavePlan: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestDayRestDay(t *testing.T) {
 func TestProgress(t *testing.T) {
 	ctx := context.Background()
 	svc, st := newService(t, istanbul(t, "2026-10-26 09:00"))
-	week := loadWeek(t, svc)
+	week := loadWeek(t, svc, st)
 	if _, err := svc.SavePlan(ctx, SourceAPI, week); err != nil {
 		t.Fatalf("SavePlan: %v", err)
 	}

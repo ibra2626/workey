@@ -44,10 +44,10 @@ func TestMigrateIdempotent(t *testing.T) {
 		t.Fatalf("schema_migrations rows = %d, want 2", applied)
 	}
 
-	// Every v1 table exists.
+	// Every table exists.
 	for _, tbl := range []string{
-		"phases", "topic_groups", "sessions", "session_items",
-		"audit_log", "idempotency_keys", "session_study",
+		"phases", "topic_groups", "sources", "sections", "units", "unit_progress",
+		"sessions", "session_items", "audit_log", "idempotency_keys", "session_study",
 	} {
 		var name string
 		err := s.DB().QueryRowContext(ctx,
@@ -70,11 +70,12 @@ func TestForeignKeysOn(t *testing.T) {
 		t.Fatalf("foreign_keys = %d, want 1", fk)
 	}
 
-	// An item under a missing session violates the FK.
+	// An item under a missing session violates the FK, even with a real source.
+	src := mkSource(t, s, "M1")
 	err := s.WithTx(ctx, func(tx *sql.Tx) error {
 		return s.InsertSessionItem(ctx, tx, &SessionItem{
-			SessionID: 999, Ordinal: 1, Book: "M1",
-			ChapterNo: 1, ChapterTitle: "x", PageFrom: 1, PageTo: 2,
+			SessionID: 999, Ordinal: 1, SourceID: src.ID,
+			LocFrom: ptrInt(1), LocTo: ptrInt(2),
 		})
 	})
 	if err == nil {
@@ -82,10 +83,22 @@ func TestForeignKeysOn(t *testing.T) {
 	}
 }
 
+// mkSource inserts a minimal book source with the given key and returns it.
+func mkSource(t *testing.T, s *Store, key string) *Source {
+	t.Helper()
+	src := &Source{Key: key, Name: key, Kind: "book", LocationUnit: "page",
+		Ordinal: 0, CreatedAt: "2026-10-26T09:00:00Z", UpdatedAt: "2026-10-26T09:00:00Z"}
+	if err := s.InsertSource(context.Background(), s.DB(), src); err != nil {
+		t.Fatalf("mkSource %s: %v", key, err)
+	}
+	return src
+}
+
 func TestSessionsByDateRangeWithItems(t *testing.T) {
 	ctx := context.Background()
 	s := newStore(t)
 	now := "2026-10-26T09:00:00Z"
+	src := mkSource(t, s, "M2")
 
 	// Three sessions on three dates; the range query should return the two
 	// inside [2026-11-02, 2026-11-08] in date/time order with their items.
@@ -101,9 +114,9 @@ func TestSessionsByDateRangeWithItems(t *testing.T) {
 			}
 			id = sess.ID
 			return s.InsertSessionItem(ctx, tx, &SessionItem{
-				SessionID: sess.ID, Ordinal: 1, Book: "M2",
-				ChapterNo: 17, ChapterTitle: "Türev", PageFrom: 210, PageTo: 225,
-				SoruFrom: ptrInt(1), SoruTo: ptrInt(40),
+				SessionID: sess.ID, Ordinal: 1, SourceID: src.ID,
+				LocFrom: ptrInt(210), LocTo: ptrInt(225),
+				UnitFrom: ptrInt(1), UnitTo: ptrInt(40),
 			})
 		})
 		if err != nil {
@@ -127,11 +140,12 @@ func TestSessionsByDateRangeWithItems(t *testing.T) {
 	if got[0].ID != inA || got[1].ID != inB {
 		t.Fatalf("order wrong: got ids %d,%d want %d,%d", got[0].ID, got[1].ID, inA, inB)
 	}
-	if len(got[0].Items) != 1 || got[0].Items[0].Book != "M2" || got[0].Items[0].PageTo != 225 {
-		t.Fatalf("session items wrong: %+v", got[0].Items)
+	item := got[0].Items
+	if len(item) != 1 || item[0].SourceID != src.ID || item[0].LocTo == nil || *item[0].LocTo != 225 {
+		t.Fatalf("session items wrong: %+v", item)
 	}
-	if got[0].Items[0].SoruTo == nil || *got[0].Items[0].SoruTo != 40 {
-		t.Fatalf("soru_to not round-tripped: %+v", got[0].Items[0])
+	if item[0].UnitTo == nil || *item[0].UnitTo != 40 {
+		t.Fatalf("unit_to not round-tripped: %+v", item[0])
 	}
 }
 
@@ -139,6 +153,7 @@ func TestCascadeDeleteItems(t *testing.T) {
 	ctx := context.Background()
 	s := newStore(t)
 	now := "2026-10-26T09:00:00Z"
+	src := mkSource(t, s, "M1")
 
 	var sessID int64
 	if err := s.WithTx(ctx, func(tx *sql.Tx) error {
@@ -148,7 +163,7 @@ func TestCascadeDeleteItems(t *testing.T) {
 		}
 		sessID = sess.ID
 		return s.InsertSessionItem(ctx, tx, &SessionItem{
-			SessionID: sess.ID, Ordinal: 1, Book: "M1", ChapterNo: 1, ChapterTitle: "x", PageFrom: 1, PageTo: 2,
+			SessionID: sess.ID, Ordinal: 1, SourceID: src.ID, LocFrom: ptrInt(1), LocTo: ptrInt(2),
 		})
 	}); err != nil {
 		t.Fatalf("setup: %v", err)
@@ -170,24 +185,25 @@ func TestCheckConstraints(t *testing.T) {
 	ctx := context.Background()
 	s := newStore(t)
 	now := "2026-10-26T09:00:00Z"
+	src := mkSource(t, s, "M1")
 
-	// Bad kind.
+	// kind is now an open label: an arbitrary value is accepted (no CHECK).
 	if err := s.WithTx(ctx, func(tx *sql.Tx) error {
 		return s.InsertSession(ctx, tx, &Session{Date: "2026-11-02", StartTime: "20:00", DurationMin: 90, Kind: "yok", CreatedAt: now, UpdatedAt: now})
-	}); err == nil {
-		t.Fatal("expected CHECK failure for bad kind")
+	}); err != nil {
+		t.Fatalf("open kind rejected: %v", err)
 	}
 
-	// page_from > page_to.
+	// loc_from > loc_to on a session item still violates the range CHECK.
 	err := s.WithTx(ctx, func(tx *sql.Tx) error {
 		sess := &Session{Date: "2026-11-03", StartTime: "20:00", DurationMin: 90, Kind: "aksam", CreatedAt: now, UpdatedAt: now}
 		if err := s.InsertSession(ctx, tx, sess); err != nil {
 			return err
 		}
-		return s.InsertSessionItem(ctx, tx, &SessionItem{SessionID: sess.ID, Ordinal: 1, Book: "M1", ChapterNo: 1, ChapterTitle: "x", PageFrom: 50, PageTo: 10})
+		return s.InsertSessionItem(ctx, tx, &SessionItem{SessionID: sess.ID, Ordinal: 1, SourceID: src.ID, LocFrom: ptrInt(50), LocTo: ptrInt(10)})
 	})
 	if err == nil {
-		t.Fatal("expected CHECK failure for page_from > page_to")
+		t.Fatal("expected CHECK failure for loc_from > loc_to")
 	}
 }
 

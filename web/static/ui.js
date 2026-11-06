@@ -6,6 +6,44 @@
   let pendingTimer;
   let navigationTimer;
   let focusID;
+  let completing = false;
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  // The one authored payoff: a small momentum burst from the completed check.
+  // Fixed overlay, pointer-events none, capped particle count, GPU transforms,
+  // and skipped entirely when motion is reduced.
+  function celebrate(anchor) {
+    if (reduceMotion.matches || !anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    if (!rect.width && !rect.height) return;
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const cs = getComputedStyle(document.documentElement);
+    const colors = ["--color-success", "--color-accent", "--color-accent-2"].map((v) => cs.getPropertyValue(v).trim() || "#ff6b4a");
+    const layer = document.createElement("div");
+    layer.className = "celebrate-layer";
+    layer.setAttribute("aria-hidden", "true");
+    const count = 16;
+    for (let i = 0; i < count; i++) {
+      const dot = document.createElement("span");
+      dot.className = "celebrate-dot";
+      const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
+      const dist = 56 + Math.random() * 72;
+      const size = 6 + Math.random() * 6;
+      dot.style.left = cx + "px";
+      dot.style.top = cy + "px";
+      dot.style.setProperty("--dx", Math.cos(angle) * dist + "px");
+      dot.style.setProperty("--dy", Math.sin(angle) * dist + 38 + "px");
+      dot.style.setProperty("--s", size + "px");
+      dot.style.setProperty("--r", Math.random() < 0.5 ? "999px" : "2px");
+      dot.style.setProperty("--rot", Math.random() * 180 - 90 + "deg");
+      dot.style.setProperty("--c", colors[i % colors.length]);
+      dot.style.animationDelay = Math.random() * 60 + "ms";
+      layer.appendChild(dot);
+    }
+    document.body.appendChild(layer);
+    setTimeout(() => layer.remove(), 1100);
+  }
 
   function start(message) {
     clearTimeout(pendingTimer);
@@ -36,6 +74,7 @@
     const form = event.detail.elt;
     const button = form.querySelector("button");
     focusID = form.contains(document.activeElement) || button?.matches(":focus-visible") ? form.dataset.sessionId : null;
+    completing = (form.getAttribute("action") || "").endsWith("/tamamla");
     form.setAttribute("aria-busy", "true");
     start("Değişiklik kaydediliyor…");
   });
@@ -52,6 +91,7 @@
     event.detail.elt.removeAttribute("aria-busy");
     finish();
     const handled = event.detail.xhr.getResponseHeader("X-Workey-Study-Form") === "true";
+    if (event.detail.failed || event.detail.xhr.status === 0) completing = false;
     if (!handled && (event.detail.failed || event.detail.xhr.status === 0)) {
       const code = event.detail.xhr.status;
       showError(code === 401 || code === 403
@@ -77,6 +117,17 @@
       }
     }
     focusID = null;
+    if (completing) {
+      completing = false;
+      const done = content.querySelector(".completion-status");
+      if (done) {
+        const panel = content.querySelector("#bugun-panel") || done;
+        panel.classList.add("is-celebrating");
+        setTimeout(() => panel.classList.remove("is-celebrating"), 900);
+        const check = done.querySelector(".completion-check");
+        requestAnimationFrame(() => celebrate(check || done));
+      }
+    }
     if (status) status.textContent = feedback ? feedback.textContent : content.querySelector(".completion-status")
       ? "Seans tamamlandı. İlerleme güncellendi." : "Seans ve ilerleme güncellendi.";
   });
@@ -116,4 +167,34 @@
   document.addEventListener("visibilitychange", () => {
     root.classList.toggle("motion-paused", document.hidden);
   });
+
+  // Theme toggle: reflect the effective day/night theme, flip and persist it.
+  // The button is revealed only once JS is present; without it the OS
+  // preference (prefers-color-scheme) still themes the app.
+  (() => {
+    const btn = document.getElementById("theme-toggle");
+    if (!btn) return;
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const label = btn.querySelector(".theme-toggle-label");
+    const effective = () => {
+      const forced = root.getAttribute("data-theme");
+      return forced === "dark" || forced === "light" ? forced : media.matches ? "dark" : "light";
+    };
+    const sync = () => {
+      const eff = effective();
+      btn.dataset.effective = eff;
+      btn.setAttribute("aria-pressed", eff === "dark" ? "true" : "false");
+      btn.setAttribute("aria-label", eff === "dark" ? "Gündüz temasına geç" : "Gece temasına geç");
+      if (label) label.textContent = eff === "dark" ? "Gündüz teması" : "Gece teması";
+    };
+    btn.hidden = false;
+    sync();
+    btn.addEventListener("click", () => {
+      const next = effective() === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem("workey-theme", next); } catch (e) {}
+      sync();
+    });
+    media.addEventListener("change", sync);
+  })();
 })();

@@ -20,12 +20,13 @@ type navItem struct {
 	Key   string // matches the active key passed to Layout
 }
 
-// navItems are the four primary sections. Order is fixed.
+// navItems are the primary sections. Order is fixed.
 var navItems = []navItem{
 	{Href: "/", Label: "Bugün", Icon: "i-today", Key: "bugun"},
 	{Href: "/hafta", Label: "Hafta", Icon: "i-week", Key: "hafta"},
 	{Href: "/ilerleme", Label: "İlerleme", Icon: "i-prog", Key: "ilerleme"},
 	{Href: "/plan", Label: "Plan", Icon: "i-plan", Key: "plan"},
+	{Href: "/kaynaklar", Label: "Kaynaklar", Icon: "i-sources", Key: "kaynaklar"},
 }
 
 var usageNavItems = []navItem{

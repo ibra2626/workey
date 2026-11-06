@@ -33,7 +33,11 @@ func TestStudyUpgradeAndPersistence(t *testing.T) {
 	if err := s.InsertSession(ctx, s.DB(), sess); err != nil {
 		t.Fatal(err)
 	}
-	it := &SessionItem{SessionID: sess.ID, Ordinal: 0, Book: "M1", ChapterNo: 1, ChapterTitle: "Temsili kaynak", PageFrom: 1, PageTo: 10}
+	src := &Source{Key: "M1", Name: "Temsili kaynak", Kind: "book", LocationUnit: "page", Ordinal: 0, CreatedAt: "before", UpdatedAt: "before"}
+	if err := s.InsertSource(ctx, s.DB(), src); err != nil {
+		t.Fatal(err)
+	}
+	it := &SessionItem{SessionID: sess.ID, Ordinal: 0, SourceID: src.ID, LocFrom: ptrInt(1), LocTo: ptrInt(10)}
 	if err := s.InsertSessionItem(ctx, s.DB(), it); err != nil {
 		t.Fatal(err)
 	}

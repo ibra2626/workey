@@ -24,6 +24,7 @@ templ Layout(p LayoutProps) {
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<title>{ p.Title }</title>
+			@themeInit()
 			@fontPreloads(p.Active == "bugun" || p.Active == "hafta" || p.Active == "ilerleme")
 			<link rel="stylesheet" href={ asset("/static/app.css") }/>
 			<script defer src={ asset("/static/htmx.min.js") }></script>
@@ -46,6 +47,32 @@ templ Layout(p LayoutProps) {
 	</html>
 }
 
+// themeInit applies a stored theme choice before first paint so a manual
+// override never flashes. With no stored choice the CSS prefers-color-scheme
+// rules decide, so a no-JavaScript visitor still gets the right theme.
+templ themeInit() {
+	<script>
+		(function () {
+			try {
+				var t = localStorage.getItem("workey-theme");
+				if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+			} catch (e) {}
+		})();
+	</script>
+}
+
+// themeToggle flips the day / night theme and stores the choice. Hidden until
+// ui.js attaches it, so a no-JavaScript visitor keeps the OS-preference theme
+// rather than seeing a dead control. The label and icon are set by ui.js for
+// the effective theme.
+templ themeToggle() {
+	<button type="button" class="theme-toggle" id="theme-toggle" hidden aria-pressed="false">
+		@icon("i-moon", "ico-light")
+		@icon("i-sun", "ico-dark")
+		<span class="theme-toggle-label">Gece teması</span>
+	</button>
+}
+
 // Match the unversioned URLs inside app.css exactly so preload and CSS share
 // one font request. Include Turkish subsets and only first-screen weights.
 templ fontPreloads(study bool) {
@@ -63,7 +90,7 @@ templ fontPreloads(study bool) {
 // Crop only the source image's outer whitespace in the viewport; preserve the
 // supplied logo's pixels and proportions. Both placements sit on Card White.
 templ brandLogo(sizeClass string) {
-	<svg class={ "block max-w-full", sizeClass } viewBox="140 325 1260 334" role="img" aria-label="Workey" focusable="false">
+	<svg class={ "brand-logo block max-w-full", sizeClass } viewBox="140 325 1260 334" role="img" aria-label="Workey" focusable="false">
 		<image href={ asset("/static/workey.png") } width="1536" height="1024"></image>
 	</svg>
 }
@@ -90,9 +117,12 @@ templ iconSprite() {
 		<symbol id="i-prog" viewBox="0 0 24 24"><path d="M3 18c3-1 4-6 7-6s4 3 7 2 3-6 4-8"></path></symbol>
 		<symbol id="i-plan" viewBox="0 0 24 24"><path d="M4 5.5h16M4 5.5v14h16v-14M4 10h16M9 10v9.5"></path></symbol>
 		<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></symbol>
+		<symbol id="i-sources" viewBox="0 0 24 24"><path d="M5 4.5h8l2 2h4v13H5zM5 9.5h14M9 4.5v15"></path></symbol>
 		<symbol id="i-guide" viewBox="0 0 24 24"><path d="M4 4h6l2 2 2-2h6v15h-6l-2 2-2-2H4zM12 6v15"></path></symbol>
 		<symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 3.5h10v17l-5-4-5 4z"></path></symbol>
 		<symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9.5v5h4l5 4v-13l-5 4zM16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11"></path></symbol>
+			<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"></circle><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.1 5.1l1.7 1.7M17.2 17.2l1.7 1.7M18.9 5.1l-1.7 1.7M6.8 17.2l-1.7 1.7"></path></symbol>
+			<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.6A8 8 0 1 1 9.4 4a6.5 6.5 0 0 0 10.6 10.6z"></path></symbol>
 	</svg>
 }
 
@@ -116,31 +146,32 @@ templ rail(p LayoutProps) {
 		for _, it := range append(append([]navItem(nil), navItems...), usageNavItems...) {
 			<a
 				href={ templ.SafeURL(it.Href) }
-				class="flex items-center gap-3 rounded-nav px-3 py-[10px] text-body text-ink-3 no-underline transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:2px] aria-[current=page]:bg-ground aria-[current=page]:font-semibold aria-[current=page]:text-ink"
+				class="nav-link rail-link flex items-center gap-3 rounded-nav px-3 py-[10px] text-body text-ink-3 no-underline focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:2px]"
 				{ ariaCurrent(p.Active == it.Key)... }
 			>
 				@icon(it.Icon, "w-5 h-5")
 				{ it.Label }
 			</a>
 		}
-		if p.HasExam && p.DaysToExam > 0 {
-			<div class="mt-auto px-3">
+		<div class="mt-auto px-3">
+			if p.HasExam && p.DaysToExam > 0 {
 				<p class="text-label font-semibold text-ink-3">Sınava</p>
 				<p class="cn leading-none text-numeral-rail font-semibold text-ink">
 					{ strconv.Itoa(p.DaysToExam) } <span class="text-numeral-unit text-ink-3">gün</span>
 				</p>
-			</div>
-		}
+			}
+			@themeToggle()
+		</div>
 	</nav>
 }
 
 // tabBar is the mobile-only bottom tab bar (68px, Card White, top hairline).
 templ tabBar(active string) {
-	<nav class="fixed inset-x-0 bottom-0 z-10 grid h-[68px] grid-cols-5 border-t border-line bg-card md:hidden">
+	<nav class="fixed inset-x-0 bottom-0 z-10 grid h-[68px] grid-cols-6 border-t border-line bg-card md:hidden">
 		for _, it := range mobileNavItems() {
 			<a
 				href={ templ.SafeURL(it.Href) }
-				class="flex flex-col items-center justify-center gap-1 rounded-nav text-label text-ink-3 no-underline transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:-2px] aria-[current=page]:font-semibold aria-[current=page]:text-ink"
+				class="nav-link tab-link flex flex-col items-center justify-center gap-1 rounded-nav text-label text-ink-3 no-underline focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:-2px]"
 				{ ariaCurrent(mobileActive(active) == it.Key)... }
 			>
 				@icon(it.Icon, "w-[22px] h-[22px]")

@@ -1,0 +1,26 @@
+{
+  "_comment": "SAMPLE DATA — not a real catalog. Source 'M1' for the sample week (26 Ekim – 1 Kasım 2026, design/directions/04-antrenman-gunlugu.html): a book counted in pages, four sections; section 3 (Üslü ifadeler) carries three Antrenman units that the Wednesday block references by unit range. The real catalog is written by the AI assistant through the MCP/API interface with save_source.",
+  "source": {
+    "key": "M1",
+    "name": "Matematik 1",
+    "kind": "book",
+    "location_unit": "page",
+    "ordinal": 1
+  },
+  "sections": [
+    { "ordinal": 1, "name": "Sayı basamakları", "loc_from": 1, "loc_to": 22, "units": [] },
+    { "ordinal": 2, "name": "Bölme ve bölünebilme", "loc_from": 23, "loc_to": 40, "units": [] },
+    {
+      "ordinal": 3,
+      "name": "Üslü ifadeler",
+      "loc_from": 41,
+      "loc_to": 58,
+      "units": [
+        { "ordinal": 1, "label": "Antrenman", "number": 1, "loc_from": 41, "loc_to": 46 },
+        { "ordinal": 2, "label": "Antrenman", "number": 2, "loc_from": 47, "loc_to": 52 },
+        { "ordinal": 3, "label": "Antrenman", "number": 3, "loc_from": 53, "loc_to": 58 }
+      ]
+    },
+    { "ordinal": 4, "name": "Köklü ifadeler", "loc_from": 59, "loc_to": 76, "units": [] }
+  ]
+}

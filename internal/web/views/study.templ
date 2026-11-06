@@ -182,7 +182,7 @@ templ bookmarkForm(sv plan.SessionView, p TodayPage) {
 		<input type="hidden" name="pause_mode" value="bookmark"/>
 		if singleStudySource(sv, input) {
 			<input type="hidden" name="item_ordinal" value="0"/>
-			<p class="study-form-source"><span>Kaynak</span>{ plan.FormatItem(sv.Items[0]) } · { sv.Items[0].ChapterTitle }</p>
+			<p class="study-form-source"><span>Kaynak</span>{ itemLabel(sv, 0) }</p>
 		} else {
 			<label>
 				Kaynak
@@ -191,8 +191,8 @@ templ bookmarkForm(sv plan.SessionView, p TodayPage) {
 						<option value={ input.Ordinal } selected>{ "Geçersiz kaynak: " + input.Ordinal }</option>
 					}
 					<option value="" selected?={ input.Ordinal == "" }>Kaynak seç</option>
-					for i, item := range sv.Items {
-						<option value={ strconv.Itoa(i) } selected?={ input.Ordinal == strconv.Itoa(i) }>{ plan.FormatItem(item) } · { item.ChapterTitle }</option>
+					for i := range sv.Items {
+						<option value={ strconv.Itoa(i) } selected?={ input.Ordinal == strconv.Itoa(i) }>{ itemLabel(sv, i) }</option>
 					}
 				</select>
 			</label>
@@ -215,8 +215,8 @@ templ bookmarkForm(sv plan.SessionView, p TodayPage) {
 		<div id={ "bookmark-help-" + strconv.FormatInt(sv.ID, 10) } class="study-help text-body-small text-ink-2">
 			<p>Yarım kalan sayfaysa aynı sayfayı, bittiyse sonrakini yaz; uygulama otomatik artırmaz. Yanlış defterinde de kitaptaki sayfayı kullan.</p>
 			<ul class="mt-2 divide-y divide-line" aria-label="Geçerli sayfa aralıkları">
-				for _, item := range sv.Items {
-					<li class="py-2 tnum">{ sourceRanges(item, sv.Kind) }</li>
+				for i := range sv.Items {
+					<li class="py-2 tnum">{ sourceRanges(sv, i) }</li>
 				}
 			</ul>
 			<p>Aşama veya kaynak bittiyse sonrakini seç. Seansın tamamı bittiyse Bitirdim’i kullan.</p>

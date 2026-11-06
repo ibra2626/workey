@@ -1,0 +1,63 @@
+package views
+
+import "github.com/ibra2626/workey/internal/plan"
+
+// unitMarking renders a session's catalog units with a per-unit "bitti" control
+// and, for non-video sources, optional doğru/yanlış/boş inputs. It posts to
+// set_unit_result (source web) and is wholly separate from the session's own
+// completion control (WKY-23: unit progress is independent of the session).
+// screen is "bugun" or "hafta"; weekStart is the viewed week for the Hafta swap.
+templ unitMarking(sv plan.SessionView, csrf string, screen string, weekStart string) {
+	if len(sv.UnitRows) > 0 {
+		<div class="mt-5">
+			<p class="text-label font-semibold text-ink-3">Birimler</p>
+			<ul class="mt-2 space-y-2" aria-label="Seans birimleri">
+				for _, u := range sv.UnitRows {
+					@unitRow(sv.ID, u, csrf, screen, weekStart)
+				}
+			</ul>
+		</div>
+	}
+}
+
+// unitRow is one unit's marking row: its exact notation with a done check,
+// optional D/Y/B inputs (prefilled with the stored result), and the "Bitti" /
+// "Kaydet" + "Geri al" submit buttons. The two submit buttons carry distinct
+// name="done" values so one form serves both marking and undo.
+templ unitRow(sessionID int64, u plan.UnitRow, csrf string, screen string, weekStart string) {
+	<li class="rounded-block border border-line p-3">
+		<form method="post" { unitResultForm(screen, sessionID, u.UnitID, weekStart)... }>
+			<input type="hidden" name="_csrf" value={ csrf }/>
+			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
+				<p class={ "flex min-w-0 items-center gap-1.5 text-body-small", templ.KV("font-semibold text-ink", u.Done), templ.KV("text-ink-2", !u.Done) }>
+					if u.Done {
+						@icon("i-check", "h-4 w-4 shrink-0 text-ink")
+					}
+					{ u.Notation }
+				</p>
+				<div class="flex flex-wrap items-center gap-2.5">
+					if !u.IsVideo {
+						@dybField("correct", "D", u.Correct)
+						@dybField("wrong", "Y", u.Wrong)
+						@dybField("blank", "B", u.Blank)
+					}
+					if u.Done {
+						<button type="submit" name="done" value="true" class="action-button secondary-action h-11 shrink-0 rounded-nav px-3 text-label font-semibold text-ink-3 hover:text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:2px]">@actionLabel("Kaydet", "Kaydediliyor…")</button>
+						<button type="submit" name="done" value="false" class="action-button secondary-action h-11 shrink-0 rounded-nav px-2 text-label text-ink-3 underline-offset-2 hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:2px]">@actionLabel("Geri al", "Geri alınıyor…")</button>
+					} else {
+						<button type="submit" name="done" value="true" class="action-button primary-action flex h-11 shrink-0 items-center justify-center gap-2 rounded-pill bg-ink px-5 text-label font-semibold text-card hover:bg-ink-hover focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:3px]">@actionLabel("Bitti", "Kaydediliyor…")</button>
+					}
+				</div>
+			</div>
+		</form>
+	</li>
+}
+
+// dybField is one doğru/yanlış/boş numeric input (44px tall for touch), showing
+// the stored value when the unit is already done.
+templ dybField(name string, label string, value *int) {
+	<label class="flex items-center gap-1.5 text-label text-ink-3">
+		{ label }
+		<input type="text" inputmode="numeric" name={ name } value={ optIntValue(value) } class="h-11 w-14 rounded-nav border border-line bg-ground px-2 text-center text-body-small tnum text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:1px]"/>
+	</label>
+}

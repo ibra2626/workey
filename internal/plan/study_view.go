@@ -15,16 +15,17 @@ type StudyView struct {
 	Bookmark       *BookmarkView `json:"bookmark,omitempty"`
 }
 
-// BookmarkView resolves the stable zero-based source ordinal to a book reference.
+// BookmarkView resolves the stable zero-based item ordinal to a catalog
+// reference. ResumePage is a location value in the source's location unit.
 type BookmarkView struct {
-	ItemOrdinal int    `json:"item_ordinal" jsonschema:"Zero-based ordinal in the session's ordered items."`
-	Stage       string `json:"stage" jsonschema:"konu, soru, yanlis_defteri for aksam; calisma for other kinds."`
-	ResumePage  int    `json:"resume_page" jsonschema:"Next page to work on, including a partly read page. Never automatically incremented; yanlis_defteri also refers to the book page."`
-	Item        Item   `json:"item"`
-	Notation    string `json:"notation" jsonschema:"Resolved canonical book/chapter/page reference for the selected source."`
+	ItemOrdinal int      `json:"item_ordinal" jsonschema:"Zero-based ordinal in the session's ordered items."`
+	Stage       string   `json:"stage" jsonschema:"konu, soru, yanlis_defteri for aksam; calisma for other kinds."`
+	ResumePage  int      `json:"resume_page" jsonschema:"Next location to work on in the source's location unit, including a partly done one. Never automatically incremented."`
+	Item        ItemView `json:"item"`
+	Notation    string   `json:"notation" jsonschema:"Resolved canonical source/section/unit reference for the selected item."`
 }
 
-func attachStudy(sv *SessionView, study *store.Study, items []store.SessionItem) {
+func attachStudy(sv *SessionView, cat *catalog, study *store.Study, items []store.SessionItem) {
 	sv.StudyVersion = studyVersion(study)
 	if study == nil {
 		return
@@ -33,13 +34,13 @@ func attachStudy(sv *SessionView, study *store.Study, items []store.SessionItem)
 		LastStartedAt: study.LastStartedAt, UpdatedAt: study.UpdatedAt,
 		EntryMode: study.EntryMode, Version: study.Version}
 	if study.ItemOrdinal != nil && study.Stage != nil && study.ResumePage != nil {
-		for _, source := range items {
-			if source.Ordinal != *study.ItemOrdinal {
+		for _, item := range items {
+			if item.Ordinal != *study.ItemOrdinal {
 				continue
 			}
-			item := toDomainItems([]store.SessionItem{source})[0]
-			v.Bookmark = &BookmarkView{ItemOrdinal: source.Ordinal, Stage: *study.Stage,
-				ResumePage: *study.ResumePage, Item: item, Notation: FormatItems([]Item{item})}
+			v.Bookmark = &BookmarkView{ItemOrdinal: item.Ordinal, Stage: *study.Stage,
+				ResumePage: *study.ResumePage, Item: cat.itemView(item),
+				Notation: FormatRef(cat.resolve(item))}
 			break
 		}
 	}

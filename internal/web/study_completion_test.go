@@ -26,7 +26,11 @@ func TestWeekPartialBookmarkSurvivesCompletionAndUndo(t *testing.T) {
 	if _, err := a.svc.StartStudy(ctx, plan.SourceWeb, id, plan.EntryNormal, 0, testExamDate); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.svc.PauseStudy(ctx, plan.SourceWeb, id, &plan.Bookmark{ItemOrdinal: 0, Stage: plan.StageKonu, ResumePage: rows[0].Items[0].PageFrom}, 1); err != nil {
+	resume := 0
+	if lf := rows[0].Items[0].LocFrom; lf != nil {
+		resume = *lf
+	}
+	if _, err := a.svc.PauseStudy(ctx, plan.SourceWeb, id, &plan.Bookmark{ItemOrdinal: 0, Stage: plan.StageKonu, ResumePage: resume}, 1); err != nil {
 		t.Fatal(err)
 	}
 	check := func(body string, partial bool) {

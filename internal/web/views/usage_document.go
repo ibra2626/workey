@@ -200,7 +200,7 @@ func NewUsageDocument(key string, guide plan.AgentGuide) UsageDocument {
 		paragraph("Sunucu tarihi: "+guide.Today+" · "+guide.Timezone+" · Sınav: "+guide.ExamDate),
 		UsageBlock{Kind: UsageList, Ordered: true, Items: guide.Workflow},
 	))
-	rules := namedSection("rules", "Ortak işlem kuralları", paragraph("Kitaplar: "+strings.Join(guide.Books, ", ")+". Seans türleri: "+strings.Join(guide.SessionKinds, ", ")+"."))
+	rules := namedSection("rules", "Ortak işlem kuralları", paragraph("Kaynak türleri: "+strings.Join(guide.SourceKinds, ", ")+". Konum birimleri: "+strings.Join(guide.LocationUnits, ", ")+". Seans türleri: "+strings.Join(guide.SessionKinds, ", ")+"."))
 	for _, rule := range guide.Rules {
 		rules.Children = append(rules.Children, paragraph(rule))
 	}

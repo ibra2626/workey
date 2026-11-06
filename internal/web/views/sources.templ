@@ -1,0 +1,226 @@
+package views
+
+import (
+	"strconv"
+
+	"github.com/ibra2626/workey/internal/plan"
+)
+
+// Sources is the Kaynaklar screen: the agent-extracted catalog with per-source
+// and per-section reporting. Each source and section reads as a summary line
+// first and opens its editable fields on demand (native disclosures), so the
+// whole catalog reviews in two screens instead of hundreds of open inputs. It
+// follows DESIGN.md — soft tokens, Barlow, dividers over nested cards, no
+// gamification.
+templ Sources(p SourcesPage) {
+	@Layout(LayoutProps{Title: "Workey · Kaynaklar", Active: "kaynaklar", CSRF: p.CSRF}) {
+		@SourcesMain(p)
+	}
+}
+
+// SourcesMain swaps every card's figures and the feedback banner together, so a
+// save refreshes the whole list.
+templ SourcesMain(p SourcesPage) {
+	<div id="kaynaklar-main">
+		<div class="flex items-baseline justify-between px-1">
+			<p class="text-title-lg font-semibold text-ink md:text-headline md:font-bold">Kaynaklar</p>
+		</div>
+		<p class="mt-2 px-1 text-body-small text-ink-2">Asistanın çıkardığı kaynakları gözden geçir ve düzelt. Bir kaynağı açıp bölümlerini, bölümü açıp bilgilerini düzenleyebilirsin; birim ilerlemesi korunur.</p>
+		if p.Feedback != "" {
+			<div class="mt-3 rounded-panel bg-card p-4 text-body text-ink" role={ studyFeedbackRole(p.Invalid) } tabindex="-1">
+				<p>{ p.Feedback }</p>
+			</div>
+		}
+		if p.Catalog == nil || len(p.Catalog.Sources) == 0 {
+			<div class="mt-5 rounded-panel bg-card p-5 md:p-8">
+				<h2 class="text-title-lg font-semibold text-ink">Henüz kaynak yok.</h2>
+				<p class="mt-2 text-body text-ink-2">Asistan kaynakları ekleyince burada listelenip düzeltilebilecek.</p>
+			</div>
+		} else {
+			<div class="mt-5 space-y-3 md:space-y-5">
+				for _, src := range p.Catalog.Sources {
+					@sourceCard(p, src)
+				}
+			</div>
+		}
+	</div>
+}
+
+// sourceCard is one source: a summary header, then its whole-source edit form.
+// The form re-submits every field, so each section's and unit's inputs stay in
+// the DOM inside the (closed) disclosures and still save.
+templ sourceCard(p SourcesPage, src plan.SourceView) {
+	<section id={ "kaynak-" + src.Key } class="rounded-panel bg-card p-5 md:p-7">
+		<div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+			<div class="min-w-0">
+				<h2 class="text-title-lg font-semibold text-ink">{ src.Name }</h2>
+				<p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-meta text-ink-3">
+					<span class={ "cat-badge", templ.KV("is-video", isVideoKind(src.Kind)) }>{ kindLabel(src.Kind) }</span>
+					<span>{ src.Key }</span>
+					<span aria-hidden="true">·</span>
+					<span>{ strconv.Itoa(len(src.Sections)) } bölüm</span>
+					<span aria-hidden="true">·</span>
+					<span class="tnum">{ strconv.Itoa(sourceUnitCount(src)) } { unitNoun(src) }</span>
+				</p>
+			</div>
+			@progressFigures(p.sourceTotals(src.ID), src.Kind)
+		</div>
+		<form class="mt-5" { sourceFormAttrs(src.Key)... }>
+			<input type="hidden" name="_csrf" value={ p.CSRF }/>
+			<input type="hidden" name="ordinal" value={ strconv.Itoa(src.Ordinal) }/>
+			<input type="hidden" name="section_ordinals" value={ sectionOrdinalsCSV(src) }/>
+			<details class="cat-src-edit">
+				<summary class="cat-summary cat-summary-sub">Kaynak bilgileri</summary>
+				<div class="cat-src-body grid gap-3 md:grid-cols-3">
+					@textField("name", "Ad", src.Name)
+					@selectField("kind", "Tür", sourceKindOptions(), src.Kind, kindLabel)
+					@selectField("location_unit", "Konum birimi", locationUnitOptions(), src.LocationUnit, unitLabel)
+				</div>
+			</details>
+			<div class="cat-sections">
+				for _, sec := range src.Sections {
+					@sectionRow(p, src, sec)
+				}
+			</div>
+			<button type="submit" class="action-button mt-5 flex h-11 items-center justify-center gap-2 rounded-pill bg-ink px-6 text-body font-semibold text-card hover:bg-ink-hover focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:3px]">
+				@actionLabel("Kaydet", "Kaydediliyor…")
+			</button>
+		</form>
+	</section>
+}
+
+// sectionRow is one section as a disclosure: a summary line (index, name, range,
+// done count), opening to its editable fields and its units.
+templ sectionRow(p SourcesPage, src plan.SourceView, sec plan.SectionView) {
+	<details class="cat-sec">
+		<summary class="cat-summary">
+			<span class="cat-sec-index cn">{ strconv.Itoa(sec.Ordinal) }</span>
+			<span class="cat-sec-name">{ sectionTitle(sec) }</span>
+			<span class="cat-sec-meta">
+				if r := locRangeLabel(src.LocationUnit, sec.LocFrom, sec.LocTo); r != "" {
+					<span class="tnum">{ r }</span>
+					<span aria-hidden="true">·</span>
+				}
+				<span class="tnum">{ strconv.Itoa(len(sec.Units)) } { unitNoun(src) }</span>
+				@sectionDoneNote(p.sectionTotals(sec.ID))
+			</span>
+		</summary>
+		<div class="cat-sec-body">
+			<input type="hidden" name={ secFieldName(sec.Ordinal, "unit_ordinals") } value={ unitOrdinalsCSV(sec) }/>
+			<div class="grid gap-3 md:grid-cols-3">
+				@textField(secFieldName(sec.Ordinal, "name"), "Bölüm adı", sec.Name)
+				@numberField(secFieldName(sec.Ordinal, "loc_from"), "Konum başlangıcı", optIntValue(sec.LocFrom))
+				@numberField(secFieldName(sec.Ordinal, "loc_to"), "Konum bitişi", optIntValue(sec.LocTo))
+			</div>
+			if len(sec.Units) > 0 {
+				<details class="cat-units">
+					<summary class="cat-summary cat-summary-sub">Birimler ({ strconv.Itoa(len(sec.Units)) })</summary>
+					<div class="cat-units-body mt-2 space-y-2">
+						@unitHeaderRow()
+						for _, u := range sec.Units {
+							@unitFields(sec, u)
+						}
+					</div>
+				</details>
+			}
+		</div>
+	</details>
+}
+
+// progressFigures renders the done count and, for non-video sources, the D/Y/B
+// sums as calm figures (no badges, no bars). A video source shows done only.
+templ progressFigures(t plan.ProgressTotals, kind string) {
+	<dl class="cat-figures flex flex-wrap items-baseline gap-x-5 gap-y-1 text-body-small">
+		@reportFigure("Tamamlanan", strconv.Itoa(t.DoneCount))
+		if !isVideoKind(kind) {
+			@reportFigure("Doğru", strconv.Itoa(t.Correct))
+			@reportFigure("Yanlış", strconv.Itoa(t.Wrong))
+			@reportFigure("Boş", strconv.Itoa(t.Blank))
+		}
+	</dl>
+}
+
+// sectionDoneNote appends the done count to a section summary when any unit is
+// done; silent otherwise so unstarted sections stay quiet.
+templ sectionDoneNote(t plan.ProgressTotals) {
+	if t.DoneCount > 0 {
+		<span aria-hidden="true">·</span>
+		<span class="cat-sec-done tnum">{ strconv.Itoa(t.DoneCount) } tamamlandı</span>
+	}
+}
+
+// unitHeaderRow labels the unit editor's columns once, so the rows below carry
+// bare inputs instead of repeating four labels per unit.
+templ unitHeaderRow() {
+	<div class="cat-unit-head grid gap-2 md:grid-cols-4">
+		<span>Birim etiketi</span>
+		<span>No</span>
+		<span>Konum başlangıcı</span>
+		<span>Konum bitişi</span>
+	</div>
+}
+
+// unitFields is one study unit's editable row: label, number, location range.
+// Labels live in the header row; inputs carry aria-labels for assistive tech.
+templ unitFields(sec plan.SectionView, u plan.UnitView) {
+	<div class="grid gap-2 md:grid-cols-4">
+		@bareTextField(unitFieldName(sec.Ordinal, u.Ordinal, "label"), "Birim etiketi", u.Label)
+		@bareNumberField(unitFieldName(sec.Ordinal, u.Ordinal, "number"), "No", optIntValue(u.Number))
+		@bareNumberField(unitFieldName(sec.Ordinal, u.Ordinal, "loc_from"), "Konum başlangıcı", optIntValue(u.LocFrom))
+		@bareNumberField(unitFieldName(sec.Ordinal, u.Ordinal, "loc_to"), "Konum bitişi", optIntValue(u.LocTo))
+	</div>
+}
+
+// reportFigure is a calm label/value pair (no badge, no bar), shared with the
+// İlerleme page's unit figures.
+templ reportFigure(label string, value string) {
+	<div class="flex items-baseline gap-1.5">
+		<dt class="text-ink-3">{ label }</dt>
+		<dd class="tnum font-semibold text-ink">{ value }</dd>
+	</div>
+}
+
+// sectionTitle falls back to a plain "Bölüm N" when the section has no name.
+func sectionTitle(sec plan.SectionView) string {
+	if sec.Name != "" {
+		return sec.Name
+	}
+	return "Bölüm " + strconv.Itoa(sec.Ordinal)
+}
+
+// textField and numberField are the shared labelled inputs; the 44px height
+// keeps touch targets at the DESIGN.md minimum.
+templ textField(name string, label string, value string) {
+	<label class="block text-body-small text-ink-2">
+		{ label }
+		<input type="text" name={ name } value={ value } class="mt-1 h-11 w-full rounded-nav border border-line bg-ground px-3 text-body text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:1px]"/>
+	</label>
+}
+
+templ numberField(name string, label string, value string) {
+	<label class="block text-body-small text-ink-2">
+		{ label }
+		<input type="text" inputmode="numeric" name={ name } value={ value } class="mt-1 h-11 w-full rounded-nav border border-line bg-ground px-3 text-body tnum text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:1px]"/>
+	</label>
+}
+
+// bareTextField / bareNumberField are the unit-row inputs: no visible label (the
+// header row names the columns), an aria-label for assistive tech.
+templ bareTextField(name string, label string, value string) {
+	<input type="text" name={ name } value={ value } aria-label={ label } class="h-11 w-full rounded-nav border border-line bg-ground px-3 text-body text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:1px]"/>
+}
+
+templ bareNumberField(name string, label string, value string) {
+	<input type="text" inputmode="numeric" name={ name } value={ value } aria-label={ label } class="h-11 w-full rounded-nav border border-line bg-ground px-3 text-body tnum text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:1px]"/>
+}
+
+templ selectField(name string, label string, options []string, selected string, labeler func(string) string) {
+	<label class="block text-body-small text-ink-2">
+		{ label }
+		<select name={ name } class="mt-1 h-11 w-full rounded-nav border border-line bg-ground px-3 text-body text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:1px]">
+			for _, opt := range options {
+				<option value={ opt } selected?={ opt == selected }>{ labeler(opt) }</option>
+			}
+		</select>
+	</label>
+}

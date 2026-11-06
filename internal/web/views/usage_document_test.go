@@ -20,7 +20,7 @@ func TestUsageDocumentRenderersShareAllContent(t *testing.T) {
 	svc := plan.New(nil, clock.Fake{Current: time.Date(2030, 2, 4, 22, 30, 0, 0, time.UTC)})
 	guide := svc.AgentGuide(clock.Date{Year: 2031, Month: 7, Day: 20})
 	// Distinct values catch a second hard-coded catalog in either renderer.
-	guide.Books = []string{"kitap-ç"}
+	guide.SourceKinds = []string{"kitap-ç"}
 	guide.SessionKinds = []string{"tür-ğ"}
 	for _, key := range []string{"kullanim", "mcp", "api"} {
 		t.Run(key, func(t *testing.T) {

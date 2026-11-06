@@ -17,6 +17,7 @@ import (
 func TestStudyRESTContractAndLegacyWrites(t *testing.T) {
 	h, st := newAPI(t)
 	ctx := context.Background()
+	do(t, h, "POST", "/api/v1/sources", []byte(apidoc.ExampleSource), nil)
 	do(t, h, "PUT", "/api/v1/outline", []byte(apidoc.ExampleOutline), nil)
 	do(t, h, "PUT", "/api/v1/plan", []byte(apidoc.ExamplePlan), nil)
 	var spec struct {

@@ -18,15 +18,15 @@ type Phase struct {
 	EndDate   string // 'YYYY-MM-DD'
 }
 
-// TopicGroup is a named group of topics with an optional DGS question-weight
-// range. The plan references groups by id from sessions.
+// TopicGroup is a named group of topics with an optional question-weight range.
+// The plan references groups by id from sessions.
 type TopicGroup struct {
-	ID             int64
-	Key            string
-	Name           string
-	Ordinal        int
-	DGSQuestionMin *int
-	DGSQuestionMax *int
+	ID          int64
+	Key         string
+	Name        string
+	Ordinal     int
+	QuestionMin *int
+	QuestionMax *int
 }
 
 // ListPhases returns all phases ordered by ordinal.
@@ -94,7 +94,7 @@ func (s *Store) DeletePhaseByKey(ctx context.Context, q dbtx, key string) error 
 // ListTopicGroups returns all topic groups ordered by ordinal.
 func (s *Store) ListTopicGroups(ctx context.Context, q dbtx) ([]TopicGroup, error) {
 	rows, err := q.QueryContext(ctx, `
-		SELECT id, key, name, ordinal, dgs_question_min, dgs_question_max
+		SELECT id, key, name, ordinal, question_min, question_max
 		FROM topic_groups ORDER BY ordinal`)
 	if err != nil {
 		return nil, fmt.Errorf("store: query topic groups: %w", err)
@@ -104,7 +104,7 @@ func (s *Store) ListTopicGroups(ctx context.Context, q dbtx) ([]TopicGroup, erro
 	var groups []TopicGroup
 	for rows.Next() {
 		var g TopicGroup
-		if err := rows.Scan(&g.ID, &g.Key, &g.Name, &g.Ordinal, &g.DGSQuestionMin, &g.DGSQuestionMax); err != nil {
+		if err := rows.Scan(&g.ID, &g.Key, &g.Name, &g.Ordinal, &g.QuestionMin, &g.QuestionMax); err != nil {
 			return nil, fmt.Errorf("store: scan topic group: %w", err)
 		}
 		groups = append(groups, g)
@@ -119,9 +119,9 @@ func (s *Store) ListTopicGroups(ctx context.Context, q dbtx) ([]TopicGroup, erro
 func (s *Store) TopicGroupByKey(ctx context.Context, q dbtx, key string) (*TopicGroup, error) {
 	var g TopicGroup
 	err := q.QueryRowContext(ctx, `
-		SELECT id, key, name, ordinal, dgs_question_min, dgs_question_max
+		SELECT id, key, name, ordinal, question_min, question_max
 		FROM topic_groups WHERE key = ?`, key,
-	).Scan(&g.ID, &g.Key, &g.Name, &g.Ordinal, &g.DGSQuestionMin, &g.DGSQuestionMax)
+	).Scan(&g.ID, &g.Key, &g.Name, &g.Ordinal, &g.QuestionMin, &g.QuestionMax)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -134,9 +134,9 @@ func (s *Store) TopicGroupByKey(ctx context.Context, q dbtx, key string) (*Topic
 // InsertTopicGroup inserts g and sets g.ID.
 func (s *Store) InsertTopicGroup(ctx context.Context, q dbtx, g *TopicGroup) error {
 	res, err := q.ExecContext(ctx, `
-		INSERT INTO topic_groups (key, name, ordinal, dgs_question_min, dgs_question_max)
+		INSERT INTO topic_groups (key, name, ordinal, question_min, question_max)
 		VALUES (?, ?, ?, ?, ?)`,
-		g.Key, g.Name, g.Ordinal, g.DGSQuestionMin, g.DGSQuestionMax,
+		g.Key, g.Name, g.Ordinal, g.QuestionMin, g.QuestionMax,
 	)
 	if err != nil {
 		return fmt.Errorf("store: insert topic group: %w", err)
@@ -153,9 +153,9 @@ func (s *Store) InsertTopicGroup(ctx context.Context, q dbtx, g *TopicGroup) err
 // g.Key.
 func (s *Store) UpdateTopicGroupByKey(ctx context.Context, q dbtx, g TopicGroup) error {
 	if _, err := q.ExecContext(ctx, `
-		UPDATE topic_groups SET name = ?, ordinal = ?, dgs_question_min = ?, dgs_question_max = ?
+		UPDATE topic_groups SET name = ?, ordinal = ?, question_min = ?, question_max = ?
 		WHERE key = ?`,
-		g.Name, g.Ordinal, g.DGSQuestionMin, g.DGSQuestionMax, g.Key,
+		g.Name, g.Ordinal, g.QuestionMin, g.QuestionMax, g.Key,
 	); err != nil {
 		return fmt.Errorf("store: update topic group %s: %w", g.Key, err)
 	}

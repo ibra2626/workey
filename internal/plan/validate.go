@@ -58,9 +58,8 @@ func validateSavePlan(req SavePlanRequest) error {
 		if si.DurationMin <= 0 {
 			b.add(p+".duration_min", CodeInvalid, "duration_min must be greater than zero")
 		}
-		if !validKinds[si.Kind] {
-			b.add(p+".kind", CodeInvalid, "kind must be one of aksam, uzun_blok, deneme")
-		}
+		// kind is a free label since WKY-22: no enum gate. A blank or unknown
+		// kind is accepted; the screens special-case only the known constants.
 
 		if dateOK && validTime(si.StartTime) {
 			slot := si.slot()
@@ -91,29 +90,31 @@ func validateSavePlan(req SavePlanRequest) error {
 	return b.result()
 }
 
-// validateItem checks one book reference.
+// validateItem checks one catalog reference structurally, without touching the
+// store: a non-empty source key, positive ordinals, ordered ranges, and a unit
+// range only where a section is named. The catalog-reference checks (does the
+// source/section/unit exist) run in the service against the stored catalog.
 func validateItem(b *errBuilder, p string, it Item) {
-	if !validBooks[it.Book] {
-		b.add(p+".book", CodeInvalid, "book must be one of M1, M2, M3, G1, G2")
+	if it.SourceKey == "" {
+		b.add(p+".source_key", CodeRequired, "source_key is required")
 	}
-	if it.ChapterNo <= 0 {
-		b.add(p+".chapter_no", CodeInvalid, "chapter_no must be greater than zero")
+	if it.SectionOrdinal != nil && *it.SectionOrdinal < 1 {
+		b.add(p+".section_ordinal", CodeInvalid, "section_ordinal must be greater than zero")
 	}
-	if it.ChapterTitle == "" {
-		b.add(p+".chapter_title", CodeRequired, "chapter_title is required")
+	if (it.UnitFrom != nil || it.UnitTo != nil) && it.SectionOrdinal == nil {
+		b.add(p+".section_ordinal", CodeRequired, "section_ordinal is required when a unit range is given")
 	}
-	if it.PageFrom <= 0 {
-		b.add(p+".page_from", CodeInvalid, "page_from must be greater than zero")
+	if it.UnitFrom != nil && *it.UnitFrom < 1 {
+		b.add(p+".unit_from", CodeInvalid, "unit_from must be greater than zero")
 	}
-	if it.PageTo <= 0 {
-		b.add(p+".page_to", CodeInvalid, "page_to must be greater than zero")
+	if it.UnitTo != nil && *it.UnitTo < 1 {
+		b.add(p+".unit_to", CodeInvalid, "unit_to must be greater than zero")
 	}
-	if it.PageFrom > 0 && it.PageTo > 0 && it.PageFrom > it.PageTo {
-		b.add(p+".page_to", CodeRangeOrder, "page_to must not be before page_from")
+	validateOptionalRange(b, p, "unit", it.UnitFrom, it.UnitTo)
+	validateOptionalRange(b, p, "loc", it.LocFrom, it.LocTo)
+	if it.UnitFrom == nil && it.UnitTo == nil && it.LocFrom == nil && it.LocTo == nil {
+		b.add(p+".unit_from", CodeRequired, "an item needs a unit range or a location range")
 	}
-	validateOptionalRange(b, p, "konu", it.KonuFrom, it.KonuTo)
-	validateOptionalRange(b, p, "soru", it.SoruFrom, it.SoruTo)
-	validateOptionalRange(b, p, "antrenman", it.AntrenmanFrom, it.AntrenmanTo)
 }
 
 // validateOptionalRange checks a paired optional range: both set or both unset,
@@ -131,8 +132,77 @@ func validateOptionalRange(b *errBuilder, p, name string, from, to *int) {
 	}
 }
 
+// knownSet reports whether v is one of allowed.
+func knownSet(v string, allowed []string) bool {
+	for _, a := range allowed {
+		if v == a {
+			return true
+		}
+	}
+	return false
+}
+
+// validateSaveSource checks a source write structurally, without touching the
+// store: the source's own fields (key, name, kind and location_unit against their
+// closed sets), and each section and unit (required fields, positive and unique
+// ordinals, paired/ordered ranges). The catalog is replaced whole, so there is no
+// cross-source check here.
+func validateSaveSource(req SaveSourceRequest) error {
+	var b errBuilder
+
+	if req.Source.Key == "" {
+		b.add("source.key", CodeRequired, "key is required")
+	}
+	if req.Source.Name == "" {
+		b.add("source.name", CodeRequired, "name is required")
+	}
+	if !knownSet(req.Source.Kind, SourceKinds()) {
+		b.add("source.kind", CodeInvalid, "kind must be one of book, video, course, other")
+	}
+	if !knownSet(req.Source.LocationUnit, LocationUnits()) {
+		b.add("source.location_unit", CodeInvalid, "location_unit must be one of page, minute, lesson, other")
+	}
+
+	secOrdinals := map[int]int{}
+	for i, sec := range req.Sections {
+		p := fmt.Sprintf("sections[%d]", i)
+		if sec.Name == "" {
+			b.add(p+".name", CodeRequired, "name is required")
+		}
+		if sec.Ordinal < 1 {
+			b.add(p+".ordinal", CodeInvalid, "ordinal must be greater than zero")
+		} else if j, dup := secOrdinals[sec.Ordinal]; dup {
+			b.add(p+".ordinal", CodeDuplicate, fmt.Sprintf("duplicate ordinal also used by sections[%d]", j))
+		} else {
+			secOrdinals[sec.Ordinal] = i
+		}
+		validateOptionalRange(&b, p, "loc", sec.LocFrom, sec.LocTo)
+
+		unitOrdinals := map[int]int{}
+		for k, u := range sec.Units {
+			up := fmt.Sprintf("%s.units[%d]", p, k)
+			if u.Label == "" {
+				b.add(up+".label", CodeRequired, "label is required")
+			}
+			if u.Ordinal < 1 {
+				b.add(up+".ordinal", CodeInvalid, "ordinal must be greater than zero")
+			} else if j, dup := unitOrdinals[u.Ordinal]; dup {
+				b.add(up+".ordinal", CodeDuplicate, fmt.Sprintf("duplicate ordinal also used by sections[%d].units[%d]", i, j))
+			} else {
+				unitOrdinals[u.Ordinal] = k
+			}
+			if u.Number != nil && *u.Number < 1 {
+				b.add(up+".number", CodeInvalid, "number must be greater than zero")
+			}
+			validateOptionalRange(&b, up, "loc", u.LocFrom, u.LocTo)
+		}
+	}
+
+	return b.result()
+}
+
 // validateSaveOutline checks phases and topic groups without touching the store:
-// required fields, date ordering, DGS ranges and key uniqueness within the
+// required fields, date ordering, question ranges and key uniqueness within the
 // request.
 func validateSaveOutline(req SaveOutlineRequest) error {
 	var b errBuilder
@@ -176,11 +246,11 @@ func validateSaveOutline(req SaveOutlineRequest) error {
 			b.add(path+".name", CodeRequired, "name is required")
 		}
 		switch {
-		case g.DGSQuestionMin == nil && g.DGSQuestionMax == nil:
-		case g.DGSQuestionMin == nil || g.DGSQuestionMax == nil:
-			b.add(path+".dgs_question_min", CodeInvalid, "dgs_question_min and dgs_question_max must be set together")
-		case *g.DGSQuestionMin > *g.DGSQuestionMax:
-			b.add(path+".dgs_question_max", CodeRangeOrder, "dgs_question_max must not be before dgs_question_min")
+		case g.QuestionMin == nil && g.QuestionMax == nil:
+		case g.QuestionMin == nil || g.QuestionMax == nil:
+			b.add(path+".question_min", CodeInvalid, "question_min and question_max must be set together")
+		case *g.QuestionMin > *g.QuestionMax:
+			b.add(path+".question_max", CodeRangeOrder, "question_max must not be before question_min")
 		}
 	}
 

@@ -29,6 +29,15 @@
         ],
         "createdAt": "2026-10-26T11:42:38.921Z",
         "reason": "agent triage: detector reads h1/h2 before Tailwind CDN applies classes (reports h1 16px); rendered h1 is 28-44px vs 15px body"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "web/styles/input.css"
+        ],
+        "createdAt": "2026-11-05T14:20:42.354Z",
+        "reason": "Intentional nav active-state momentum marker: 3px rounded pill ::before with glow on the active rail item, not a card accent border; part of the user-approved colorful/animated İvme direction."
       }
     ]
   }

@@ -92,11 +92,11 @@ func (s *Service) applyTopicGroups(ctx context.Context, tx *sql.Tx, source Sourc
 	for _, in := range incoming {
 		seen[in.Key] = true
 		desired := store.TopicGroup{
-			Key:            in.Key,
-			Name:           in.Name,
-			Ordinal:        in.Ordinal,
-			DGSQuestionMin: in.DGSQuestionMin,
-			DGSQuestionMax: in.DGSQuestionMax,
+			Key:         in.Key,
+			Name:        in.Name,
+			Ordinal:     in.Ordinal,
+			QuestionMin: in.QuestionMin,
+			QuestionMax: in.QuestionMax,
 		}
 		ex, ok := byKey[in.Key]
 		if !ok {
@@ -257,8 +257,8 @@ func optionalJSON(v any) (*string, error) {
 func topicGroupEqual(a, b store.TopicGroup) bool {
 	return a.Name == b.Name &&
 		a.Ordinal == b.Ordinal &&
-		intPtrEqual(a.DGSQuestionMin, b.DGSQuestionMin) &&
-		intPtrEqual(a.DGSQuestionMax, b.DGSQuestionMax)
+		intPtrEqual(a.QuestionMin, b.QuestionMin) &&
+		intPtrEqual(a.QuestionMax, b.QuestionMax)
 }
 
 func phaseEqual(a, b store.Phase) bool {

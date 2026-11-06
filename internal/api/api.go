@@ -43,6 +43,9 @@ func (h *Handler) routes() http.Handler {
 		httpx.WriteJSON(w, http.StatusOK, h.svc.AgentGuide(h.examDate))
 	})
 	mux.HandleFunc("GET /api/v1/openapi.json", apidoc.ServeHTTP)
+	mux.HandleFunc("GET /api/v1/sources", h.getSources)
+	mux.HandleFunc("POST /api/v1/sources", h.saveSource)
+	mux.HandleFunc("POST /api/v1/units/{id}/result", h.setUnitResult)
 	mux.HandleFunc("GET /api/v1/plan", h.getPlan)
 	mux.HandleFunc("PUT /api/v1/plan", h.putPlan)
 	mux.HandleFunc("GET /api/v1/outline", h.getOutline)
@@ -122,6 +125,57 @@ func (h *Handler) putOutline(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, res)
 }
 
+// GET /api/v1/sources
+func (h *Handler) getSources(w http.ResponseWriter, r *http.Request) {
+	cat, err := h.svc.Sources(r.Context())
+	if err != nil {
+		writePlanError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, cat)
+}
+
+// POST /api/v1/sources  (body: plan.SaveSourceRequest; optional Idempotency-Key)
+// Create or replace one source (keyed by source.key) with its full ordered
+// sections and units. The service reconciles by ordinal, so a re-write keeps
+// unit ids and the user's unit progress.
+func (h *Handler) saveSource(w http.ResponseWriter, r *http.Request) {
+	var req plan.SaveSourceRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if key := r.Header.Get("Idempotency-Key"); key != "" {
+		req.IdempotencyKey = key
+	}
+	res, err := h.svc.SaveSource(r.Context(), plan.SourceAPI, req)
+	if err != nil {
+		writePlanError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, res)
+}
+
+// POST /api/v1/units/{id}/result  (body: done + optional doğru/yanlış/boş)
+// Mark a catalog unit done or undo it, independently of session completion. The
+// unit is addressed by the {id} path value; a unit_id in the body is ignored.
+func (h *Handler) setUnitResult(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "unit")
+	if !ok {
+		return
+	}
+	var req plan.UnitResultRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	req.UnitID = id
+	view, err := h.svc.SetUnitResult(r.Context(), plan.SourceAPI, req)
+	if err != nil {
+		writePlanError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, view)
+}
+
 // GET /api/v1/progress
 func (h *Handler) getProgress(w http.ResponseWriter, r *http.Request) {
 	prog, err := h.svc.Progress(r.Context(), h.examDate)
@@ -194,13 +248,18 @@ func (h *Handler) undoSession(w http.ResponseWriter, r *http.Request) {
 
 // --- helpers (parsing and error mapping only) ---
 
-// sessionID parses the {id} path value, writing a 422 and returning false when
-// it is not a positive integer.
+// sessionID parses the {id} path value for a session route.
 func sessionID(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	return pathID(w, r, "session")
+}
+
+// pathID parses the {id} path value, writing a 422 and returning false when it
+// is not a positive integer. label names the entity in the error message.
+func pathID(w http.ResponseWriter, r *http.Request, label string) (int64, bool) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil || id <= 0 {
 		httpx.WriteError(w, http.StatusUnprocessableEntity, httpx.Error{
-			Code: "validation_failed", Message: "invalid session id",
+			Code: "validation_failed", Message: "invalid " + label + " id",
 			Fields: []httpx.FieldDetail{{Path: "id", Code: plan.CodeInvalid, Message: "id must be a positive integer"}},
 		})
 		return 0, false

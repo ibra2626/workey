@@ -49,12 +49,16 @@ func (a *Auth) Handler() http.Handler {
 	mux.Handle("GET /hafta", a.requireAuth(http.HandlerFunc(a.screenWeek)))
 	mux.Handle("GET /ilerleme", a.requireAuth(http.HandlerFunc(a.screenProgress)))
 	mux.Handle("GET /plan", a.requireAuth(http.HandlerFunc(a.screenPlan)))
+	mux.Handle("GET /kaynaklar", a.requireAuth(http.HandlerFunc(a.screenSources)))
+	mux.Handle("POST /kaynaklar/{key}", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.saveSource))))
 	mux.Handle("POST /oturum/{id}/baslat", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.startStudy))))
 	mux.Handle("POST /oturum/{id}/birak", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.pauseStudy))))
 	mux.Handle("POST /oturum/{id}/tamamla", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.completeSession))))
 	mux.Handle("POST /oturum/{id}/geri-al", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.undoSession))))
+	mux.Handle("POST /oturum/{id}/birim/{unitID}/sonuc", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.todayUnitResult))))
 	mux.Handle("POST /hafta/oturum/{id}/tamamla", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.weekComplete))))
 	mux.Handle("POST /hafta/oturum/{id}/geri-al", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.weekUndo))))
+	mux.Handle("POST /hafta/oturum/{id}/birim/{unitID}/sonuc", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.weekUnitResult))))
 	mux.Handle("POST /cikis", a.requireAuth(a.requireCSRF(http.HandlerFunc(a.logout))))
 
 	cop := http.NewCrossOriginProtection()
@@ -155,14 +159,47 @@ func (a *Auth) screenProgress(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "sunucu hatası", http.StatusInternalServerError)
 		return
 	}
+	units, err := a.unitAggregate(r.Context())
+	if err != nil {
+		http.Error(w, "sunucu hatası", http.StatusInternalServerError)
+		return
+	}
 	p := views.ProgressPage{
 		Progress:   prog,
+		Units:      units,
 		DaysToExam: prog.DaysToExam,
 		HasExam:    a.examDate != (clock.Date{}),
 		CSRF:       csrfTokenFromRequest(r),
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = views.Progress(p).Render(r.Context(), w)
+}
+
+// unitAggregate sums the İlerleme unit-level summary from saved data only: the
+// total units in the catalog (the honest denominator) and the done-count and
+// D/Y/B sums over every source's progress.
+func (a *Auth) unitAggregate(ctx context.Context) (views.UnitAggregate, error) {
+	cat, err := a.svc.Sources(ctx)
+	if err != nil {
+		return views.UnitAggregate{}, err
+	}
+	var agg views.UnitAggregate
+	for _, src := range cat.Sources {
+		for _, sec := range src.Sections {
+			agg.TotalUnits += len(sec.Units)
+		}
+	}
+	srcProg, err := a.svc.SourceProgress(ctx)
+	if err != nil {
+		return views.UnitAggregate{}, err
+	}
+	for _, t := range srcProg {
+		agg.DoneCount += t.DoneCount
+		agg.Correct += t.Correct
+		agg.Wrong += t.Wrong
+		agg.Blank += t.Blank
+	}
+	return agg, nil
 }
 
 // screenToday renders the Bugün screen for the clock's current date.
@@ -226,6 +263,84 @@ func (a *Auth) setSessionDone(w http.ResponseWriter, r *http.Request, done bool)
 	_ = views.TodayMain(p).Render(r.Context(), w)
 }
 
+// todayUnitResult marks one of a session's units done/undone from Bugün (source
+// web), independently of the session's own completion. An htmx request gets the
+// swapped Bugün content; a plain POST redirects back to Bugün.
+func (a *Auth) todayUnitResult(w http.ResponseWriter, r *http.Request) {
+	if !a.applyUnitResult(w, r) {
+		return
+	}
+	if r.Header.Get("HX-Request") == "" {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	p, err := a.buildTodayPage(r.Context(), csrfTokenFromRequest(r))
+	if err != nil {
+		http.Error(w, "sunucu hatası", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = views.TodayMain(p).Render(r.Context(), w)
+}
+
+// weekUnitResult marks one of a session's units done/undone from Hafta. The
+// viewed week comes from the "tarih" form field so the swap (or the no-JS
+// redirect) returns to the same week.
+func (a *Auth) weekUnitResult(w http.ResponseWriter, r *http.Request) {
+	if !a.applyUnitResult(w, r) {
+		return
+	}
+	date := a.svc.TodayDate()
+	if v := r.FormValue("tarih"); v != "" {
+		if d, ok := plan.ParseDate(v); ok {
+			date = d
+		}
+	}
+	p, err := a.buildWeekPage(r.Context(), date, csrfTokenFromRequest(r))
+	if err != nil {
+		http.Error(w, "sunucu hatası", http.StatusInternalServerError)
+		return
+	}
+	if r.Header.Get("HX-Request") == "" {
+		http.Redirect(w, r, "/hafta?tarih="+p.Week.Start, http.StatusSeeOther)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = views.WeekMain(p).Render(r.Context(), w)
+}
+
+// applyUnitResult parses a per-unit marking form and calls SetUnitResult (source
+// web). It writes the error response and returns false on any failure; the
+// caller renders the refreshed screen on success. D/Y/B are read only when the
+// unit is being marked done; the service rejects D/Y/B on a video unit.
+func (a *Auth) applyUnitResult(w http.ResponseWriter, r *http.Request) bool {
+	unitID, err := strconv.ParseInt(r.PathValue("unitID"), 10, 64)
+	if err != nil {
+		http.Error(w, "geçersiz birim", http.StatusBadRequest)
+		return false
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "istek okunamadı", http.StatusBadRequest)
+		return false
+	}
+	req := plan.UnitResultRequest{UnitID: unitID, Done: r.PostFormValue("done") == "true"}
+	if req.Done {
+		correct, e1 := formOptInt(r.PostFormValue("correct"))
+		wrong, e2 := formOptInt(r.PostFormValue("wrong"))
+		blank, e3 := formOptInt(r.PostFormValue("blank"))
+		if e1 != nil || e2 != nil || e3 != nil {
+			http.Error(w, "geçersiz değer", http.StatusUnprocessableEntity)
+			return false
+		}
+		req.Correct, req.Wrong, req.Blank = correct, wrong, blank
+	}
+	if _, err := a.svc.SetUnitResult(r.Context(), plan.SourceWeb, req); err != nil {
+		http.Error(w, "işlem tamamlanamadı", http.StatusUnprocessableEntity)
+		return false
+	}
+	return true
+}
+
 // buildTodayPage assembles the Bugün view model from the plan read models: the
 // day itself, this week's figures and the exam countdown. The service has
 // already derived every state and notation string.
@@ -263,7 +378,40 @@ func (a *Auth) buildTodayPage(ctx context.Context, csrf string) (views.TodayPage
 	if err != nil {
 		return views.TodayPage{}, err
 	}
+	if err := a.svc.LoadUnitRows(ctx, daySessionPtrs(day)); err != nil {
+		return views.TodayPage{}, err
+	}
 	return p, nil
+}
+
+// daySessionPtrs collects pointers to every SessionView a Bugün render may show
+// units for, so LoadUnitRows can fill them in place.
+func daySessionPtrs(d *plan.DayView) []*plan.SessionView {
+	var out []*plan.SessionView
+	for i := range d.Sessions {
+		out = append(out, &d.Sessions[i])
+	}
+	if d.ActiveStudy != nil {
+		out = append(out, d.ActiveStudy)
+	}
+	if d.LatestPausedStudy != nil {
+		out = append(out, d.LatestPausedStudy)
+	}
+	if d.Tomorrow != nil {
+		out = append(out, d.Tomorrow)
+	}
+	return out
+}
+
+// weekSessionPtrs collects pointers to every session in a WeekView.
+func weekSessionPtrs(w *plan.WeekView) []*plan.SessionView {
+	var out []*plan.SessionView
+	for i := range w.Days {
+		for j := range w.Days[i].Sessions {
+			out = append(out, &w.Days[i].Sessions[j])
+		}
+	}
+	return out
 }
 
 // Old forms predate study records and therefore observed version zero. They
@@ -381,6 +529,9 @@ func (a *Auth) buildWeekPage(ctx context.Context, date clock.Date, csrf string) 
 	if start, ok := plan.ParseDate(wk.Start); ok {
 		p.PrevDate = shiftDays(start, -7).String()
 		p.NextDate = shiftDays(start, 7).String()
+	}
+	if err := a.svc.LoadUnitRows(ctx, weekSessionPtrs(wk)); err != nil {
+		return views.WeekPage{}, err
 	}
 	return p, nil
 }

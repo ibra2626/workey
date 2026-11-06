@@ -1,5 +1,5 @@
 {
-  "_comment": "SAMPLE DATA — not a real plan. Week 1 (26 Ekim – 1 Kasım 2026) from the design mockup (design/directions/04-antrenman-gunlugu.html): four weekday evening blocks and a Saturday long block. The real plan is written by the AI assistant through the MCP/API interface.",
+  "_comment": "SAMPLE DATA — not a real plan. Week 1 (26 Ekim – 1 Kasım 2026) from the design mockup (design/directions/04-antrenman-gunlugu.html): four weekday evening blocks and a Saturday long block. Items reference the catalog source 'M1' by key, a section by ordinal, and a page (location) range; Wednesday also names an Antrenman unit range. The real plan and its catalog are written by the AI assistant through the MCP/API interface.",
   "from": "2026-10-26",
   "to": "2026-11-01",
   "sessions": [
@@ -10,7 +10,7 @@
       "kind": "aksam",
       "topic_group": "temel-kavramlar",
       "items": [
-        { "book": "M1", "chapter_no": 1, "chapter_title": "Temel kavramlar", "page_from": 1, "page_to": 22 }
+        { "source_key": "M1", "section_ordinal": 1, "loc_from": 1, "loc_to": 22 }
       ]
     },
     {
@@ -20,7 +20,7 @@
       "kind": "aksam",
       "topic_group": "temel-kavramlar",
       "items": [
-        { "book": "M1", "chapter_no": 2, "chapter_title": "Sayı basamakları", "page_from": 23, "page_to": 40 }
+        { "source_key": "M1", "section_ordinal": 2, "loc_from": 23, "loc_to": 40 }
       ]
     },
     {
@@ -31,17 +31,12 @@
       "topic_group": "uslu-koklu-carpanlar",
       "items": [
         {
-          "book": "M1",
-          "chapter_no": 3,
-          "chapter_title": "Üslü ifadeler",
-          "page_from": 41,
-          "page_to": 58,
-          "konu_from": 41,
-          "konu_to": 44,
-          "soru_from": 45,
-          "soru_to": 58,
-          "antrenman_from": 1,
-          "antrenman_to": 3
+          "source_key": "M1",
+          "section_ordinal": 3,
+          "unit_from": 1,
+          "unit_to": 3,
+          "loc_from": 41,
+          "loc_to": 58
         }
       ]
     },
@@ -52,7 +47,7 @@
       "kind": "aksam",
       "topic_group": "uslu-koklu-carpanlar",
       "items": [
-        { "book": "M1", "chapter_no": 4, "chapter_title": "Köklü ifadeler", "page_from": 59, "page_to": 76 }
+        { "source_key": "M1", "section_ordinal": 4, "loc_from": 59, "loc_to": 76 }
       ]
     },
     {
@@ -61,8 +56,8 @@
       "duration_min": 180,
       "kind": "uzun_blok",
       "items": [
-        { "book": "M1", "chapter_no": 2, "chapter_title": "Sayı basamakları", "page_from": 23, "page_to": 40 },
-        { "book": "M1", "chapter_no": 1, "chapter_title": "Karma tekrar (1–4)", "page_from": 1, "page_to": 76 }
+        { "source_key": "M1", "section_ordinal": 2, "loc_from": 23, "loc_to": 40 },
+        { "source_key": "M1", "loc_from": 1, "loc_to": 76 }
       ]
     }
   ]

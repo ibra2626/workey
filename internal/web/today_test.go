@@ -29,6 +29,11 @@ func seedWeek(t *testing.T, st *store.Store) {
 	t.Helper()
 	ctx := context.Background()
 	svc := plan.New(st, clock.Fake{Current: timeAt(seedClock)})
+	var source plan.SaveSourceRequest
+	loadFixture(t, "sample-sources.json", &source)
+	if _, err := svc.SaveSource(ctx, plan.SourceAPI, source); err != nil {
+		t.Fatalf("SaveSource: %v", err)
+	}
 	var outline plan.SaveOutlineRequest
 	loadFixture(t, "sample-outline.json", &outline)
 	if _, err := svc.SaveOutline(ctx, plan.SourceAPI, outline); err != nil {
@@ -84,14 +89,14 @@ func TestBugunRendersTonightsSession(t *testing.T) {
 	seedWeek(t, st)
 	body := getAuthed(t, a, "/")
 
-	// Turkish date heading and the exact book notation and page range.
+	// Turkish date heading and the exact catalog notation. The v1 konu/soru page
+	// splits no longer exist in the catalog item; the session shows one exact,
+	// unit-prefixed reference (source·section + location range) via sv.Notation.
 	for _, want := range []string{
 		"Çarşamba, 28 Ekim", // Turkish day heading
-		"M1·3",              // book·chapter, middle dot U+00B7
-		"Üslü ifadeler",     // chapter title
-		"s. 41–58",          // page range with en dash U+2013
-		"s. 41–44",          // konu split
-		"Antr. 1–3",         // antrenman range
+		"M1·3",              // source·section, middle dot U+00B7
+		"Üslü ifadeler",     // section title
+		"s. 41–58",          // location range with en dash U+2013
 		"Seansı tamamla",    // action wording, distinct from the completed state
 	} {
 		if !strings.Contains(body, want) {
@@ -201,7 +206,7 @@ func TestBugunShowsEverySourceInLongBlock(t *testing.T) {
 	seedWeek(t, st)
 	a.svc = plan.New(st, clock.Fake{Current: timeAt(clock.Date{Year: 2026, Month: 10, Day: 31})})
 	body := getAuthed(t, a, "/")
-	for _, want := range []string{"Seans kaynakları", "M1·2, s. 23–40", "M1·1, s. 1–76", "Karma tekrar (1–4)"} {
+	for _, want := range []string{"Seans kaynakları", "M1·2, s. 23–40", "M1, s. 1–76", "Bölme ve bölünebilme"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("long block missing %q", want)
 		}

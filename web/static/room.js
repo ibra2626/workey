@@ -557,6 +557,45 @@
     }));
   }
 
+  // The current stage's state cell shows a live elapsed ring: overall session
+  // progress (minute / total), tinted by the active stage's zone colour and
+  // breathing quietly. Updated in place so the fill transitions and the breath
+  // never restarts; rebuilt only when a row first becomes current.
+  function renderCurrent(cell, minute, total, color) {
+    const frac = total > 0 ? Math.max(0, Math.min(1, minute / total)) : 0;
+    let ring = cell.querySelector(".room-ring");
+    if (!ring) {
+      const NS = "http://www.w3.org/2000/svg";
+      ring = document.createElement("div");
+      ring.className = "room-ring";
+      const svg = document.createElementNS(NS, "svg");
+      svg.setAttribute("class", "room-ring-svg");
+      svg.setAttribute("viewBox", "0 0 44 44");
+      svg.setAttribute("aria-hidden", "true");
+      for (const name of ["room-ring-track", "room-ring-fill"]) {
+        const c = document.createElementNS(NS, "circle");
+        c.setAttribute("class", name);
+        c.setAttribute("cx", "22");
+        c.setAttribute("cy", "22");
+        c.setAttribute("r", "19");
+        if (name === "room-ring-fill") c.setAttribute("pathLength", "1");
+        svg.append(c);
+      }
+      const num = document.createElement("span");
+      num.className = "room-ring-min cn";
+      ring.append(svg, num);
+      const unit = document.createElement("span");
+      unit.className = "room-ring-unit";
+      cell.replaceChildren(ring, unit);
+    }
+    ring.style.setProperty("--ring", color);
+    const prog = ring.querySelector(".room-ring-fill");
+    prog.style.stroke = color;
+    prog.style.strokeDashoffset = String(1 - frac);
+    ring.querySelector(".room-ring-min").textContent = String(minute);
+    cell.querySelector(".room-ring-unit").textContent = "dk / " + total;
+  }
+
   function update() {
     if (!room) return;
     const total = segments.reduce((sum, seg) => sum + seg.min, 0);
@@ -570,6 +609,8 @@
     room.querySelectorAll("[data-room-seg]").forEach((row, i) => {
       const state = over || i < index ? "past" : i === index ? "current" : "next";
       row.dataset.state = state;
+      const bar = row.querySelector(".room-step-bar");
+      if (bar) bar.style.boxShadow = state === "current" ? "0 0 12px -2px " + (segments[i].fill || "var(--color-accent)") : "";
       const now = row.querySelector("[data-room-now]");
       if (now) now.hidden = state !== "current";
       const cell = row.querySelector("[data-room-state]");
@@ -577,7 +618,7 @@
         if (state === "past") {
           stateText(cell, [{ tag: "svg", check: true }, "Bitti"]);
         } else if (state === "current") {
-          stateText(cell, [{ tag: "span", className: "cn", text: String(minute) }, "dk / " + total]);
+          renderCurrent(cell, minute, total, segments[i].fill || "var(--color-accent)");
         } else {
           stateText(cell, [Math.max(0, start - minute) + " dk sonra"]);
         }

@@ -175,7 +175,7 @@ func apiSections() []UsageBlock {
 		paragraph("Workey’in .env dosyasındaki WORKEY_API_TOKEN değerini PowerShell 7 komutunun gizli girişine girin. Tokenı kod örneğine veya URL’ye yazmayın."),
 	}, first.Children...)
 	write := namedSection("read-write", "Planı okuyun ve yazın",
-		paragraph("Önce ajan rehberi → mevcut outline → ilgili from–to aralığının planı → ilerleme sırasıyla okuyun. Korunacak faz, grup ve açık seansları tüm kitap referanslarıyla yazma gövdesine dahil edin."),
+		paragraph("Önce ajan rehberi → mevcut outline → ilgili from–to aralığının planı → ilerleme sırasıyla okuyun. Korunacak faz, grup ve açık seansları tüm kaynak referanslarıyla yazma gövdesine dahil edin."),
 		examples[1], examples[2],
 		paragraph("Dikkat: outline faz ve grupların, plan ise seçilen aralıktaki başlanmamış açık seansların tam listesini değiştirir. Listede bulunmayan başlanmamış açık seanslar silinir; korunacak kayıtları dahil edin. Geçmiş, tamamlanmış ve başlanmış kayıtlar korunur; başlanmış seansın değişikliği skipped reason=started döner."),
 		examples[3],
@@ -205,7 +205,7 @@ Invoke-RestMethod "$base/progress" -Headers $headers`, "powershell", ""),
 		usageSection("2. Faz isteği — temsili veri", []string{"PUT /api/v1/outline. Aşağıdaki tarihler ve sayfalar yalnızca sözleşme örneğidir. Gerçek planı göndermeden önce mevcut kayıtları okuyun ve korunacak kayıtları dahil edin. Yanıt, phases ve topic_groups için created/updated/deleted/unchanged anahtar listelerini içerir."}, apidoc.ExampleOutline, "json", ""),
 		usageSection("3. Plan isteği — temsili veri", []string{
 			"PUT /api/v1/plan. from/to dahil aralık; sessions tam listedir. Her seans date, start_time, pozitif duration_min, kind ve en az bir items kaydı taşır. topic_group ve makeup_of isteğe bağlıdır.",
-			"Her item: book, pozitif chapter_no, chapter_title, pozitif page_from/page_to. Bitiş başlangıçtan küçük olamaz. İsteğe bağlı konu_from/to, soru_from/to, antrenman_from/to çift halinde gönderilir. Bu isteğe bağlı aralıkların mevcut doğrulaması yalnızca çift bulunmasını ve sıralamayı denetler.",
+			"Her item kaynak kataloğuna referans verir: zorunlu source_key (kaynağın anahtarı); isteğe bağlı section_ordinal (kaynak içindeki bölüm sırası); isteğe bağlı unit_from/unit_to (bölüm içindeki 1 tabanlı birim aralığı) ve/veya loc_from/loc_to (kaynağın konum biriminde ham aralık: sayfa/dakika/ders…). Bitiş başlangıçtan küçük olamaz. Kaynak, bölüm ve birimler önce get_sources eşdeğeri GET/POST /api/v1/sources ile yazılır; item yalnızca referans tutar, konu veya soru metni taşımaz.",
 			"Sabit tarihli örneği bugünün gerçek planı olarak göndermeyin. Geçmiş tarihler skipped döner. Tüm alanların şemaları indirilebilir OpenAPI belgesindedir.",
 		}, apidoc.ExamplePlan, "json", ""),
 		usageSection("4. Yazma ve tekrar deneme", []string{

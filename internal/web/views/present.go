@@ -68,10 +68,40 @@ type WeekPage struct {
 // ProgressPage is the İlerleme screen model.
 type ProgressPage struct {
 	Progress   *plan.ProgressView
+	Units      UnitAggregate // unit-level done + D/Y/B over the whole catalog
 	DaysToExam int
 	HasExam    bool
 	ExamFull   string // "18 Temmuz 2027" for the rail
 	CSRF       string
+}
+
+// UnitAggregate is the İlerleme unit-level summary: units marked done out of the
+// units in the catalog, and the D/Y/B sums over the done units. Every figure is
+// saved data — no hard-coded total — so the denominators stay honest.
+type UnitAggregate struct {
+	DoneCount  int
+	TotalUnits int
+	Correct    int
+	Wrong      int
+	Blank      int
+}
+
+// Answered is the total questions reported across done units (D+Y+B).
+func (u UnitAggregate) Answered() int { return u.Correct + u.Wrong + u.Blank }
+
+// HasUnits reports whether the catalog has any unit to summarise.
+func (u UnitAggregate) HasUnits() bool { return u.TotalUnits > 0 }
+
+// DonePct is the done-unit share of the catalog, 0–100 (0 when empty).
+func (u UnitAggregate) DonePct() int {
+	if u.TotalUnits <= 0 {
+		return 0
+	}
+	p := int(math.Round(float64(u.DoneCount) / float64(u.TotalUnits) * 100))
+	if p > 100 {
+		p = 100
+	}
+	return p
 }
 
 // --- session interval profile -------------------------------------------
@@ -99,8 +129,8 @@ func sessionProfile(sv plan.SessionView) []zoneBlock {
 		soru := sv.DurationMin * 5 / 9
 		yanlis := sv.DurationMin - konu - soru
 		return []zoneBlock{
-			{Label: "Konu", Pages: konuPages(sv), Duration: dk(konu), Fill: "var(--color-z1)", Flex: konu, HeightPct: 43},
-			{Label: "Soru", Pages: soruPages(sv), Duration: dk(soru), Fill: "var(--color-z3)", Flex: soru, HeightPct: 92},
+			{Label: "Konu", Duration: dk(konu), Fill: "var(--color-z1)", Flex: konu, HeightPct: 43},
+			{Label: "Soru", Duration: dk(soru), Fill: "var(--color-z3)", Flex: soru, HeightPct: 92},
 			{Label: "Yanlış defteri", Duration: dk(yanlis), Fill: "var(--color-z2)", Flex: yanlis, HeightPct: 64},
 		}
 	}
@@ -113,31 +143,9 @@ func sessionProfile(sv plan.SessionView) []zoneBlock {
 	}
 }
 
-// konuPages renders the konu page span of a session from its items' konu
-// splits, e.g. "s. 41–44"; "" when no item carries a konu split.
-func konuPages(sv plan.SessionView) string {
-	if from, to, ok := spanOf(sv.Items, func(it plan.Item) (*int, *int) { return it.KonuFrom, it.KonuTo }); ok {
-		return "s. " + numSpan(from, to)
-	}
-	return ""
-}
-
-// soruPages renders the soru page span and antrenman range, e.g.
-// "s. 45–58, Antr. 1–3"; "" when nothing is known.
-func soruPages(sv plan.SessionView) string {
-	var parts []string
-	if from, to, ok := spanOf(sv.Items, func(it plan.Item) (*int, *int) { return it.SoruFrom, it.SoruTo }); ok {
-		parts = append(parts, "s. "+numSpan(from, to))
-	}
-	if from, to, ok := spanOf(sv.Items, func(it plan.Item) (*int, *int) { return it.AntrenmanFrom, it.AntrenmanTo }); ok {
-		parts = append(parts, "Antr. "+numSpan(from, to))
-	}
-	return strings.Join(parts, ", ")
-}
-
 // spanOf returns the min-from and max-to over the items whose selected pair of
 // optional bounds is present, and false when none is.
-func spanOf(items []plan.Item, pick func(plan.Item) (*int, *int)) (from, to int, ok bool) {
+func spanOf(items []plan.ItemView, pick func(plan.ItemView) (*int, *int)) (from, to int, ok bool) {
 	for _, it := range items {
 		f, t := pick(it)
 		if f == nil || t == nil {
@@ -180,38 +188,106 @@ func firstSession(d *plan.DayView) plan.SessionView {
 	return d.Sessions[0]
 }
 
-// chapterRef renders a session's leading book·chapter reference, e.g. "M1·3",
-// from its first item.
+// chapterRef renders a session's leading source·section reference, e.g. "M1·3",
+// from its first item (source key, with the section ordinal when present).
 func chapterRef(sv plan.SessionView) string {
 	if len(sv.Items) == 0 {
 		return ""
 	}
-	return plan.Ref(sv.Items[0])
+	return itemHead(sv.Items[0])
 }
 
-// chapterTitle returns the first item's chapter title.
+// chapterTitle returns the first item's section name, falling back to its
+// source name when the item names no section.
 func chapterTitle(sv plan.SessionView) string {
 	if len(sv.Items) == 0 {
 		return ""
 	}
-	return sv.Items[0].ChapterTitle
+	return itemTitle(sv.Items[0])
 }
 
-// chapterBook returns the full book name behind the first item's book code.
+// chapterBook returns the first item's source name.
 func chapterBook(sv plan.SessionView) string {
 	if len(sv.Items) == 0 {
 		return ""
 	}
-	return bookName(sv.Items[0].Book)
+	return sv.Items[0].SourceName
 }
 
-// headPages renders the session's overall page span, e.g. "s. 41–58", across
-// all its items.
+// headPages renders the session's overall location span across its items, e.g.
+// "41–58". The location unit is resolved in sv.Notation, so the view layer
+// renders the bare numeric span here.
 func headPages(sv plan.SessionView) string {
-	if from, to, ok := spanOf(sv.Items, func(it plan.Item) (*int, *int) { return &it.PageFrom, &it.PageTo }); ok {
-		return "s. " + numSpan(from, to)
+	if from, to, ok := spanOf(sv.Items, func(it plan.ItemView) (*int, *int) { return it.LocFrom, it.LocTo }); ok {
+		return numSpan(from, to)
 	}
 	return ""
+}
+
+// itemHead renders one item's source·section lead, e.g. "M1·3" or "M1".
+func itemHead(it plan.ItemView) string {
+	if it.SectionOrdinal != nil {
+		return it.SourceKey + middleDot + strconv.Itoa(*it.SectionOrdinal)
+	}
+	return it.SourceKey
+}
+
+// itemTitle returns an item's section name, or its source name when the item
+// names no section.
+func itemTitle(it plan.ItemView) string {
+	if it.SectionName != "" {
+		return it.SectionName
+	}
+	return it.SourceName
+}
+
+// itemRef renders one item's canonical reference through the plan formatter,
+// e.g. "M1·3, Antrenman 1–3". The location unit is left empty so a location
+// range prints as a bare span (the prefixed form lives in sv.Notation).
+func itemRef(it plan.ItemView) string {
+	return plan.FormatRef(plan.ItemRef{
+		SourceKey:      it.SourceKey,
+		SectionOrdinal: it.SectionOrdinal,
+		Units:          it.Units,
+		LocFrom:        it.LocFrom,
+		LocTo:          it.LocTo,
+	})
+}
+
+// itemNotations splits the session's canonical notation into its per-item
+// references. The service built sv.Notation with the one formatter, joining the
+// items with " · " (space–middle-dot–space, distinct from the prefix-less dot
+// inside a head like "M1·3"), so this recovers each item's exact, unit-prefixed
+// notation without re-deriving it in the view layer.
+func itemNotations(sv plan.SessionView) []string {
+	if sv.Notation == "" {
+		return nil
+	}
+	return strings.Split(sv.Notation, " "+middleDot+" ")
+}
+
+// itemNotation returns the i-th item's exact notation, falling back to the
+// bare view-layer reference when the split does not line up with the items.
+func itemNotation(sv plan.SessionView, i int) string {
+	if ns := itemNotations(sv); i >= 0 && i < len(ns) {
+		return ns[i]
+	}
+	if i >= 0 && i < len(sv.Items) {
+		return itemRef(sv.Items[i])
+	}
+	return ""
+}
+
+// itemLabel renders the i-th item for a session's source list: its exact
+// notation and section title, e.g. "M1·2, s. 23–40 · Karma tekrar (1–4)".
+func itemLabel(sv plan.SessionView, i int) string {
+	label := itemNotation(sv, i)
+	if i >= 0 && i < len(sv.Items) {
+		if t := itemTitle(sv.Items[i]); t != "" {
+			label += " " + middleDot + " " + t
+		}
+	}
+	return label
 }
 
 // tomorrowLine renders the "Yarın" sub-line: "s. 59–76 · 20:30 · 90 dk".
@@ -226,25 +302,6 @@ func tomorrowLine(sv plan.SessionView) string {
 
 // middleDot is U+00B7, the separator joining a session's meta fields.
 const middleDot = "·"
-
-// bookName maps a book code to its full title for the book line under a chapter
-// (e.g. "M1" → "Antrenmanlarla Matematik 1"). Unknown codes render as the code.
-func bookName(code string) string {
-	switch code {
-	case "M1":
-		return "Antrenmanlarla Matematik 1"
-	case "M2":
-		return "Antrenmanlarla Matematik 2"
-	case "M3":
-		return "Antrenmanlarla Matematik 3"
-	case "G1":
-		return "Antrenmanlarla Geometri 1"
-	case "G2":
-		return "Antrenmanlarla Geometri 2"
-	default:
-		return code
-	}
-}
 
 // axisTicks returns the time-axis labels under a session profile: every 30
 // minutes from the start to the end for an akşam session, or just the start and
@@ -465,10 +522,10 @@ func rowMeta(sv plan.SessionView) string {
 	return pages + " " + middleDot + " " + detail
 }
 
-// pagesPlain renders a session's page span without the "s." prefix, for the
-// Hafta table "Sayfa" column, e.g. "41–58".
+// pagesPlain renders a session's location span for the Hafta table column,
+// e.g. "41–58" (the location unit is carried by sv.Notation).
 func pagesPlain(sv plan.SessionView) string {
-	if from, to, ok := spanOf(sv.Items, func(it plan.Item) (*int, *int) { return &it.PageFrom, &it.PageTo }); ok {
+	if from, to, ok := spanOf(sv.Items, func(it plan.ItemView) (*int, *int) { return it.LocFrom, it.LocTo }); ok {
 		return numSpan(from, to)
 	}
 	return ""
@@ -580,21 +637,13 @@ func capitalFirst(s string) string {
 
 // --- progress strip ------------------------------------------------------
 
-// stripCell is one column of the 38-week plan strip: a base fill (Phase Mist in
-// the current phase, Hairline later) with a Forest-Ink overlay for the done
-// fraction.
-type stripCell struct {
-	BaseFill string
-	InkPct   int
-}
-
 // dgsLabel renders a topic group's DGS question weight, e.g. "8–10 soru" (never
 // abbreviated "s."); "" when the group carries no weight.
 func dgsLabel(gp plan.GroupProgress) string {
-	if gp.DGSMin == nil || gp.DGSMax == nil {
+	if gp.QuestionMin == nil || gp.QuestionMax == nil {
 		return ""
 	}
-	return numSpan(*gp.DGSMin, *gp.DGSMax) + " soru"
+	return numSpan(*gp.QuestionMin, *gp.QuestionMax) + " soru"
 }
 
 // currentPhaseRange returns the first and last plan week of the current phase,
@@ -624,18 +673,125 @@ func phaseRangeLabel(v *plan.ProgressView) string {
 	return phaseShort(v.CurrentPhase) + " " + middleDot + " H" + strconv.Itoa(first) + enDash + "H" + strconv.Itoa(last)
 }
 
-// progressStrip builds the 38 columns: the current phase's weeks sit on Phase
-// Mist, later phases on Hairline; each column shows its done fraction in ink.
-func progressStrip(v *plan.ProgressView) []stripCell {
-	out := make([]stripCell, 0, len(v.Strip))
-	for _, c := range v.Strip {
-		base := "var(--color-line)"
-		if c.PhaseName != "" && c.PhaseName == v.CurrentPhase {
-			base = "var(--color-z1-soft)"
-		}
-		out = append(out, stripCell{BaseFill: base, InkPct: int(math.Round(c.DoneFraction * 100))})
+// streakStatus renders the honest, no-blame line under the İvme meter. A broken
+// streak is never scolded: it invites starting again today. A rest day keeps the
+// run without demanding work.
+func streakStatus(v *plan.ProgressView) string {
+	switch {
+	case v.Streak > 0 && v.StudiedToday:
+		return "Bugün tamamlandı. İvme sürüyor."
+	case v.Streak > 0 && v.StudyDayToday:
+		return "Bugünü tamamla, seriyi sürdür."
+	case v.Streak > 0:
+		return "Bugün dinlenme. Seri korunuyor."
+	case v.StudyDayToday:
+		return "Bugün başla, ivmeni kur."
+	default:
+		return "Seri henüz başlamadı."
 	}
-	return out
+}
+
+// --- summit road ("zirveye giden yol") -----------------------------------
+
+// summitRoad is the geometry of the İlerleme ascending road: a climbing ground
+// line over the 38 plan weeks to the exam summit, per-week effort studs whose
+// height is the week's real done fraction (the done-ledger ink), a momentum
+// ribbon for the distance travelled in time, phase-boundary milestones and the
+// current-week marker. Every figure is the honest Strip data — nothing here is
+// invented. All coordinates live in the fixed viewBox (W×H).
+type summitRoad struct {
+	W, H       int
+	Ground     string // climbing polyline "x,y x,y …"
+	Base       string // closed mountain polygon under the ground line
+	Ribbon     string // travelled-area polygon (weeks up to the current one)
+	HasRibbon  bool
+	Studs      []roadStud // per-week effort block
+	Milestones []roadMark // phase-boundary dots
+	Summit     roadMark   // final week (exam peak)
+	Marker     *roadMark  // current week, nil outside the plan
+	ExamLabel  string
+	Aria       string
+}
+
+// roadStud is one week's effort block, rising from the road by the done share.
+type roadStud struct{ X, Y, H int }
+
+// roadMark is a point on the road (milestone, summit or the current marker).
+type roadMark struct{ X, Y int }
+
+// buildSummitRoad turns the progress strip into the climbing-road geometry.
+// ok is false when there is no strip to draw.
+func buildSummitRoad(v *plan.ProgressView) (summitRoad, bool) {
+	n := len(v.Strip)
+	if n == 0 {
+		return summitRoad{}, false
+	}
+	const (
+		w, h       = 1000, 280
+		padL, padR = 26, 54
+		padT, padB = 34, 44
+		maxStud    = 46
+	)
+	spanX := w - padL - padR
+	spanY := h - padT - padB
+	baseBottom := h - padB
+	xAt := func(i int) int {
+		if n == 1 {
+			return padL + spanX/2
+		}
+		return padL + int(math.Round(float64(spanX)*float64(i)/float64(n-1)))
+	}
+	yAt := func(i int) int {
+		if n == 1 {
+			return padT
+		}
+		return baseBottom - int(math.Round(float64(spanY)*float64(i)/float64(n-1)))
+	}
+
+	r := summitRoad{W: w, H: h, ExamLabel: v.ExamDate}
+	var ground, base strings.Builder
+	base.WriteString(strconv.Itoa(xAt(0)) + "," + strconv.Itoa(baseBottom) + " ")
+	for i := 0; i < n; i++ {
+		pt := strconv.Itoa(xAt(i)) + "," + strconv.Itoa(yAt(i))
+		if i > 0 {
+			ground.WriteByte(' ')
+		}
+		ground.WriteString(pt)
+		base.WriteString(pt + " ")
+	}
+	base.WriteString(strconv.Itoa(xAt(n-1)) + "," + strconv.Itoa(baseBottom))
+	r.Ground = ground.String()
+	r.Base = base.String()
+
+	for i, c := range v.Strip {
+		if hgt := int(math.Round(c.DoneFraction * maxStud)); hgt > 0 {
+			r.Studs = append(r.Studs, roadStud{X: xAt(i), Y: yAt(i) - hgt, H: hgt})
+		}
+		if i == n-1 {
+			r.Summit = roadMark{X: xAt(i), Y: yAt(i)}
+		} else if c.PhaseName != "" && c.PhaseName != v.Strip[i+1].PhaseName {
+			r.Milestones = append(r.Milestones, roadMark{X: xAt(i), Y: yAt(i)})
+		}
+	}
+
+	if cur := v.WeekNumber; cur >= 1 && cur <= n {
+		ci := cur - 1
+		r.Marker = &roadMark{X: xAt(ci), Y: yAt(ci)}
+		var rib strings.Builder
+		rib.WriteString(strconv.Itoa(xAt(0)) + "," + strconv.Itoa(baseBottom))
+		for i := 0; i <= ci; i++ {
+			rib.WriteString(" " + strconv.Itoa(xAt(i)) + "," + strconv.Itoa(yAt(i)))
+		}
+		rib.WriteString(" " + strconv.Itoa(xAt(ci)) + "," + strconv.Itoa(baseBottom))
+		r.Ribbon = rib.String()
+		r.HasRibbon = true
+	}
+
+	r.Aria = "38 haftalık yol, sınav zirvesine doğru."
+	if v.WeekNumber >= 1 {
+		r.Aria = "38 haftalık yol; şu an " + strconv.Itoa(v.WeekNumber) + ". hafta, sınav zirvesine doğru tırmanış."
+	}
+	return r, true
 }
 
 // --- small text helpers --------------------------------------------------
@@ -678,6 +834,40 @@ func completeForm(id int64, action string) templ.Attributes {
 		"hx-disabled-elt": "#bugun-main button, #bugun-main input, #bugun-main select",
 		"hx-sync":         "#bugun-main:drop",
 		"data-session-id": strconv.FormatInt(id, 10),
+		"hx-request":      `{"timeout":20000}`,
+	}
+}
+
+// unitResultForm returns the form attributes for a per-unit marking control.
+// screen is "bugun" (swaps #bugun-main, posts to the Bugün route) or "hafta"
+// (swaps #hafta-main, posts to the Hafta route with the viewed week's ?tarih= so
+// the swap and the no-JS redirect return to the same week). A click on either
+// submit button carries its own name="done" value, so done/undo share one form.
+func unitResultForm(screen string, sessionID, unitID int64, weekStart string) templ.Attributes {
+	sid := strconv.FormatInt(sessionID, 10)
+	uid := strconv.FormatInt(unitID, 10)
+	if screen == "hafta" {
+		url := "/hafta/oturum/" + sid + "/birim/" + uid + "/sonuc?tarih=" + weekStart
+		return templ.Attributes{
+			"action":          url,
+			"method":          "post",
+			"hx-post":         url,
+			"hx-target":       "#hafta-main",
+			"hx-swap":         "outerHTML",
+			"hx-disabled-elt": "#hafta-main button, #hafta-main input",
+			"hx-sync":         "#hafta-main:drop",
+			"hx-request":      `{"timeout":20000}`,
+		}
+	}
+	url := "/oturum/" + sid + "/birim/" + uid + "/sonuc"
+	return templ.Attributes{
+		"action":          url,
+		"method":          "post",
+		"hx-post":         url,
+		"hx-target":       "#bugun-main",
+		"hx-swap":         "outerHTML",
+		"hx-disabled-elt": "#bugun-main button, #bugun-main input",
+		"hx-sync":         "#bugun-main:drop",
 		"hx-request":      `{"timeout":20000}`,
 	}
 }

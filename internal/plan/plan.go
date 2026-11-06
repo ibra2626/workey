@@ -29,40 +29,58 @@ func (s Source) valid() bool {
 	}
 }
 
-// Session kinds.
+// Session kinds. These are display hints only: since WKY-22 a session's kind is
+// a free label (the store imposes no CHECK), so a blank or unknown kind is
+// accepted. The constants name the kinds the v1 screens still special-case.
 const (
 	KindAksam    = "aksam"
 	KindUzunBlok = "uzun_blok"
 	KindDeneme   = "deneme"
 )
 
-// validKinds is the set accepted for a session's kind.
-var validKinds = map[string]bool{
-	KindAksam:    true,
-	KindUzunBlok: true,
-	KindDeneme:   true,
+// Source kinds. Unlike a session kind these are a closed set the store enforces
+// with a CHECK; a video source's units carry no D/Y/B (see units.go kindVideo).
+const (
+	SourceKindBook   = "book"
+	SourceKindVideo  = "video"
+	SourceKindCourse = "course"
+	SourceKindOther  = "other"
+)
+
+// Location units name how a source counts ranges; a closed set the store
+// enforces with a CHECK. The notation formatter prefixes a range accordingly
+// (page → "s. ", minute → "dk ", lesson → "ders ").
+const (
+	LocationUnitPage   = "page"
+	LocationUnitMinute = "minute"
+	LocationUnitLesson = "lesson"
+	LocationUnitOther  = "other"
+)
+
+// SourceKinds and LocationUnits list the accepted values, shared by validation,
+// the MCP/REST schemas and the agent guide.
+func SourceKinds() []string {
+	return []string{SourceKindBook, SourceKindVideo, SourceKindCourse, SourceKindOther}
 }
 
-// validBooks is the set accepted for an item's book.
-var validBooks = map[string]bool{
-	"M1": true, "M2": true, "M3": true, "G1": true, "G2": true,
+func LocationUnits() []string {
+	return []string{LocationUnitPage, LocationUnitMinute, LocationUnitLesson, LocationUnitOther}
 }
 
-// Item is one book reference inside a session: a book, a chapter and a page
-// range, with optional konu / soru / antrenman splits. It stores references
-// only — no topic text or question content.
+// Item is one catalog reference inside a session: a source (named by its stable
+// key), an optional section (by ordinal within the source), and a unit range
+// and/or a location range. unit_from/unit_to are 1-based unit ordinals within
+// the section; loc_from/loc_to are raw numbers in the source's location unit
+// (page / minute / lesson / other). The service resolves key → id and section
+// ordinal → id at write time. An item stores references only — never topic text
+// or question content. See internal/store.SessionItem for the persisted shape.
 type Item struct {
-	Book          string `json:"book"`
-	ChapterNo     int    `json:"chapter_no"`
-	ChapterTitle  string `json:"chapter_title"`
-	PageFrom      int    `json:"page_from"`
-	PageTo        int    `json:"page_to"`
-	KonuFrom      *int   `json:"konu_from,omitempty"`
-	KonuTo        *int   `json:"konu_to,omitempty"`
-	SoruFrom      *int   `json:"soru_from,omitempty"`
-	SoruTo        *int   `json:"soru_to,omitempty"`
-	AntrenmanFrom *int   `json:"antrenman_from,omitempty"`
-	AntrenmanTo   *int   `json:"antrenman_to,omitempty"`
+	SourceKey      string `json:"source_key"`
+	SectionOrdinal *int   `json:"section_ordinal,omitempty"`
+	UnitFrom       *int   `json:"unit_from,omitempty"`
+	UnitTo         *int   `json:"unit_to,omitempty"`
+	LocFrom        *int   `json:"loc_from,omitempty"`
+	LocTo          *int   `json:"loc_to,omitempty"`
 }
 
 // SlotRef addresses a session by its (date, start_time) key, the stable handle
@@ -138,11 +156,11 @@ type PhaseInput struct {
 
 // TopicGroupInput is one topic group in a SaveOutline request.
 type TopicGroupInput struct {
-	Key            string `json:"key"`
-	Name           string `json:"name"`
-	Ordinal        int    `json:"ordinal"`
-	DGSQuestionMin *int   `json:"dgs_question_min,omitempty"`
-	DGSQuestionMax *int   `json:"dgs_question_max,omitempty"`
+	Key         string `json:"key"`
+	Name        string `json:"name"`
+	Ordinal     int    `json:"ordinal"`
+	QuestionMin *int   `json:"question_min,omitempty"`
+	QuestionMax *int   `json:"question_max,omitempty"`
 }
 
 // SaveOutlineRequest declares the full set of phases and topic groups; each is
@@ -165,4 +183,48 @@ type OutlineChange struct {
 type SaveOutlineResult struct {
 	Phases      OutlineChange `json:"phases"`
 	TopicGroups OutlineChange `json:"topic_groups"`
+}
+
+// --- catalog write-path inputs (the save_source path, WKY-24/25) ---------
+//
+// A source is written whole: its definition plus its full ordered set of
+// sections, each carrying its ordered units. The service resolves the source by
+// key and reconciles sections/units by id so a re-write keeps unit progress
+// (see internal/store UpdateSection / UpdateUnit vs ReplaceSections). These
+// types are defined here now so WKY-24 (MCP) and WKY-25 (REST) share one shape.
+
+// SourceInput is a source's own fields in a SaveSource request.
+type SourceInput struct {
+	Key          string `json:"key"`
+	Name         string `json:"name"`
+	Kind         string `json:"kind"`          // book | video | course | other (free label)
+	LocationUnit string `json:"location_unit"` // page | minute | lesson | other
+	Ordinal      int    `json:"ordinal"`
+}
+
+// SectionInput is one section of a source, with its ordered units.
+type SectionInput struct {
+	Ordinal int         `json:"ordinal"`
+	Name    string      `json:"name"`
+	LocFrom *int        `json:"loc_from,omitempty"`
+	LocTo   *int        `json:"loc_to,omitempty"`
+	Units   []UnitInput `json:"units"`
+}
+
+// UnitInput is one study unit inside a section. Label is the source's own word
+// ("Antrenman" / "Test" / "Föy" / "Ders"); the code never enumerates them.
+type UnitInput struct {
+	Ordinal int    `json:"ordinal"`
+	Label   string `json:"label"`
+	Number  *int   `json:"number,omitempty"`
+	LocFrom *int   `json:"loc_from,omitempty"`
+	LocTo   *int   `json:"loc_to,omitempty"`
+}
+
+// SaveSourceRequest declares one source and its full set of sections/units,
+// replaced by the source's key.
+type SaveSourceRequest struct {
+	Source         SourceInput    `json:"source"`
+	Sections       []SectionInput `json:"sections"`
+	IdempotencyKey string         `json:"idempotency_key,omitempty"`
 }

@@ -15,7 +15,7 @@ import (
 
 func TestStudyMCPOutputContractAndLegacyWrites(t *testing.T) {
 	ctx := context.Background()
-	st, srv := newWorkflow(t, "")
+	st, srv := newMCP(t)
 	cs := connect(t, srv.URL+"/mcp", testToken)
 	seedPlan(t, cs)
 	tools, err := cs.ListTools(ctx, nil)
