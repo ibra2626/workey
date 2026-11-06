@@ -637,14 +637,6 @@ func capitalFirst(s string) string {
 
 // --- progress strip ------------------------------------------------------
 
-// stripCell is one column of the 38-week plan strip: a base fill (Phase Mist in
-// the current phase, Hairline later) with a Forest-Ink overlay for the done
-// fraction.
-type stripCell struct {
-	BaseFill string
-	InkPct   int
-}
-
 // dgsLabel renders a topic group's DGS question weight, e.g. "8–10 soru" (never
 // abbreviated "s."); "" when the group carries no weight.
 func dgsLabel(gp plan.GroupProgress) string {
@@ -681,18 +673,125 @@ func phaseRangeLabel(v *plan.ProgressView) string {
 	return phaseShort(v.CurrentPhase) + " " + middleDot + " H" + strconv.Itoa(first) + enDash + "H" + strconv.Itoa(last)
 }
 
-// progressStrip builds the 38 columns: the current phase's weeks sit on Phase
-// Mist, later phases on Hairline; each column shows its done fraction in ink.
-func progressStrip(v *plan.ProgressView) []stripCell {
-	out := make([]stripCell, 0, len(v.Strip))
-	for _, c := range v.Strip {
-		base := "var(--color-line)"
-		if c.PhaseName != "" && c.PhaseName == v.CurrentPhase {
-			base = "var(--color-z1-soft)"
-		}
-		out = append(out, stripCell{BaseFill: base, InkPct: int(math.Round(c.DoneFraction * 100))})
+// streakStatus renders the honest, no-blame line under the İvme meter. A broken
+// streak is never scolded: it invites starting again today. A rest day keeps the
+// run without demanding work.
+func streakStatus(v *plan.ProgressView) string {
+	switch {
+	case v.Streak > 0 && v.StudiedToday:
+		return "Bugün tamamlandı. İvme sürüyor."
+	case v.Streak > 0 && v.StudyDayToday:
+		return "Bugünü tamamla, seriyi sürdür."
+	case v.Streak > 0:
+		return "Bugün dinlenme. Seri korunuyor."
+	case v.StudyDayToday:
+		return "Bugün başla, ivmeni kur."
+	default:
+		return "Seri henüz başlamadı."
 	}
-	return out
+}
+
+// --- summit road ("zirveye giden yol") -----------------------------------
+
+// summitRoad is the geometry of the İlerleme ascending road: a climbing ground
+// line over the 38 plan weeks to the exam summit, per-week effort studs whose
+// height is the week's real done fraction (the done-ledger ink), a momentum
+// ribbon for the distance travelled in time, phase-boundary milestones and the
+// current-week marker. Every figure is the honest Strip data — nothing here is
+// invented. All coordinates live in the fixed viewBox (W×H).
+type summitRoad struct {
+	W, H       int
+	Ground     string // climbing polyline "x,y x,y …"
+	Base       string // closed mountain polygon under the ground line
+	Ribbon     string // travelled-area polygon (weeks up to the current one)
+	HasRibbon  bool
+	Studs      []roadStud // per-week effort block
+	Milestones []roadMark // phase-boundary dots
+	Summit     roadMark   // final week (exam peak)
+	Marker     *roadMark  // current week, nil outside the plan
+	ExamLabel  string
+	Aria       string
+}
+
+// roadStud is one week's effort block, rising from the road by the done share.
+type roadStud struct{ X, Y, H int }
+
+// roadMark is a point on the road (milestone, summit or the current marker).
+type roadMark struct{ X, Y int }
+
+// buildSummitRoad turns the progress strip into the climbing-road geometry.
+// ok is false when there is no strip to draw.
+func buildSummitRoad(v *plan.ProgressView) (summitRoad, bool) {
+	n := len(v.Strip)
+	if n == 0 {
+		return summitRoad{}, false
+	}
+	const (
+		w, h       = 1000, 280
+		padL, padR = 26, 54
+		padT, padB = 34, 44
+		maxStud    = 46
+	)
+	spanX := w - padL - padR
+	spanY := h - padT - padB
+	baseBottom := h - padB
+	xAt := func(i int) int {
+		if n == 1 {
+			return padL + spanX/2
+		}
+		return padL + int(math.Round(float64(spanX)*float64(i)/float64(n-1)))
+	}
+	yAt := func(i int) int {
+		if n == 1 {
+			return padT
+		}
+		return baseBottom - int(math.Round(float64(spanY)*float64(i)/float64(n-1)))
+	}
+
+	r := summitRoad{W: w, H: h, ExamLabel: v.ExamDate}
+	var ground, base strings.Builder
+	base.WriteString(strconv.Itoa(xAt(0)) + "," + strconv.Itoa(baseBottom) + " ")
+	for i := 0; i < n; i++ {
+		pt := strconv.Itoa(xAt(i)) + "," + strconv.Itoa(yAt(i))
+		if i > 0 {
+			ground.WriteByte(' ')
+		}
+		ground.WriteString(pt)
+		base.WriteString(pt + " ")
+	}
+	base.WriteString(strconv.Itoa(xAt(n-1)) + "," + strconv.Itoa(baseBottom))
+	r.Ground = ground.String()
+	r.Base = base.String()
+
+	for i, c := range v.Strip {
+		if hgt := int(math.Round(c.DoneFraction * maxStud)); hgt > 0 {
+			r.Studs = append(r.Studs, roadStud{X: xAt(i), Y: yAt(i) - hgt, H: hgt})
+		}
+		if i == n-1 {
+			r.Summit = roadMark{X: xAt(i), Y: yAt(i)}
+		} else if c.PhaseName != "" && c.PhaseName != v.Strip[i+1].PhaseName {
+			r.Milestones = append(r.Milestones, roadMark{X: xAt(i), Y: yAt(i)})
+		}
+	}
+
+	if cur := v.WeekNumber; cur >= 1 && cur <= n {
+		ci := cur - 1
+		r.Marker = &roadMark{X: xAt(ci), Y: yAt(ci)}
+		var rib strings.Builder
+		rib.WriteString(strconv.Itoa(xAt(0)) + "," + strconv.Itoa(baseBottom))
+		for i := 0; i <= ci; i++ {
+			rib.WriteString(" " + strconv.Itoa(xAt(i)) + "," + strconv.Itoa(yAt(i)))
+		}
+		rib.WriteString(" " + strconv.Itoa(xAt(ci)) + "," + strconv.Itoa(baseBottom))
+		r.Ribbon = rib.String()
+		r.HasRibbon = true
+	}
+
+	r.Aria = "38 haftalık yol, sınav zirvesine doğru."
+	if v.WeekNumber >= 1 {
+		r.Aria = "38 haftalık yol; şu an " + strconv.Itoa(v.WeekNumber) + ". hafta, sınav zirvesine doğru tırmanış."
+	}
+	return r, true
 }
 
 // --- small text helpers --------------------------------------------------

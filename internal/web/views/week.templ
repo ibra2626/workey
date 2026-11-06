@@ -151,7 +151,7 @@ templ volumeBarEl(b volumeBar) {
 		if b.Rest {
 			<span class="w-full rounded-pill bg-line" style="height:3px"></span>
 		} else if b.IsToday {
-			<span class="chart-rise w-full rounded-bar bg-z3-soft" { styleAttr("height:" + pct(b.HeightPct) + ";box-shadow:inset 0 0 0 2px var(--color-z3)")... }></span>
+			<span class="chart-rise vbar-today w-full rounded-bar bg-z3-soft" { styleAttr("height:" + pct(b.HeightPct) + ";box-shadow:inset 0 0 0 2px var(--color-z3)")... }></span>
 		} else {
 			<span class={ "chart-rise w-full rounded-bar", barClass(b) } { styleAttr("height:" + pct(b.HeightPct))... }></span>
 		}

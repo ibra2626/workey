@@ -151,6 +151,62 @@ type ProgressView struct {
 	ExamDate        string          `json:"exam_date,omitempty"` // "18 Tem"
 	Groups          []GroupProgress `json:"groups"`
 	Strip           []WeekCell      `json:"strip"`
+	// Momentum ("İvme"): consecutive completed study-days up to today. A study
+	// day is a scheduled date with at least one completed session; rest days (no
+	// scheduled session) are transparent, so a planned break never breaks the
+	// run. Today counts only once its session is completed, but today being a
+	// still-open study day does not yet end the run. StudiedToday / StudyDayToday
+	// let the screen frame the no-blame "start again today" recovery.
+	Streak        int  `json:"streak"`
+	StudiedToday  bool `json:"studied_today"`
+	StudyDayToday bool `json:"study_day_today"`
+}
+
+// computeStreak counts the consecutive completed study-days ending at (or just
+// before) today. A study day is a scheduled date with a completed session; a
+// rest day with no scheduled session is transparent. Today, while still an open
+// study day, is stepped over rather than treated as a miss, so the standing run
+// survives until the day actually ends without work.
+func computeStreak(all []store.Session, today clock.Date) (streak int, studiedToday, studyDayToday bool) {
+	planned := map[string]bool{}
+	done := map[string]bool{}
+	earliest := ""
+	for _, ss := range all {
+		if ss.Date == "" {
+			continue
+		}
+		planned[ss.Date] = true
+		if ss.CompletedAt != nil {
+			done[ss.Date] = true
+		}
+		if earliest == "" || ss.Date < earliest {
+			earliest = ss.Date
+		}
+	}
+	td := today.String()
+	studyDayToday = planned[td]
+	studiedToday = done[td]
+	floor, ok := ParseDate(earliest)
+	if !ok {
+		return 0, studiedToday, studyDayToday
+	}
+	cursor := today
+	if planned[cursor.String()] && !done[cursor.String()] {
+		cursor = addDays(cursor, -1) // today still open: step over it, not a miss
+	}
+	for civilDays(floor, cursor) >= 0 {
+		ds := cursor.String()
+		switch {
+		case !planned[ds]:
+			// Rest day: neither extends nor breaks the run.
+		case done[ds]:
+			streak++
+		default:
+			return streak, studiedToday, studyDayToday // a missed study day ends it
+		}
+		cursor = addDays(cursor, -1)
+	}
+	return streak, studiedToday, studyDayToday
 }
 
 // Day returns the Bugün model for date. State is always derived against the
@@ -374,6 +430,7 @@ func (s *Service) Progress(ctx context.Context, examDate clock.Date) (*ProgressV
 	}
 	view.DoneHours = FormatHoursTR(view.DoneMin)
 	view.PlannedHours = FormatHoursTR(view.PlannedMin)
+	view.Streak, view.StudiedToday, view.StudyDayToday = computeStreak(all, today)
 
 	for _, g := range groups {
 		gp := GroupProgress{

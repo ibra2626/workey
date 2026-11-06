@@ -1,11 +1,10 @@
-//go:build webworkflow
-
 // The cross-transport workflow proves MCP writes and web (form/CSRF) completions
-// share one store with correct audit provenance, and drives the opt-in visual
-// review. It needs internal/web, which the v2 catalog migration leaves red until
-// WKY-26/27 rebuild its views; until then build and run these with
-// `go test -tags webworkflow ./internal/mcpserver/...` (WKY-28 re-enables them by
-// default). The default MCP test build stays web-free (see newMCP).
+// share one store with correct audit provenance, including the catalog end-to-end
+// run (book + video sources, unit results, screens), and drives the opt-in visual
+// review. It needs internal/web, which the v2 catalog migration left red until
+// WKY-26/27 rebuilt its views; WKY-28 re-enabled these tests by default (they ran
+// behind `-tags webworkflow` in the interim). The default MCP test build in
+// mcpserver_test stays otherwise web-free (see newMCP).
 package mcpserver_test
 
 import (
@@ -182,6 +181,221 @@ func TestMCPWebWorkflow(t *testing.T) {
 	callOK(t, cs, "get_progress", map[string]any{}, &after)
 	if after.SessionsDone != 0 || after.DoneMin != 0 {
 		t.Fatal("web undo did not reach MCP progress")
+	}
+}
+
+// TestCatalogEndToEnd is the WKY-28 gate: it drives the live /mcp endpoint to
+// define two different source kinds (a book counted in pages with Antrenman/Test
+// units, and a video counted in lessons with Ders units), plan a week referencing
+// both, mark units done (with D/Y/B on the book, none on the video), then reads
+// the web screens and MCP progress to prove unit completion and session
+// completion stay independent — all with no code change and no fixed book/DGS
+// assumption anywhere in the flow.
+func TestCatalogEndToEnd(t *testing.T) {
+	st, srv := newWorkflow(t, "")
+	cs := connect(t, srv.URL+"/mcp", testToken)
+
+	// 1. A book-kind source: pages, sections, Antrenman + Test units.
+	book := map[string]any{
+		"source": map[string]any{"key": "GR", "name": "İngilizce Gramer", "kind": "book", "location_unit": "page", "ordinal": 1},
+		"sections": []any{
+			map[string]any{"ordinal": 1, "name": "Tenses", "loc_from": 1, "loc_to": 30, "units": []any{
+				map[string]any{"ordinal": 1, "label": "Antrenman", "number": 1, "loc_from": 1, "loc_to": 10},
+				map[string]any{"ordinal": 2, "label": "Antrenman", "number": 2, "loc_from": 11, "loc_to": 20},
+				map[string]any{"ordinal": 3, "label": "Test", "number": 1, "loc_from": 21, "loc_to": 30},
+			}},
+		},
+	}
+	var bookRes plan.SaveSourceResult
+	callOK(t, cs, "save_source", book, &bookRes)
+	if !bookRes.Created {
+		t.Fatalf("book source not created: %+v", bookRes)
+	}
+
+	// 2. A video-kind source: lessons, Ders units, no D/Y/B.
+	video := map[string]any{
+		"source": map[string]any{"key": "VD", "name": "Matematik Video Serisi", "kind": "video", "location_unit": "lesson", "ordinal": 2},
+		"sections": []any{
+			map[string]any{"ordinal": 1, "name": "Limit", "loc_from": 1, "loc_to": 3, "units": []any{
+				map[string]any{"ordinal": 1, "label": "Ders", "number": 1, "loc_from": 1, "loc_to": 1},
+				map[string]any{"ordinal": 2, "label": "Ders", "number": 2, "loc_from": 2, "loc_to": 2},
+				map[string]any{"ordinal": 3, "label": "Ders", "number": 3, "loc_from": 3, "loc_to": 3},
+			}},
+		},
+	}
+	callOK(t, cs, "save_source", video, nil)
+
+	// 3. get_sources: confirm both sources, their kinds/location units, and labels.
+	var cat plan.CatalogView
+	callOK(t, cs, "get_sources", map[string]any{}, &cat)
+	if len(cat.Sources) != 2 {
+		t.Fatalf("get_sources returned %d sources, want 2", len(cat.Sources))
+	}
+	unitID := func(key string, sectionOrdinal, unitOrdinal int) int64 {
+		t.Helper()
+		for _, src := range cat.Sources {
+			if src.Key != key {
+				continue
+			}
+			for _, sec := range src.Sections {
+				if sec.Ordinal != sectionOrdinal {
+					continue
+				}
+				for _, u := range sec.Units {
+					if u.Ordinal == unitOrdinal {
+						return u.ID
+					}
+				}
+			}
+		}
+		t.Fatalf("unit %s·%d ordinal %d not found", key, sectionOrdinal, unitOrdinal)
+		return 0
+	}
+	for _, src := range cat.Sources {
+		switch src.Key {
+		case "GR":
+			if src.Kind != "book" || src.LocationUnit != "page" || len(src.Sections) != 1 || len(src.Sections[0].Units) != 3 {
+				t.Fatalf("GR structure wrong: %+v", src)
+			}
+			if src.Sections[0].Units[2].Label != "Test" {
+				t.Errorf("GR unit 3 label = %q, want Test", src.Sections[0].Units[2].Label)
+			}
+		case "VD":
+			if src.Kind != "video" || src.LocationUnit != "lesson" || len(src.Sections[0].Units) != 3 {
+				t.Fatalf("VD structure wrong: %+v", src)
+			}
+			if src.Sections[0].Units[0].Label != "Ders" {
+				t.Errorf("VD unit 1 label = %q, want Ders", src.Sections[0].Units[0].Label)
+			}
+		default:
+			t.Errorf("unexpected source key %q", src.Key)
+		}
+	}
+
+	// 4. save_plan a week referencing both sources: today's block studies the book,
+	// tomorrow's block the video.
+	planReq := map[string]any{
+		"from": "2026-10-26", "to": "2026-11-01",
+		"sessions": []any{
+			map[string]any{"date": "2026-10-26", "start_time": "20:30", "duration_min": 90, "kind": "aksam", "items": []any{
+				map[string]any{"source_key": "GR", "section_ordinal": 1, "unit_from": 1, "unit_to": 3, "loc_from": 1, "loc_to": 30},
+			}},
+			map[string]any{"date": "2026-10-27", "start_time": "20:30", "duration_min": 60, "kind": "aksam", "items": []any{
+				map[string]any{"source_key": "VD", "section_ordinal": 1, "unit_from": 1, "unit_to": 3, "loc_from": 1, "loc_to": 3},
+			}},
+		},
+	}
+	var saved plan.SavePlanResult
+	callOK(t, cs, "save_plan", planReq, &saved)
+	if len(saved.Created) != 2 || len(saved.Updated)+len(saved.Deleted) != 0 {
+		t.Fatalf("save_plan result unexpected: %+v", saved)
+	}
+
+	// get_plan echoes both sources' references in the canonical notation.
+	var planRead struct {
+		Sessions []plan.SessionView `json:"sessions"`
+	}
+	callOK(t, cs, "get_plan", map[string]any{"from": "2026-10-26", "to": "2026-11-01"}, &planRead)
+	var notations strings.Builder
+	for _, s := range planRead.Sessions {
+		notations.WriteString(s.Notation)
+		notations.WriteString(" | ")
+	}
+	all := notations.String()
+	for _, want := range []string{"GR·1", "Antrenman", "VD·1", "Ders"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("get_plan notation %q missing %q", all, want)
+		}
+	}
+
+	// 5. set_unit_result: the book's first Antrenman with D/Y/B; the video's first
+	// Ders with none.
+	var bookUnit plan.UnitResultView
+	callOK(t, cs, "set_unit_result", map[string]any{
+		"unit_id": unitID("GR", 1, 1), "done": true, "correct": 8, "wrong": 2, "blank": 0,
+	}, &bookUnit)
+	if !bookUnit.Done || bookUnit.Correct == nil || *bookUnit.Correct != 8 || !strings.Contains(bookUnit.Notation, "GR·1") {
+		t.Fatalf("book unit result wrong: %+v", bookUnit)
+	}
+	var videoUnit plan.UnitResultView
+	callOK(t, cs, "set_unit_result", map[string]any{"unit_id": unitID("VD", 1, 1), "done": true}, &videoUnit)
+	if !videoUnit.Done || videoUnit.Correct != nil || videoUnit.Wrong != nil || videoUnit.Blank != nil {
+		t.Fatalf("video unit must store no D/Y/B: %+v", videoUnit)
+	}
+
+	// 6. Read the screens and prove unit vs session completion are independent.
+	get := func(path string) string {
+		t.Helper()
+		res, err := http.Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		b, err := io.ReadAll(res.Body)
+		if err != nil || res.StatusCode != http.StatusOK {
+			t.Fatalf("GET %s: status=%d err=%v", path, res.StatusCode, err)
+		}
+		return string(b)
+	}
+
+	today := get("/")
+	for _, want := range []string{"Birimler", "GR·1, Antrenman 1", "GR·1, Test 1", ">Bitti<", `name="correct"`} {
+		if !strings.Contains(today, want) {
+			t.Errorf("Bugün missing %q", want)
+		}
+	}
+	week := get("/hafta")
+	if !strings.Contains(week, "VD·1, Ders 1") {
+		t.Error("Hafta missing the video unit reference")
+	}
+
+	unitDone := func() int {
+		var n int
+		if err := st.DB().QueryRow("SELECT COUNT(*) FROM unit_progress").Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	if n := unitDone(); n != 2 {
+		t.Fatalf("unit_progress rows = %d, want 2 (book Antrenman 1 + video Ders 1)", n)
+	}
+
+	// Two units are done, but no session has been completed.
+	var prog plan.ProgressView
+	callOK(t, cs, "get_progress", map[string]any{}, &prog)
+	if prog.SessionsDone != 0 {
+		t.Fatalf("marking units wrongly completed a session: SessionsDone=%d", prog.SessionsDone)
+	}
+
+	// Complete today's session through the real web form (CSRF), then confirm the
+	// session counts as done while the unit progress is untouched.
+	csrf := regexp.MustCompile(`name="_csrf" value="([^"]+)"`).FindStringSubmatch(today)
+	action := regexp.MustCompile(`action="(/oturum/[0-9]+/tamamla)"`).FindStringSubmatch(today)
+	if len(csrf) != 2 || len(action) != 2 {
+		t.Fatal("missing completion form on Bugün")
+	}
+	res, err := http.PostForm(srv.URL+action[1], url.Values{"_csrf": {csrf[1]}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("complete POST: %d", res.StatusCode)
+	}
+	callOK(t, cs, "get_progress", map[string]any{}, &prog)
+	if prog.SessionsDone != 1 {
+		t.Fatalf("web completion did not reach MCP progress: SessionsDone=%d", prog.SessionsDone)
+	}
+	if n := unitDone(); n != 2 {
+		t.Fatalf("session completion changed unit progress: unit_progress rows = %d, want 2", n)
+	}
+
+	// İlerleme shows the honest unit aggregate: 2 done out of all 6 catalog units.
+	progress := get("/ilerleme")
+	for _, want := range []string{"Birim ilerlemesi", "6 birim", "Çözülen"} {
+		if !strings.Contains(progress, want) {
+			t.Errorf("İlerleme missing %q", want)
+		}
 	}
 }
 

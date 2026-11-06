@@ -36,8 +36,10 @@ templ Progress(p ProgressPage) {
 				<p class="mt-2 text-body text-ink-2">Asistan planı yazınca ilerleme burada 38 hafta üzerinden gösterilecek.</p>
 			</section>
 		} else {
+			<!-- İvme: the honest streak meter (gamification, no-blame framing). -->
+			@momentumMeter(p.Progress)
 			<!-- Plan position and the 38-week strip. -->
-			<section class="mt-5 rounded-panel bg-card p-5 md:p-7">
+			<section class="mt-3 rounded-panel bg-card p-5 md:mt-5 md:p-7">
 				<div class="flex items-end justify-between">
 					<div>
 						<p class="text-label font-semibold text-ink-3">38 haftalık plan</p>
@@ -53,20 +55,12 @@ templ Progress(p ProgressPage) {
 					</p>
 					<div class="hidden gap-5 text-meta text-ink-3 md:flex">
 						@legendSwatch("var(--color-ink)", "Yapılan")
-						@legendSwatch("var(--color-z1-soft)", phaseShort(p.Progress.CurrentPhase)+" planı")
-						@legendSwatch("var(--color-line)", "Sonraki fazlar")
+						@legendSwatch("var(--gradient-momentum)", "Gidilen yol")
+						@legendSwatch("var(--color-accent)", "Kilometre taşı")
 					</div>
 				</div>
-				<!-- 38-week strip. -->
-				<div class="mt-4 flex items-stretch gap-[2px] md:mt-5 md:gap-[4px]" style="height:44px" aria-label="38 haftalık plan">
-					for _, c := range progressStrip(p.Progress) {
-						<div class="chart-rise relative h-full flex-1 overflow-hidden rounded-xs" { styleAttr("background:" + c.BaseFill)... }>
-							if c.InkPct > 0 {
-								<span class="absolute inset-x-0 bottom-0 bg-ink" { styleAttr("height:" + pct(c.InkPct))... }></span>
-							}
-						</div>
-					}
-				</div>
+				<!-- Zirveye giden yol: the 38-week plan as a climb to the exam summit. -->
+				@summitRoadSVG(p.Progress)
 				<div class="mt-1.5 flex justify-between text-label tnum text-ink-3">
 					<span>{ phaseRangeLabel(p.Progress) }</span>
 					<span>H{ strconv.Itoa(p.Progress.WeeksTotal) }
@@ -122,13 +116,18 @@ templ groupRow(gp plan.GroupProgress) {
 	<!-- Mobile. -->
 	<li class="md:hidden">
 		<div class="flex items-baseline justify-between gap-3">
-			<span class="text-body font-semibold text-ink">{ gp.Name }</span>
+			<span class="flex min-w-0 items-center gap-1.5 text-body font-semibold text-ink">
+				{ gp.Name }
+				if gp.Percent >= 100 {
+					@icon("i-check", "mastery-check")
+				}
+			</span>
 			<span class={ "cn text-numeral-inline font-semibold", percentClass(gp.Percent) }>%{ strconv.Itoa(gp.Percent) }</span>
 		</div>
 		<div class="mt-1 flex items-center gap-2">
 			<div class="h-[6px] flex-1 overflow-hidden rounded-bar bg-line">
 				if gp.Percent > 0 {
-					<span class="chart-grow block h-full rounded-bar bg-ink" { styleAttr("width:" + pct(gp.Percent))... }></span>
+					<span class={ "chart-grow block h-full rounded-bar bg-ink", templ.KV("track-mastered", gp.Percent >= 100) } { styleAttr("width:" + pct(gp.Percent))... }></span>
 				}
 			</div>
 			<span class="w-[64px] text-right text-label tnum text-ink-3">{ dgsLabel(gp) }</span>
@@ -136,10 +135,15 @@ templ groupRow(gp plan.GroupProgress) {
 	</li>
 	<!-- Desktop. -->
 	<li class="hidden grid-cols-[200px_1fr_70px_48px] items-center gap-4 md:grid">
-		<span class="text-body font-semibold text-ink">{ gp.Name }</span>
+		<span class="flex items-center gap-1.5 text-body font-semibold text-ink">
+			{ gp.Name }
+			if gp.Percent >= 100 {
+				@icon("i-check", "mastery-check")
+			}
+		</span>
 		<div class="h-[8px] overflow-hidden rounded-bar bg-line">
 			if gp.Percent > 0 {
-				<span class="chart-grow block h-full rounded-bar bg-ink" { styleAttr("width:" + pct(gp.Percent))... }></span>
+				<span class={ "chart-grow block h-full rounded-bar bg-ink", templ.KV("track-mastered", gp.Percent >= 100) } { styleAttr("width:" + pct(gp.Percent))... }></span>
 			}
 		</div>
 		<span class="text-right text-meta tnum text-ink-3">{ dgsLabel(gp) }</span>
@@ -147,10 +151,87 @@ templ groupRow(gp plan.GroupProgress) {
 	</li>
 }
 
-// legendSwatch is one coloured square with its label, for the strip legend.
+// legendSwatch is one coloured square with its label, for the road legend.
 templ legendSwatch(fill string, label string) {
 	<span class="flex items-center gap-1.5">
 		<span class="h-3 w-3 rounded-xs" { styleAttr("background:" + fill)... }></span>
 		{ label }
 	</span>
+}
+
+// momentumMeter is the İvme panel: the consecutive-study-day streak as a warm
+// flame that lights once the run is alive. Every figure is honest (computeStreak
+// over completed sessions); a broken run is framed as an invitation, never a
+// scolding, and a rest day keeps the run. Decorative to the a11y tree beyond the
+// panel label; the status line carries the meaning.
+templ momentumMeter(v *plan.ProgressView) {
+	<section class={ "momentum rounded-panel bg-card p-5 md:p-6", templ.KV("is-lit", v.Streak > 0) } aria-label="İvme">
+		<svg class="momentum-flame" viewBox="0 0 24 28" aria-hidden="true">
+			<defs>
+				<linearGradient id="flame-grad" x1="0" y1="1" x2="0" y2="0">
+					<stop offset="0" stop-color="var(--color-accent-2)"></stop>
+					<stop offset="1" stop-color="var(--color-accent)"></stop>
+				</linearGradient>
+			</defs>
+			<path d="M12 1.5c2.2 5 7 6.2 7 12.8A7 7 0 0 1 5 14.3c0-2 .8-3.7 2.1-5.1.1 2 1.3 3.1 2.6 3.4C8.5 8 9.7 4.4 12 1.5z"></path>
+		</svg>
+		<div class="momentum-body">
+			<p class="momentum-label">İvme</p>
+			if v.Streak > 0 {
+				<p class="momentum-hero cn leading-none">
+					<span class="momentum-num">{ strconv.Itoa(v.Streak) }</span>
+					<span class="momentum-unit">gün üst üste</span>
+				</p>
+			}
+			<p class="momentum-status">{ streakStatus(v) }</p>
+		</div>
+	</section>
+}
+
+// summitRoadSVG draws the İlerleme "zirveye giden yol": the 38 plan weeks as a
+// climb to the exam summit. The faint mountain and the climbing ground line are
+// the plan; the momentum ribbon is the distance travelled in time (up to the
+// current week); the ink studs are each week's real done share; the accent dots
+// are phase milestones; the summit glows with the exam date; the current week
+// pulses. Every figure is honest Strip data. Decorative to the a11y tree beyond
+// the one summary label — the numbers above and the tracks below carry the data.
+templ summitRoadSVG(v *plan.ProgressView) {
+	if r, ok := buildSummitRoad(v); ok {
+		<div class="mt-4 md:mt-5">
+			<svg
+				class="summit-road"
+				viewBox={ "0 0 " + strconv.Itoa(r.W) + " " + strconv.Itoa(r.H) }
+				preserveAspectRatio="xMidYMid meet"
+				role="img"
+				aria-label={ r.Aria }
+			>
+				<defs>
+					<linearGradient id="road-momentum" x1="0" y1="1" x2="1" y2="0">
+						<stop offset="0" stop-color="var(--color-accent)"></stop>
+						<stop offset="1" stop-color="var(--color-accent-2)"></stop>
+					</linearGradient>
+				</defs>
+				<polygon class="road-base" points={ r.Base }></polygon>
+				if r.HasRibbon {
+					<polygon class="road-ribbon" points={ r.Ribbon }></polygon>
+				}
+				<polyline class="road-line" points={ r.Ground }></polyline>
+				for _, s := range r.Studs {
+					<rect class="road-stud" x={ strconv.Itoa(s.X - 4) } y={ strconv.Itoa(s.Y) } width="8" height={ strconv.Itoa(s.H) } rx="2"></rect>
+				}
+				for _, m := range r.Milestones {
+					<circle class="road-mile" cx={ strconv.Itoa(m.X) } cy={ strconv.Itoa(m.Y) } r="4.5"></circle>
+				}
+				<circle class="road-summit-glow" cx={ strconv.Itoa(r.Summit.X) } cy={ strconv.Itoa(r.Summit.Y) } r="15"></circle>
+				<circle class="road-summit-dot" cx={ strconv.Itoa(r.Summit.X) } cy={ strconv.Itoa(r.Summit.Y) } r="6"></circle>
+				if r.ExamLabel != "" {
+					<text class="road-summit-label" x={ strconv.Itoa(r.Summit.X) } y={ strconv.Itoa(r.Summit.Y - 20) } text-anchor="end">{ r.ExamLabel }</text>
+				}
+				if r.Marker != nil {
+					<circle class="road-now-halo" cx={ strconv.Itoa(r.Marker.X) } cy={ strconv.Itoa(r.Marker.Y) } r="9"></circle>
+					<circle class="road-now" cx={ strconv.Itoa(r.Marker.X) } cy={ strconv.Itoa(r.Marker.Y) } r="5.5"></circle>
+				}
+			</svg>
+		</div>
+	}
 }

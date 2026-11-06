@@ -31,9 +31,8 @@ func newServer(t *testing.T) string {
 }
 
 // newMCP mounts the /mcp transport over a migrated temp store with the fixed test
-// clock. It is web-free so the default MCP test build does not depend on
-// internal/web (which the v2 catalog migration leaves red until WKY-26/27); the
-// cross-transport workflow lives behind the 'webworkflow' build tag.
+// clock, web-free. The cross-transport workflow that also mounts internal/web
+// lives in webworkflow_test.go (newWorkflow); since WKY-28 it runs by default.
 func newMCP(t *testing.T) (*store.Store, *httptest.Server) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "workey.db")

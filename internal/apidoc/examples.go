@@ -83,7 +83,7 @@ func ResponseExample(name string) any {
 			DoneAt: strptr("2026-10-26T06:00:00Z"), Correct: pint(5), Wrong: pint(1), Blank: pint(0),
 		}
 	case "Progress":
-		progress := plan.ProgressView{HasPlan: true, WeekNumber: 1, WeeksTotal: 38, SessionsPlanned: 1, PlannedMin: 90, DoneHours: "0", PlannedHours: "1,5", CurrentPhase: "İşlem temeli", DaysToExam: 265, ExamDate: "18 Tem", Groups: []plan.GroupProgress{{Key: "temel", Name: "Temel kavramlar", PlannedMin: 90}}}
+		progress := plan.ProgressView{HasPlan: true, WeekNumber: 1, WeeksTotal: 38, SessionsPlanned: 1, PlannedMin: 90, DoneHours: "0", PlannedHours: "1,5", CurrentPhase: "İşlem temeli", DaysToExam: 265, ExamDate: "18 Tem", StudyDayToday: true, Groups: []plan.GroupProgress{{Key: "temel", Name: "Temel kavramlar", PlannedMin: 90}}}
 		for i := 1; i <= 38; i++ {
 			cell := plan.WeekCell{WeekNumber: i}
 			if i <= 7 {

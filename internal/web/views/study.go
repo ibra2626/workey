@@ -166,7 +166,9 @@ type roomSegment struct {
 	Label string `json:"label"`
 	Stage string `json:"stage"`
 	Min   int    `json:"min"`
-	Fill  string `json:"-"`
+	// Fill is the stage's zone colour as a CSS var reference. The room script
+	// reads it to tint the live elapsed ring with the current stage's colour.
+	Fill  string `json:"fill"`
 	Pages string `json:"-"`
 }
 

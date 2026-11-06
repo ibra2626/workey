@@ -63,7 +63,7 @@ func newMCPServer(h *handler) (*mcp.Server, error) {
 		Instructions: "First call get_agent_guide for the current Istanbul date, rules and workflow. Extract each source's structure (sections and units) from what the user provides and write it with save_source, then read it back with get_sources; the user corrects it in the web Kaynaklar page. Build the plan referencing sources, sections and units. Read existing sources, outline, plan and progress before writes. Preserve retained sessions: save_plan and save_outline replace full sets. Never invent source references. Re-read after writes and summarize in Turkish.",
 	})
 	mcp.AddTool(srv, &mcp.Tool{
-		Name: "get_agent_guide", Description: "Read this first. Return the server's current Istanbul date, exam date, supported books/session kinds, full-replacement rules and safe planning workflow. Does not change data.",
+		Name: "get_agent_guide", Description: "Read this first. Return the server's current Istanbul date, exam date, supported source kinds, location units and session kinds, full-replacement rules and safe planning workflow. Does not change data.",
 		Annotations: toolHints(true, false),
 	}, func(context.Context, *mcp.CallToolRequest, struct{}) (*mcp.CallToolResult, plan.AgentGuide, error) {
 		return nil, h.svc.AgentGuide(h.examDate), nil

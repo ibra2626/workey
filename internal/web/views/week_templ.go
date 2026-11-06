@@ -642,7 +642,7 @@ func volumeBarEl(b volumeBar) templ.Component {
 				templ_7745c5c3_ElementWriter := templ_7745c5c3_Buffer
 				templ_7745c5c3_Buffer := templ.GetBuffer()
 				var templ_7745c5c3_ElementScripts []templ.ComponentScript
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<span class=\"chart-rise w-full rounded-bar bg-z3-soft\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<span class=\"chart-rise vbar-today w-full rounded-bar bg-z3-soft\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
