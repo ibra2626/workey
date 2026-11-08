@@ -261,3 +261,16 @@ Decisions (this session delivered 1–2; 3 is a follow-up):
 - **Deferred (follow-up, needs a data change): video-first Bugün / study room.** Making the daily moment truly video-centred (which lesson, an "open/watch" link) needs a stored video URL per source/unit (schema + save_source/MCP/REST contract), so it is its own task. PRODUCT.md's product truth (paper books → video courses, exam scope) was left for the user to revise deliberately.
 
 Checks: templ generate, Tailwind rebuild, `go build ./...`, `CGO_ENABLED=0 go build ./...`, `go vet ./...` all green; `go test ./internal/web/... ./internal/plan/... ./internal/store/... ./cmd/...` pass; impeccable detector clean. Verified live at 1280 and 390 (Kaynaklar desktop+mobile, İlerleme, Bugün). No commit/push. govulncheck not run (pure UI/CSS, no dep change).
+
+## 2026-11-08 — Unit title/link, leftover units, every session of the day on Bugün
+
+Context: first real study day. A session ran out of time with Antrenman 5 unfinished and nothing surfaced it (the next session started at 6); the second block of the day (Türkçe 16:30) had no visible time or video, and Bugün rendered only `Sessions[0]` once no study was active.
+
+Decisions:
+- **Optional `units.title` / `units.url`** (migration 0003, additive, NULL by default) through save_source/get_sources, the Kaynaklar form and Bugün/Hafta unit rows. A url must be absolute http/https; title at most 200 characters. save_source stays a full replace, so a re-write must resend them. These are references, not study content; PRODUCT's "no content" rule still holds. Values come only from what the user provides.
+- **Leftover = closed session's unfinished unit that no open session covers.** Closed means completed, or started on an earlier day; a past session never started stays in the missed/makeup flow. Exposed as additive `get_progress.leftover_units` and a calm "Kalan birimler" panel. Workey only reports; the assistant re-places units via save_plan.
+- **Unit rows carry `CarriedOver` and `NextDate`** so a closed session says where the rest continues and the next session labels it "Önceki seanstan kalan".
+- **Bugün leads with the first open session** and lists the day's other sessions with their time, start control and units.
+
+Alternatives: automatic re-planning inside the app (rejected: the plan is written by the assistant); per-section playlist link only (rejected: does not answer "which video").
+Consequences: migration test expects 3 rows. TR catalog titles are shortened from the playlist's own titles; links keep the playlist parameter.

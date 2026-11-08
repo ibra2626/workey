@@ -29,12 +29,18 @@ templ unitRow(sessionID int64, u plan.UnitRow, csrf string, screen string, weekS
 		<form method="post" { unitResultForm(screen, sessionID, u.UnitID, weekStart)... }>
 			<input type="hidden" name="_csrf" value={ csrf }/>
 			<div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
-				<p class={ "flex min-w-0 items-center gap-1.5 text-body-small", templ.KV("font-semibold text-ink", u.Done), templ.KV("text-ink-2", !u.Done) }>
-					if u.Done {
-						@icon("i-check", "h-4 w-4 shrink-0 text-ink")
+				<div class="min-w-0">
+					<p class={ "flex min-w-0 items-center gap-1.5 text-body-small", templ.KV("font-semibold text-ink", u.Done), templ.KV("text-ink-2", !u.Done) }>
+						if u.Done {
+							@icon("i-check", "h-4 w-4 shrink-0 text-ink")
+						}
+						{ u.Notation }
+					</p>
+					@unitReference(u)
+					if u.CarriedOver {
+						<p class="mt-0.5 text-meta text-ink-3">Önceki seanstan kalan</p>
 					}
-					{ u.Notation }
-				</p>
+				</div>
 				<div class="flex flex-wrap items-center gap-2.5">
 					if !u.IsVideo {
 						@dybField("correct", "D", u.Correct)
@@ -51,6 +57,16 @@ templ unitRow(sessionID int64, u plan.UnitRow, csrf string, screen string, weekS
 			</div>
 		</form>
 	</li>
+}
+
+// unitReference shows the unit's own title and, when it has a link, opens it in
+// a new tab. A link without a title still needs a readable name.
+templ unitReference(u plan.UnitRow) {
+	if u.URL != "" {
+		<a class="mt-0.5 inline-block text-body-small text-ink underline underline-offset-2 hover:text-ink-hover focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:2px]" href={ templ.URL(u.URL) } target="_blank" rel="noopener noreferrer">{ unitLinkText(u) }</a>
+	} else if u.Title != "" {
+		<p class="mt-0.5 text-body-small text-ink-2">{ u.Title }</p>
+	}
 }
 
 // dybField is one doğru/yanlış/boş numeric input (44px tall for touch), showing

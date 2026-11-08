@@ -57,6 +57,13 @@ type UnitRow struct {
 	Correct  *int   `json:"correct,omitempty"`
 	Wrong    *int   `json:"wrong,omitempty"`
 	Blank    *int   `json:"blank,omitempty"`
+	Title    string `json:"title,omitempty"`
+	URL      string `json:"url,omitempty"`
+	// CarriedOver marks an unfinished unit an earlier, already closed session
+	// also covered. NextDate is the date of the next open session after this one
+	// that covers the unit, or empty when no later session does.
+	CarriedOver bool   `json:"carried_over,omitempty"`
+	NextDate    string `json:"next_date,omitempty"`
 }
 
 // UnitResult is a unit's stored progress for a read model, keyed elsewhere by
@@ -201,6 +208,10 @@ func (s *Service) LoadUnitRows(ctx context.Context, sessions []*SessionView) err
 		if err != nil {
 			return err
 		}
+		timeline, err := s.loadUnitTimeline(ctx, tx, cat)
+		if err != nil {
+			return err
+		}
 		var ids []int64
 		seen := map[int64]bool{}
 		for _, sv := range sessions {
@@ -241,7 +252,9 @@ func (s *Service) LoadUnitRows(ctx context.Context, sessions []*SessionView) err
 					sv.UnitRows[i].Correct = p.Correct
 					sv.UnitRows[i].Wrong = p.Wrong
 					sv.UnitRows[i].Blank = p.Blank
+					continue
 				}
+				timeline.annotate(&sv.UnitRows[i], *sv)
 			}
 		}
 		return nil
@@ -270,7 +283,16 @@ func unitRow(cat *catalog, it ItemView, u store.Unit) UnitRow {
 		Label:   u.Label,
 		Number:  num,
 		IsVideo: cat.sourceKind(it.SourceKey) == kindVideo,
+		Title:   derefString(u.Title),
+		URL:     derefString(u.URL),
 	}
+}
+
+func derefString(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return *v
 }
 
 // UnitResults returns the stored progress for the given unit ids, keyed by unit

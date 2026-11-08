@@ -214,11 +214,13 @@ type SectionInput struct {
 // UnitInput is one study unit inside a section. Label is the source's own word
 // ("Antrenman" / "Test" / "Föy" / "Ders"); the code never enumerates them.
 type UnitInput struct {
-	Ordinal int    `json:"ordinal"`
-	Label   string `json:"label"`
-	Number  *int   `json:"number,omitempty"`
-	LocFrom *int   `json:"loc_from,omitempty"`
-	LocTo   *int   `json:"loc_to,omitempty"`
+	Ordinal int     `json:"ordinal"`
+	Label   string  `json:"label"`
+	Number  *int    `json:"number,omitempty"`
+	LocFrom *int    `json:"loc_from,omitempty"`
+	LocTo   *int    `json:"loc_to,omitempty"`
+	Title   *string `json:"title,omitempty"` // the source's own title for the unit
+	URL     *string `json:"url,omitempty"`   // http/https link to open the unit
 }
 
 // SaveSourceRequest declares one source and its full set of sections/units,

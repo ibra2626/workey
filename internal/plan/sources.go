@@ -14,12 +14,14 @@ import (
 // UnitView is one unit in a catalog read: its id (so a caller can address it
 // with set_unit_result) plus its definition.
 type UnitView struct {
-	ID      int64  `json:"id"`
-	Ordinal int    `json:"ordinal"`
-	Label   string `json:"label"`
-	Number  *int   `json:"number,omitempty"`
-	LocFrom *int   `json:"loc_from,omitempty"`
-	LocTo   *int   `json:"loc_to,omitempty"`
+	ID      int64   `json:"id"`
+	Ordinal int     `json:"ordinal"`
+	Label   string  `json:"label"`
+	Number  *int    `json:"number,omitempty"`
+	LocFrom *int    `json:"loc_from,omitempty"`
+	LocTo   *int    `json:"loc_to,omitempty"`
+	Title   *string `json:"title,omitempty"`
+	URL     *string `json:"url,omitempty"`
 }
 
 // SectionView is one section in a catalog read, with its ordered units.
@@ -99,7 +101,7 @@ func sectionView(sec store.Section, units []store.Unit) SectionView {
 	for _, u := range units {
 		out.Units = append(out.Units, UnitView{
 			ID: u.ID, Ordinal: u.Ordinal, Label: u.Label, Number: u.Number,
-			LocFrom: u.LocFrom, LocTo: u.LocTo,
+			LocFrom: u.LocFrom, LocTo: u.LocTo, Title: u.Title, URL: u.URL,
 		})
 	}
 	return out
@@ -120,6 +122,7 @@ func (s *Service) SaveSource(ctx context.Context, source Source, req SaveSourceR
 	if !source.valid() {
 		return nil, fmt.Errorf("plan: invalid source %q", source)
 	}
+	normalizeUnitLinks(req.Sections)
 	if err := validateSaveSource(req); err != nil {
 		return nil, err
 	}
@@ -302,7 +305,7 @@ func (s *Service) reconcileUnits(ctx context.Context, tx *sql.Tx, sectionID int6
 	for _, in := range units {
 		cur, ok := byOrdinal[in.Ordinal]
 		if !ok {
-			u := store.Unit{SectionID: sectionID, Ordinal: in.Ordinal, Label: in.Label, Number: in.Number, LocFrom: in.LocFrom, LocTo: in.LocTo}
+			u := store.Unit{SectionID: sectionID, Ordinal: in.Ordinal, Label: in.Label, Number: in.Number, LocFrom: in.LocFrom, LocTo: in.LocTo, Title: in.Title, URL: in.URL}
 			if err := s.st.InsertUnit(ctx, tx, &u); err != nil {
 				return err
 			}
@@ -312,6 +315,8 @@ func (s *Service) reconcileUnits(ctx context.Context, tx *sql.Tx, sectionID int6
 		cur.Number = in.Number
 		cur.LocFrom = in.LocFrom
 		cur.LocTo = in.LocTo
+		cur.Title = in.Title
+		cur.URL = in.URL
 		if err := s.st.UpdateUnit(ctx, tx, cur); err != nil {
 			return err
 		}
@@ -336,7 +341,7 @@ func (s *Service) insertSections(ctx context.Context, tx *sql.Tx, sourceID int64
 // insertUnits inserts a section's units.
 func (s *Service) insertUnits(ctx context.Context, tx *sql.Tx, sectionID int64, units []UnitInput) error {
 	for _, in := range units {
-		u := store.Unit{SectionID: sectionID, Ordinal: in.Ordinal, Label: in.Label, Number: in.Number, LocFrom: in.LocFrom, LocTo: in.LocTo}
+		u := store.Unit{SectionID: sectionID, Ordinal: in.Ordinal, Label: in.Label, Number: in.Number, LocFrom: in.LocFrom, LocTo: in.LocTo, Title: in.Title, URL: in.URL}
 		if err := s.st.InsertUnit(ctx, tx, &u); err != nil {
 			return err
 		}
@@ -402,11 +407,13 @@ func (s *Service) auditSource(ctx context.Context, tx *sql.Tx, source Source, ac
 // --- structural snapshots (ids/timestamps excluded) ----------------------
 
 type snapUnit struct {
-	Ordinal int    `json:"ordinal"`
-	Label   string `json:"label"`
-	Number  *int   `json:"number,omitempty"`
-	LocFrom *int   `json:"loc_from,omitempty"`
-	LocTo   *int   `json:"loc_to,omitempty"`
+	Ordinal int     `json:"ordinal"`
+	Label   string  `json:"label"`
+	Number  *int    `json:"number,omitempty"`
+	LocFrom *int    `json:"loc_from,omitempty"`
+	LocTo   *int    `json:"loc_to,omitempty"`
+	Title   *string `json:"title,omitempty"`
+	URL     *string `json:"url,omitempty"`
 }
 
 type snapSection struct {
@@ -436,7 +443,7 @@ func requestSnapshotJSON(req SaveSourceRequest) (string, error) {
 	for _, sec := range req.Sections {
 		ss := snapSection{Ordinal: sec.Ordinal, Name: sec.Name, LocFrom: sec.LocFrom, LocTo: sec.LocTo}
 		for _, u := range sec.Units {
-			ss.Units = append(ss.Units, snapUnit{Ordinal: u.Ordinal, Label: u.Label, Number: u.Number, LocFrom: u.LocFrom, LocTo: u.LocTo})
+			ss.Units = append(ss.Units, snapUnit{Ordinal: u.Ordinal, Label: u.Label, Number: u.Number, LocFrom: u.LocFrom, LocTo: u.LocTo, Title: u.Title, URL: u.URL})
 		}
 		sn.Sections = append(sn.Sections, ss)
 	}
@@ -461,7 +468,7 @@ func (s *Service) sourceSnapshotJSON(ctx context.Context, tx *sql.Tx, src store.
 			return "", err
 		}
 		for _, u := range units {
-			ss.Units = append(ss.Units, snapUnit{Ordinal: u.Ordinal, Label: u.Label, Number: u.Number, LocFrom: u.LocFrom, LocTo: u.LocTo})
+			ss.Units = append(ss.Units, snapUnit{Ordinal: u.Ordinal, Label: u.Label, Number: u.Number, LocFrom: u.LocFrom, LocTo: u.LocTo, Title: u.Title, URL: u.URL})
 		}
 		sn.Sections = append(sn.Sections, ss)
 	}

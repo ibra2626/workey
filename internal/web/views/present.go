@@ -1,6 +1,7 @@
 package views
 
 import (
+	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -26,7 +27,8 @@ const enDash = "–"
 // and Progress read models).
 type TodayPage struct {
 	Day             *plan.DayView
-	Week            *plan.WeekView // this week, for the desktop "Bu hafta" mini chart
+	Leftovers       []plan.LeftoverUnit // unfinished units no open session covers
+	Week            *plan.WeekView      // this week, for the desktop "Bu hafta" mini chart
 	HasPlan         bool
 	WeekNumber      int    // plan week 1..38, 0 outside the plan
 	PhaseName       string // full phase name, e.g. "Faz 1 · İşlem temeli"
@@ -177,6 +179,67 @@ func numSpan(from, to int) string {
 // dk renders a minute count with its unit, e.g. "20 dk".
 func dk(min int) string {
 	return strconv.Itoa(min) + " dk"
+}
+
+// primarySession is the session the Bugün hero leads with: the day's first one
+// still open, or the first one once all are done.
+func primarySession(d *plan.DayView) plan.SessionView {
+	if d != nil {
+		for _, sv := range d.Sessions {
+			if sv.State != plan.StateDone {
+				return sv
+			}
+		}
+	}
+	return firstSession(d)
+}
+
+// otherSessions returns the day's sessions the hero does not show.
+func otherSessions(d *plan.DayView) []plan.SessionView {
+	if d == nil || len(d.Sessions) < 2 {
+		return nil
+	}
+	primary := primarySession(d)
+	out := make([]plan.SessionView, 0, len(d.Sessions)-1)
+	for _, sv := range d.Sessions {
+		if sv.ID != primary.ID {
+			out = append(out, sv)
+		}
+	}
+	return out
+}
+
+// sessionClock renders a session's planned span, e.g. "16:30–18:30 · 120 dk".
+func sessionClock(sv plan.SessionView) string {
+	start, ok := parseHHMM(sv.StartTime)
+	if !ok {
+		return sv.StartTime + " " + middleDot + " " + dk(sv.DurationMin)
+	}
+	end := (start + sv.DurationMin) % (24 * 60)
+	return sv.StartTime + "–" + fmt.Sprintf("%02d:%02d", end/60, end%60) + " " + middleDot + " " + dk(sv.DurationMin)
+}
+
+// remainingLine summarises a closed session's unfinished units and where they
+// continue, or "" when every unit is done.
+func remainingLine(sv plan.SessionView) string {
+	var parts []string
+	for _, u := range sv.UnitRows {
+		if u.Done {
+			continue
+		}
+		parts = append(parts, u.Notation+" "+middleDot+" "+unitNextPlace(u))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "Kalan: " + strings.Join(parts, ", ")
+}
+
+func unitNextPlace(u plan.UnitRow) string {
+	if u.NextDate == "" {
+		return "henüz planda yok"
+	}
+	return plan.FormatShortDate(u.NextDate) + " seansında"
 }
 
 // firstSession returns the day's first session (its evening session), or the
@@ -883,4 +946,23 @@ func percentClass(percent int) string {
 // pct renders a width/height percentage string like "17%".
 func pct(p int) string {
 	return strconv.Itoa(p) + "%"
+}
+
+// optStrValue renders an optional string as a form value.
+func optStrValue(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
+}
+
+// unitLinkText is a unit link's visible name: its own title, or a plain verb.
+func unitLinkText(u plan.UnitRow) string {
+	if u.Title != "" {
+		return u.Title
+	}
+	if u.IsVideo {
+		return "Videoyu aç"
+	}
+	return "Bağlantıyı aç"
 }

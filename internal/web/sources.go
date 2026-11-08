@@ -161,6 +161,8 @@ func parseSaveSource(r *http.Request, key string) (plan.SaveSourceRequest, error
 				Number:  number,
 				LocFrom: unitLocFrom,
 				LocTo:   unitLocTo,
+				Title:   formOptStr(r.PostFormValue(up + "_title")),
+				URL:     formOptStr(r.PostFormValue(up + "_url")),
 			})
 		}
 		req.Sections = append(req.Sections, sec)
@@ -182,6 +184,11 @@ func splitOrdinals(s string) []int {
 		}
 	}
 	return out
+}
+
+// formOptStr returns an optional text field; the service treats blank as absent.
+func formOptStr(v string) *string {
+	return &v
 }
 
 // formOptInt parses an optional integer field: empty is nil, a non-numeric value

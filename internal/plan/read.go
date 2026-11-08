@@ -160,6 +160,9 @@ type ProgressView struct {
 	Streak        int  `json:"streak"`
 	StudiedToday  bool `json:"studied_today"`
 	StudyDayToday bool `json:"study_day_today"`
+	// LeftoverUnits lists units a closed session covered that are still not done
+	// and that no open session covers: the work the plan has lost track of.
+	LeftoverUnits []LeftoverUnit `json:"leftover_units,omitempty"`
 }
 
 // computeStreak counts the consecutive completed study-days ending at (or just
@@ -431,6 +434,9 @@ func (s *Service) Progress(ctx context.Context, examDate clock.Date) (*ProgressV
 	view.DoneHours = FormatHoursTR(view.DoneMin)
 	view.PlannedHours = FormatHoursTR(view.PlannedMin)
 	view.Streak, view.StudiedToday, view.StudyDayToday = computeStreak(all, today)
+	if view.LeftoverUnits, err = s.LeftoverUnits(ctx); err != nil {
+		return nil, err
+	}
 
 	for _, g := range groups {
 		gp := GroupProgress{

@@ -284,6 +284,8 @@ func saveSourceSchema() (*jsonschema.Schema, error) {
 			boundOptional(u, "number", "Optional number the reader sees (e.g. Antrenman 5); defaults to the ordinal when absent.")
 			boundOptional(u, "loc_from", "Optional first location number of the unit, in the source's location unit.")
 			boundOptional(u, "loc_to", "Optional last location number; must be >= loc_from.")
+			setProp(u, "title", "Optional title the source itself gives this unit (e.g. the video's title), at most 200 characters. A reference, never topic content. save_source is a full replace: send it again on every re-write or it is cleared.")
+			setProp(u, "url", "Optional http/https link that opens this unit (e.g. the video's URL). Never invent one. save_source is a full replace: send it again on every re-write or it is cleared.")
 		}
 	}
 

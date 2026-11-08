@@ -168,7 +168,17 @@ templ unitFields(sec plan.SectionView, u plan.UnitView) {
 		@bareNumberField(unitFieldName(sec.Ordinal, u.Ordinal, "number"), "No", optIntValue(u.Number))
 		@bareNumberField(unitFieldName(sec.Ordinal, u.Ordinal, "loc_from"), "Konum başlangıcı", optIntValue(u.LocFrom))
 		@bareNumberField(unitFieldName(sec.Ordinal, u.Ordinal, "loc_to"), "Konum bitişi", optIntValue(u.LocTo))
+		<div class="grid gap-2 md:col-span-4 md:grid-cols-2">
+			@unitLinkField(unitFieldName(sec.Ordinal, u.Ordinal, "title"), "Başlık", "Başlık (isteğe bağlı)", optStrValue(u.Title))
+			@unitLinkField(unitFieldName(sec.Ordinal, u.Ordinal, "url"), "Bağlantı", "Bağlantı (https://…)", optStrValue(u.URL))
+		</div>
 	</div>
+}
+
+// unitLinkField is a unit's optional title or link input; the placeholder names
+// it because the shared header row only labels the four columns above.
+templ unitLinkField(name string, label string, placeholder string, value string) {
+	<input type="text" name={ name } value={ value } aria-label={ label } placeholder={ placeholder } class="h-11 w-full rounded-nav border border-line bg-ground px-3 text-body text-ink focus-visible:outline-2 focus-visible:outline-ink focus-visible:[outline-offset:1px]"/>
 }
 
 // reportFigure is a calm label/value pair (no badge, no bar), shared with the

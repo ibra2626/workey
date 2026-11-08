@@ -43,6 +43,8 @@ type Unit struct {
 	Number    *int
 	LocFrom   *int
 	LocTo     *int
+	Title     *string // the source's own title for the unit (e.g. a video title)
+	URL       *string // link to open the unit (http/https)
 }
 
 // UnitProgress is a unit's study result, stored apart from the catalog so a
@@ -209,7 +211,7 @@ func (s *Store) DeleteSection(ctx context.Context, q dbtx, id int64) error {
 // UnitsBySection returns a section's units ordered by ordinal.
 func (s *Store) UnitsBySection(ctx context.Context, q dbtx, sectionID int64) ([]Unit, error) {
 	rows, err := q.QueryContext(ctx, `
-		SELECT id, section_id, ordinal, label, number, loc_from, loc_to
+		SELECT id, section_id, ordinal, label, number, loc_from, loc_to, title, url
 		FROM units WHERE section_id = ? ORDER BY ordinal`, sectionID)
 	if err != nil {
 		return nil, fmt.Errorf("store: query units of %d: %w", sectionID, err)
@@ -223,7 +225,7 @@ func (s *Store) UnitsBySection(ctx context.Context, q dbtx, sectionID int64) ([]
 // not need a per-section query.
 func (s *Store) UnitsBySource(ctx context.Context, q dbtx, sourceID int64) ([]Unit, error) {
 	rows, err := q.QueryContext(ctx, `
-		SELECT u.id, u.section_id, u.ordinal, u.label, u.number, u.loc_from, u.loc_to
+		SELECT u.id, u.section_id, u.ordinal, u.label, u.number, u.loc_from, u.loc_to, u.title, u.url
 		FROM units u JOIN sections sec ON sec.id = u.section_id
 		WHERE sec.source_id = ?
 		ORDER BY sec.ordinal, u.ordinal`, sourceID)
@@ -238,7 +240,7 @@ func scanUnits(rows *sql.Rows, id int64) ([]Unit, error) {
 	var units []Unit
 	for rows.Next() {
 		var u Unit
-		if err := rows.Scan(&u.ID, &u.SectionID, &u.Ordinal, &u.Label, &u.Number, &u.LocFrom, &u.LocTo); err != nil {
+		if err := rows.Scan(&u.ID, &u.SectionID, &u.Ordinal, &u.Label, &u.Number, &u.LocFrom, &u.LocTo, &u.Title, &u.URL); err != nil {
 			return nil, fmt.Errorf("store: scan unit of %d: %w", id, err)
 		}
 		units = append(units, u)
@@ -252,9 +254,9 @@ func scanUnits(rows *sql.Rows, id int64) ([]Unit, error) {
 // InsertUnit inserts u and sets u.ID.
 func (s *Store) InsertUnit(ctx context.Context, q dbtx, u *Unit) error {
 	res, err := q.ExecContext(ctx, `
-		INSERT INTO units (section_id, ordinal, label, number, loc_from, loc_to)
-		VALUES (?, ?, ?, ?, ?, ?)`,
-		u.SectionID, u.Ordinal, u.Label, u.Number, u.LocFrom, u.LocTo,
+		INSERT INTO units (section_id, ordinal, label, number, loc_from, loc_to, title, url)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.SectionID, u.Ordinal, u.Label, u.Number, u.LocFrom, u.LocTo, u.Title, u.URL,
 	)
 	if err != nil {
 		return fmt.Errorf("store: insert unit: %w", err)
@@ -271,9 +273,9 @@ func (s *Store) InsertUnit(ctx context.Context, q dbtx, u *Unit) error {
 // stable is how a source content re-write preserves the unit's progress.
 func (s *Store) UpdateUnit(ctx context.Context, q dbtx, u Unit) error {
 	res, err := q.ExecContext(ctx, `
-		UPDATE units SET section_id = ?, ordinal = ?, label = ?, number = ?, loc_from = ?, loc_to = ?
+		UPDATE units SET section_id = ?, ordinal = ?, label = ?, number = ?, loc_from = ?, loc_to = ?, title = ?, url = ?
 		WHERE id = ?`,
-		u.SectionID, u.Ordinal, u.Label, u.Number, u.LocFrom, u.LocTo, u.ID,
+		u.SectionID, u.Ordinal, u.Label, u.Number, u.LocFrom, u.LocTo, u.Title, u.URL, u.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("store: update unit %d: %w", u.ID, err)
@@ -416,13 +418,13 @@ type UnitRef struct {
 func (s *Store) UnitByID(ctx context.Context, q dbtx, unitID int64) (*UnitRef, error) {
 	var r UnitRef
 	err := q.QueryRowContext(ctx, `
-		SELECT u.id, u.section_id, u.ordinal, u.label, u.number, u.loc_from, u.loc_to,
+		SELECT u.id, u.section_id, u.ordinal, u.label, u.number, u.loc_from, u.loc_to, u.title, u.url,
 		       sec.ordinal, src.id, src.key, src.name, src.kind, src.location_unit
 		FROM units u
 		JOIN sections sec ON sec.id = u.section_id
 		JOIN sources src ON src.id = sec.source_id
 		WHERE u.id = ?`, unitID,
-	).Scan(&r.ID, &r.SectionID, &r.Ordinal, &r.Label, &r.Number, &r.LocFrom, &r.LocTo,
+	).Scan(&r.ID, &r.SectionID, &r.Ordinal, &r.Label, &r.Number, &r.LocFrom, &r.LocTo, &r.Title, &r.URL,
 		&r.SectionOrdinal, &r.SourceID, &r.SourceKey, &r.SourceName, &r.SourceKind, &r.LocationUnit)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
