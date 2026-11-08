@@ -86,6 +86,14 @@ func studyFirstStep(sv plan.SessionView) string {
 		b := sv.Study.Bookmark
 		return b.Notation + " · " + stageName(b.Stage) + ": s. " + strconv.Itoa(b.ResumePage) + " sayfasından devam et."
 	}
+	for _, u := range sv.UnitRows {
+		if u.IsVideo && !u.Done {
+			if u.Title != "" {
+				return u.Notation + " · " + u.Title + " ile başla."
+			}
+			return u.Notation + " ile başla."
+		}
+	}
 	if len(sv.Items) == 0 {
 		return "Seans kaynaklarını aç."
 	}

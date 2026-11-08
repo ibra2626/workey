@@ -40,8 +40,8 @@ func TestMigrateIdempotent(t *testing.T) {
 		`SELECT COUNT(1) FROM schema_migrations`).Scan(&applied); err != nil {
 		t.Fatalf("count migrations: %v", err)
 	}
-	if applied != 2 {
-		t.Fatalf("schema_migrations rows = %d, want 2", applied)
+	if applied != 3 {
+		t.Fatalf("schema_migrations rows = %d, want 3", applied)
 	}
 
 	// Every table exists.

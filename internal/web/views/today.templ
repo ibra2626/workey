@@ -45,6 +45,12 @@ templ TodayMain(p TodayPage) {
 		<div class="mt-5 grid gap-3 md:gap-5 xl:grid-cols-[1fr_340px]">
 			<div class="min-w-0 space-y-3 md:space-y-5">
 				@TodayPanel(p)
+				@todayLeftovers(p.Leftovers)
+				if p.Day.ActiveStudy == nil && p.HasPlan && !p.AfterExam {
+					for _, sv := range otherSessions(p.Day) {
+						@todayOtherSession(sv, p)
+					}
+				}
 				if p.Day.ActiveStudy != nil {
 					<section id="today-plan" class="rounded-panel bg-card p-5 md:p-8">
 						<h2 class="text-title-lg font-semibold">Bugünün planı</h2>
@@ -52,7 +58,8 @@ templ TodayMain(p TodayPage) {
 							<p class="mt-2 text-body">Bugün dinlenme.</p>
 						} else {
 							for _, sv := range p.Day.Sessions {
-								<p class="mt-3 text-body">{ sv.Notation } · { chapterTitle(sv) }</p>
+								<p class="mt-4 text-meta font-semibold text-ink-3 tnum">{ sessionClock(sv) }</p>
+								<p class="mt-1 text-body">{ sv.Notation } · { chapterTitle(sv) }</p>
 								if sv.ID != p.Day.ActiveStudy.ID {
 									<p class="text-body-small text-ink-2">Başka bir seansa geçmek için önce <a class="study-link" href="#bugun-panel">açık çalışmayı kapat</a>.</p>
 									@studyFinish(sv, p.CSRF)
@@ -62,7 +69,7 @@ templ TodayMain(p TodayPage) {
 						}
 					</section>
 				}
-				if p.Day.LatestPausedStudy != nil && (!p.HasPlan || p.AfterExam || p.Day.IsRest || p.Day.LatestPausedStudy.Date != p.Day.Date || p.Day.ActiveStudy != nil || firstSession(p.Day).ID != p.Day.LatestPausedStudy.ID) {
+				if p.Day.LatestPausedStudy != nil && (!p.HasPlan || p.AfterExam || p.Day.IsRest || p.Day.LatestPausedStudy.Date != p.Day.Date || p.Day.ActiveStudy != nil || primarySession(p.Day).ID != p.Day.LatestPausedStudy.ID) {
 					<section class="rounded-panel bg-card p-5 md:p-8">
 						<h2 class="text-title-lg font-semibold">Kaldığın yer</h2>
 						@studyWorkspace(*p.Day.LatestPausedStudy, p)
@@ -149,12 +156,12 @@ templ todayPlanPanel(p TodayPage) {
 				<h1 class="text-title-lg font-semibold text-ink">Bugün dinlenme.</h1>
 				<p class="mt-2 text-body text-ink-2">Bu akşam planlı seans yok. Yarın { tomorrowHint(p.Day.Tomorrow) }</p>
 			default:
-				if sv := firstSession(p.Day); sv.Study != nil && sv.State != plan.StateDone {
+				if sv := primarySession(p.Day); sv.Study != nil && sv.State != plan.StateDone {
 					<h1 class="text-headline font-bold leading-tight">{ studyTitle(sv) }</h1>
 					<p class="mt-1 text-body text-ink-2">{ studyTopic(sv) }</p>
 					@studyWorkspace(sv, p)
 				} else {
-					@todaySession(firstSession(p.Day), p)
+					@todaySession(primarySession(p.Day), p)
 				}
 		}
 	</section>
@@ -176,6 +183,7 @@ templ todaySession(sv plan.SessionView, p TodayPage) {
 	if sv.TopicGroupName != "" {
 		<p class="mt-1 text-body text-ink-2">Konu: { sv.TopicGroupName }</p>
 	}
+	<p class="mt-1 text-body font-semibold text-ink tnum">{ sessionClock(sv) }</p>
 	if sv.State != plan.StateDone {
 		<p class="mt-3 text-body text-ink-2">{ studyFirstStep(sv) }</p>
 		@studyStart(sv, p)
@@ -237,6 +245,48 @@ templ todaySession(sv plan.SessionView, p TodayPage) {
 	@unitMarking(sv, p.CSRF, "bugun", "")
 	if sv.State == plan.StateDone {
 		@completeControl(sv, p.CSRF)
+		@remainingNote(sv)
+	}
+}
+
+// remainingNote states plainly what a closed session left and where it goes.
+templ remainingNote(sv plan.SessionView) {
+	if line := remainingLine(sv); line != "" {
+		<p class="mt-2 text-body-small text-ink-2">{ line }</p>
+	}
+}
+
+// todayOtherSession is one more session of the day, shown beside the hero so a
+// second block keeps its time, its units and its own way in.
+templ todayOtherSession(sv plan.SessionView, p TodayPage) {
+	<section class="rounded-panel bg-card p-5 md:p-8">
+		<p class="text-meta font-semibold text-ink-3 tnum">{ sessionClock(sv) }</p>
+		<h2 class="mt-1 text-title-lg font-semibold text-ink">{ chapterTitle(sv) }</h2>
+		<p class="mt-1 text-body text-ink-2">{ sv.Notation }</p>
+		if sv.State == plan.StateDone {
+			@completeControl(sv, p.CSRF)
+			@remainingNote(sv)
+		} else {
+			@studyStart(sv, p)
+			@studyFinish(sv, p.CSRF)
+		}
+		@unitMarking(sv, p.CSRF, "bugun", "")
+	</section>
+}
+
+// todayLeftovers lists unfinished units no open session covers. It only names
+// them; placing them in the plan stays the assistant's job.
+templ todayLeftovers(items []plan.LeftoverUnit) {
+	if len(items) > 0 {
+		<section class="rounded-panel bg-card p-5 md:p-8">
+			<h2 class="text-title-lg font-semibold text-ink">Kalan birimler</h2>
+			<p class="mt-1 text-body-small text-ink-2">Bunlar sonraki seanslarda yok. Asistandan planı güncellemesini isteyebilirsin.</p>
+			<ul class="mt-3 divide-y divide-line text-body-small text-ink">
+				for _, u := range items {
+					<li class="py-2">{ u.Notation }<span class="text-ink-3 tnum"> · { plan.FormatShortDate(u.SessionDate) }</span></li>
+				}
+			</ul>
+		</section>
 	}
 }
 

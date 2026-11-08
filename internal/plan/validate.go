@@ -2,6 +2,8 @@ package plan
 
 import (
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 )
 
@@ -195,10 +197,58 @@ func validateSaveSource(req SaveSourceRequest) error {
 				b.add(up+".number", CodeInvalid, "number must be greater than zero")
 			}
 			validateOptionalRange(&b, up, "loc", u.LocFrom, u.LocTo)
+			if u.Title != nil && len([]rune(*u.Title)) > maxUnitTitleRunes {
+				b.add(up+".title", CodeInvalid, "başlık en fazla 200 karakter olabilir")
+			}
+			if u.URL != nil && !validUnitURL(*u.URL) {
+				b.add(up+".url", CodeInvalid, "bağlantı http veya https ile başlayan geçerli bir adres olmalı")
+			}
 		}
 	}
 
 	return b.result()
+}
+
+// maxUnitTitleRunes and maxUnitURLBytes bound a unit's optional reference fields.
+const (
+	maxUnitTitleRunes = 200
+	maxUnitURLBytes   = 2048
+)
+
+// validUnitURL accepts only absolute http/https links with a host, so a stored
+// link is always safe to render as a clickable href.
+func validUnitURL(raw string) bool {
+	if len(raw) > maxUnitURLBytes {
+		return false
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return false
+	}
+	return u.Scheme == "http" || u.Scheme == "https"
+}
+
+// normalizeUnitLinks trims each unit's optional title and url and treats a blank
+// value as absent, so a form's empty input and an omitted field store the same.
+func normalizeUnitLinks(sections []SectionInput) {
+	for i := range sections {
+		for k := range sections[i].Units {
+			u := &sections[i].Units[k]
+			u.Title = trimmedOrNil(u.Title)
+			u.URL = trimmedOrNil(u.URL)
+		}
+	}
+}
+
+func trimmedOrNil(v *string) *string {
+	if v == nil {
+		return nil
+	}
+	t := strings.TrimSpace(*v)
+	if t == "" {
+		return nil
+	}
+	return &t
 }
 
 // validateSaveOutline checks phases and topic groups without touching the store:

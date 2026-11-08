@@ -371,6 +371,7 @@ func (a *Auth) buildTodayPage(ctx context.Context, csrf string) (views.TodayPage
 		WeekPlannedMin: wk.PlannedMin,
 		SessionsDone:   wk.SessionsDone,
 		SessionsPlan:   wk.SessionsPlanned,
+		Leftovers:      prog.LeftoverUnits,
 		CSRF:           csrf,
 	}
 	p.PhaseLabel, p.PhaseBlocks = phaseBlocks(prog)
